@@ -190,3 +190,6 @@ Essential Mod's source code.
 
 This summary is not an exhaustive interpretation of the license; for a comprehensive understanding, please refer to [the
 full license file](https://github.com/EssentialGG/Essential/blob/main/LICENSE).
+
+https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository
+> If you publish your source code in a public repository on GitHub, according to the [Terms of Service](https://docs.github.com/en/site-policy/github-terms/github-terms-of-service), other users of GitHub.com have the right to view and fork your repository. If you have already created a repository and no longer want users to have access to the repository, you can make the repository private. When you change the visibility of a repository to private, existing forks or local copies created by other users will still exist. For more information, see [Setting repository visibility](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/setting-repository-visibility).
