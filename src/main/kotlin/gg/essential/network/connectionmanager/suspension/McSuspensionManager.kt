@@ -12,12 +12,15 @@
 package gg.essential.network.connectionmanager.suspension
 
 import gg.essential.Essential
+import gg.essential.api.gui.GuiRequiresTOS
 import gg.essential.gui.InternalEssentialGUI
+import gg.essential.gui.friends.SocialMenu
 import gg.essential.gui.modals.SuspensionModal
 import gg.essential.gui.overlay.ModalFlow
 import gg.essential.network.connectionmanager.ConnectionManager
 import gg.essential.network.connectionmanager.social.Suspension
 import gg.essential.universal.UMinecraft
+import gg.essential.universal.UScreen
 import gg.essential.util.GuiUtil
 import gg.essential.util.isMainMenu
 import net.minecraft.client.gui.GuiIngameMenu
@@ -43,6 +46,7 @@ class McSuspensionManager(connectionManager: ConnectionManager) : SuspensionMana
 suspend fun ModalFlow.suspensionModal(suspension: Suspension) {
     val connectionManager = Essential.getInstance().connectionManager
     val suspensionManager = connectionManager.suspensionManager
+
     awaitModal { continuation ->
         suspensionManager.markSeen()
         SuspensionModal(
@@ -51,5 +55,10 @@ suspend fun ModalFlow.suspensionModal(suspension: Suspension) {
             connectionManager.chatManager.getReportReasons(UMinecraft.getSettings().language),
             continuation
         )
+    }
+
+    val openedScreen = GuiUtil.openedScreen()
+    if (openedScreen is InternalEssentialGUI && (openedScreen is SocialMenu || (suspension.isPermanent && openedScreen is GuiRequiresTOS))) {
+        UScreen.displayScreen(null)
     }
 }

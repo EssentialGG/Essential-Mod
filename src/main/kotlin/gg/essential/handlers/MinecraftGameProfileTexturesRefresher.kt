@@ -67,7 +67,7 @@ object MinecraftGameProfileTexturesRefresher {
         //$$ val newProfile = GameProfile(profile.id, profile.name, PropertyMap(propertyMap))
         //#else
         //$$ val newProfile = GameProfile(profile.id, profile.name)
-        //$$ profile.properties.putAll(propertyMap)
+        //$$ newProfile.properties.putAll(propertyMap)
         //#endif
         //$$ (MinecraftClient.getInstance() as MinecraftAccessor).setGameProfileFuture(
         //$$         CompletableFuture.completedFuture(ProfileResult(newProfile, setOf()))

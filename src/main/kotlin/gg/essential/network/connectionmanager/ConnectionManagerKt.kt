@@ -70,6 +70,8 @@ abstract class ConnectionManagerKt : CMConnection {
     val outdated: Boolean
         get() = connectionStatus.get() == Status.OUTDATED
 
+    protected val mutableConnectionUriState = mutableStateOf<String?>(null)
+    val connectionUriState: State<String?> = mutableConnectionUriState
     @JvmField
     protected var connection: Connection? = null
 

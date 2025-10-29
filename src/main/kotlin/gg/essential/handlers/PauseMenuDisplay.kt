@@ -357,9 +357,7 @@ class PauseMenuDisplay {
         }
 
         //#if MC>=11600
-        //$$ if (screen is IngameMenuScreen && screen is GuiScreenAccessor &&
-        //$$     (screen.`essential$getChildren`().isEmpty() || (screen.`essential$getChildren`().size == 1 &&
-        //$$             screen.`essential$getChildren`().any { it is Widget && it.message == textTranslatable("menu.paused") } ))) {
+        //$$ if (screen is IngameMenuScreen && screen.title == textTranslatable("menu.paused")) {
         //$$     return // F3+Esc
         //$$ }
         //#endif

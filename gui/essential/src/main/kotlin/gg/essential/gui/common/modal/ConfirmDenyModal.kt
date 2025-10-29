@@ -55,14 +55,6 @@ open class ConfirmDenyModal(
         get() = cancelButtonTextState.get()
         set(value) = cancelButtonTextState.set(value)
 
-    var cancelButtonStyle: StyledButton.Style
-        get() = cancelButtonStyleState.get()
-        set(value) = cancelButtonStyleState.set(value)
-
-    var cancelButtonEnabled: Boolean
-        get() = cancelButtonEnabledState.get()
-        set(value) = cancelButtonEnabledState.set(value)
-
     val cancelButton: UIComponent by OutlineButton(
             cancelButtonStyleState.toV2(),
             cancelButtonEnabledState.not().toV2(),

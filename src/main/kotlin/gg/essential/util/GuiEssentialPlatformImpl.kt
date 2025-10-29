@@ -80,6 +80,7 @@ import gg.essential.network.connectionmanager.media.IScreenshotManager
 import gg.essential.network.connectionmanager.notices.INoticesManager
 import gg.essential.network.connectionmanager.skins.SkinsManager
 import gg.essential.network.connectionmanager.social.ProfileSuspension
+import gg.essential.network.connectionmanager.suspension.SuspensionManager
 import gg.essential.sps.SpsAddress
 import gg.essential.universal.UGraphics
 import gg.essential.universal.UImage
@@ -545,4 +546,7 @@ class GuiEssentialPlatformImpl : GuiEssentialPlatform {
     // TODO: Eventually move to :gui:essential project
     override val modalPrerequisites
         get() = McModalPrerequisites
+
+    override val suspensionManager: SuspensionManager
+        get() = Essential.getInstance().connectionManager.suspensionManager
 }

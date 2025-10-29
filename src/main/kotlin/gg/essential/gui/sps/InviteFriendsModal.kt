@@ -72,7 +72,8 @@ object InviteFriendsModal {
         callbackAfterOpen: () -> Unit = {},
     ): ConfirmDenyModal {
 
-        val spsManager = Essential.getInstance().connectionManager.spsManager
+        val connectionManager = Essential.getInstance().connectionManager
+        val spsManager = connectionManager.spsManager
         val integratedServer =
             if (worldSummary != null) null
             else getMinecraft().integratedServer.takeIf { getMinecraft().isIntegratedServerRunning }

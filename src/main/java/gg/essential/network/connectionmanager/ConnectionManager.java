@@ -453,6 +453,7 @@ public class ConnectionManager extends ConnectionManagerKt {
 
     protected void completeConnection(Connection connection) {
         this.connection = connection;
+        this.getMutableConnectionUriState().set(connection.getURI().toString());
 
         for (NetworkedManager manager : this.managers) {
             manager.onConnected();
@@ -471,6 +472,7 @@ public class ConnectionManager extends ConnectionManagerKt {
         if (this.connection != null) {
             this.previouslyConnectedProtocol = this.connection.getUsingProtocol();
             this.connection = null;
+            this.getMutableConnectionUriState().set((ignored) -> null);
         }
         this.modsSent = false;
 

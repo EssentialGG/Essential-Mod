@@ -26,7 +26,6 @@ import gg.essential.elementa.utils.ObservableList
 import gg.essential.gui.EssentialPalette
 import gg.essential.gui.common.modal.EssentialModal
 import gg.essential.gui.common.modal.configure
-import gg.essential.gui.elementa.state.v2.MutableState
 import gg.essential.gui.elementa.state.v2.State
 import gg.essential.gui.elementa.state.v2.addAll
 import gg.essential.gui.elementa.state.v2.collections.MutableTrackedList
@@ -208,18 +207,6 @@ suspend fun ModalFlow.selectFriendsToGiftModal(
     validFriends: State<MutableTrackedList<UUID>>,
     loadingFriends: State<Boolean>,
 ): Set<UUID>? {
-    fun LayoutScope.addRemoveCheckbox(selected: MutableState<Boolean>) {
-        val hoverColor = selected.map { if (it) EssentialPalette.CHECKBOX_SELECTED_BACKGROUND_HOVER else EssentialPalette.CHECKBOX_BACKGROUND_HOVER }
-        val colorModifier = Modifier.color(EssentialPalette.CHECKBOX_BACKGROUND)
-            .whenTrue(!selected, Modifier.outline(EssentialPalette.CHECKBOX_OUTLINE, 1f, true))
-            .whenTrue(selected, Modifier.color(EssentialPalette.CHECKBOX_SELECTED_BACKGROUND))
-
-        box(colorModifier.width(9f).heightAspect(1f).hoverScope().hoverColor(hoverColor)) {
-            if_(selected) {
-                image(EssentialPalette.CHECKMARK_7X5, Modifier.color(EssentialPalette.TEXT_HIGHLIGHT))
-            }
-        }
-    }
 
     return selectModal(
         "Select friends to gift\nthem ${ChatColor.WHITE + item.name + ChatColor.RESET}.", "SelectFriendsToGift"
@@ -244,7 +231,7 @@ suspend fun ModalFlow.selectFriendsToGiftModal(
             box(Modifier.fillParent()) {
                 row(Modifier.fillParent(padding = 3f)) {
                     playerEntry(selected, uuid)
-                    addRemoveCheckbox(selected)
+                    checkboxAlt(selected)
                 }
             }.onLeftClick { event ->
                 USound.playButtonPress()

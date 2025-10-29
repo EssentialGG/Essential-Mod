@@ -31,4 +31,5 @@ public class ServerRecognizedTelemetryPacket extends Packet {
     public List<String> getRecognizedTelemetry() {
         return this.recognizedTelemetry;
     }
+
 }

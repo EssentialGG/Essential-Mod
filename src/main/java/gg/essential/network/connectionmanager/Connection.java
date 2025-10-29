@@ -93,7 +93,7 @@ public class Connection extends WebSocketClient {
         }
     });
 
-    private static final URI CM_HOST_URI;
+    private static URI CM_HOST_URI;
     static {
         String defaultUri = "wss://connect.essential.gg/v1";
         URI uri = URI.create(

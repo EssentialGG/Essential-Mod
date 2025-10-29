@@ -90,19 +90,19 @@ public class EssentialKeybindingRegistry {
     public KeyBinding[] registerKeyBinds(KeyBinding[] allBindings) {
         new EssentialKeybinding("ESSENTIAL_FRIENDS", CATEGORY, UKeyboard.KEY_H).requiresEssentialFull().withInitialPress(() -> {
             if (!UKeyboard.isKeyDown(UKeyboard.KEY_F3) && UMinecraft.getMinecraft().currentScreen == null) {
-                Multithreading.runAsync(() -> GuiUtil.openScreen(SocialMenu.class, SocialMenu::new));
+                GuiUtil.openScreen(SocialMenu.class, SocialMenu::new);
             }
         });
 
         EssentialKeybinding studio = new EssentialKeybinding("COSMETIC_STUDIO", CATEGORY, UKeyboard.KEY_B).withInitialPress(() -> {
             if (!UKeyboard.isKeyDown(UKeyboard.KEY_F3) && UMinecraft.getMinecraft().currentScreen == null) {
-                Multithreading.runAsync(() -> GuiUtil.openScreen(Wardrobe.class, Wardrobe::new));
+                GuiUtil.openScreen(Wardrobe.class, Wardrobe::new);
             }
         });
 
         new EssentialKeybinding("SCREENSHOT_MANAGER", CATEGORY, UKeyboard.KEY_I).requiresEssentialFull().withInitialPress(() -> {
             if (!UKeyboard.isKeyDown(UKeyboard.KEY_F3) && UMinecraft.getMinecraft().currentScreen == null) {
-                Multithreading.runAsync(() -> GuiUtil.openScreen(ScreenshotBrowser.class, ScreenshotBrowser::new));
+                GuiUtil.openScreen(ScreenshotBrowser.class, ScreenshotBrowser::new);
             }
         });
 

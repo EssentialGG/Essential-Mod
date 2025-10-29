@@ -101,7 +101,7 @@ class EssentialServerSelectionList(
             }
             server.resourceMode = ServerData.ServerResourceMode.PROMPT
             UUIDUtil.getName(session.hostUUID).thenAcceptAsync({
-                server.serverName = if (it.endsWith("s", true)) "$it'" else "$it's"
+                server.serverName = (if (it.endsWith("s", true)) "$it'" else "$it's") + " world"
             }, UMinecraft.getMinecraft().executor)
             entries[address] = server
         }

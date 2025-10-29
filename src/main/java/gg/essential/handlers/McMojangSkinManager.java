@@ -72,10 +72,10 @@ public class McMojangSkinManager extends MojangSkinManager {
     }
 
     @Nullable
-    protected synchronized Skin updateSkinNow(boolean notification, boolean userSet) {
-        Skin updatedSkin = super.updateSkinNow(notification, userSet);
+    protected synchronized Skin updateSkinNow(boolean notification, boolean ignoreForClientUpdate) {
+        Skin updatedSkin = super.updateSkinNow(notification, ignoreForClientUpdate);
         // If the skin is set in the mojang api successfully, we want to also update the client's values
-        if (updatedSkin != null) {
+        if (updatedSkin != null && !ignoreForClientUpdate) {
             MinecraftGameProfileTexturesRefresher.INSTANCE.updateTextures(updatedSkin.getHash(), "SKIN");
         }
         return updatedSkin;

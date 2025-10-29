@@ -16,6 +16,7 @@ import gg.essential.gui.EssentialPalette
 import gg.essential.gui.common.Checkbox
 import gg.essential.gui.elementa.state.v2.MutableState
 import gg.essential.gui.elementa.state.v2.State
+import gg.essential.gui.elementa.state.v2.combinators.not
 import gg.essential.gui.elementa.state.v2.stateOf
 import gg.essential.universal.USound
 import gg.essential.util.onLeftClick
@@ -39,9 +40,12 @@ fun LayoutScope.checkbox(
 
 // Alternative checkbox style used in modern modals
 fun LayoutScope.checkboxAlt(selected: MutableState<Boolean>, modifier: Modifier = Modifier, disabled: State<Boolean> = stateOf(false)) {
-    val selectedModifier = Modifier.color(EssentialPalette.LINK).whenTrue(disabled, Modifier.color(EssentialPalette.LINK.darker()), Modifier.hoverColor(EssentialPalette.LINK_HIGHLIGHT))
-    val outlineColorModifier = Modifier.whenTrue(selected, selectedModifier, Modifier.color(EssentialPalette.CHECKBOX_OUTLINE).whenTrue(disabled, Modifier.color(EssentialPalette.CHECKBOX_OUTLINE.darker())))
-    val innerColorModifier = Modifier.whenTrue(selected, selectedModifier, Modifier.color(EssentialPalette.BUTTON).whenTrue(disabled, Modifier.color(EssentialPalette.BUTTON.darker()), Modifier.hoverColor(EssentialPalette.BUTTON_HIGHLIGHT)))
+    val selectedModifier = Modifier.color(EssentialPalette.CHECKBOX_SELECTED_BACKGROUND)
+        .whenTrue(disabled, Modifier.color(EssentialPalette.CHECKBOX_SELECTED_BACKGROUND.darker()), Modifier.hoverColor(EssentialPalette.CHECKBOX_SELECTED_BACKGROUND_HOVER))
+    val outlineColorModifier = Modifier.whenTrue(selected, selectedModifier, Modifier.color(EssentialPalette.CHECKBOX_OUTLINE)
+        .whenTrue(disabled, Modifier.color(EssentialPalette.CHECKBOX_OUTLINE.darker())))
+    val innerColorModifier = Modifier.whenTrue(selected, selectedModifier, Modifier.color(EssentialPalette.CHECKBOX_BACKGROUND)
+        .whenTrue(disabled, Modifier.color(EssentialPalette.CHECKBOX_BACKGROUND.darker()), Modifier.hoverColor(EssentialPalette.CHECKBOX_BACKGROUND_HOVER)))
 
     box(Modifier.width(9f).heightAspect(1f).hoverScope() then outlineColorModifier then modifier) {
         box(Modifier.width(7f).heightAspect(1f) then innerColorModifier) {

@@ -42,6 +42,7 @@ import gg.essential.network.connectionmanager.features.DisabledFeaturesManager
 import gg.essential.network.connectionmanager.media.IScreenshotManager
 import gg.essential.network.connectionmanager.notices.INoticesManager
 import gg.essential.network.connectionmanager.skins.SkinsManager
+import gg.essential.network.connectionmanager.suspension.SuspensionManager
 import gg.essential.universal.UImage
 import gg.essential.universal.utils.ReleasedDynamicTexture
 import gg.essential.util.image.GpuTexture
@@ -201,6 +202,8 @@ interface GuiEssentialPlatform {
 
     // TODO: Eventually move override to :gui:essential project
     val modalPrerequisites: ModalPrerequisites
+
+    val suspensionManager: SuspensionManager
 
     interface Keybind {
         val isBound: Boolean

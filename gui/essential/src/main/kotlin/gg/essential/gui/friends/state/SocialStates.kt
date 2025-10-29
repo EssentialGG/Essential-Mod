@@ -214,12 +214,12 @@ interface IMessengerStates {
     /**
      * Deletes [message] from the channel it is in
      */
-    fun deleteMessage(message: ClientMessage) = deleteMessage(message.id, message.channel.id)
+    fun deleteMessage(message: ClientMessage) = deleteMessage(message.channel.id, message.id)
 
     /**
      * Deletes [message] from the channel it is in
      */
-    fun deleteMessage(message: Message) = deleteMessage(message.id, message.channelId)
+    fun deleteMessage(message: Message) = deleteMessage(message.channelId, message.id)
 
     fun leaveGroup(channelId: Long)
 

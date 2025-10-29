@@ -11,9 +11,12 @@
  */
 package gg.essential.gui.modals
 
+import gg.essential.gui.elementa.state.v2.await
 import gg.essential.gui.overlay.ModalFlow
 import gg.essential.util.GuiEssentialPlatform.Companion.platform
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 abstract class ModalPrerequisites {
 
@@ -61,6 +64,11 @@ suspend fun ModalFlow.ensurePrerequisites(
         }
 
         ensurePrerequisitesInternal(prerequisites)
+
+        modalManager.coroutineScope.launch {
+            platform.suspensionManager.activeSuspension.await { it != null && (social || it.isPermanent) }
+            modalManager.coroutineScope.cancel()
+        }
     }
 }
 
