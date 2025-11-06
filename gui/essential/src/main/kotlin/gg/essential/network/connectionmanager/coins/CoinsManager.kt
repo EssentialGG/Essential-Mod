@@ -39,6 +39,7 @@ import gg.essential.network.registerPacketHandler
 import gg.essential.util.*
 import gg.essential.util.GuiEssentialPlatform.Companion.platform
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory

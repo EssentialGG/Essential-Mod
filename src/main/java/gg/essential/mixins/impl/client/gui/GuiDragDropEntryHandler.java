@@ -475,6 +475,15 @@ public class
      * otherwise only ever place the indicator at 0, matching vanilla behaviour
      */
     public void handleIndicatorForNonReorderingList(List<E> listThatWontReorder, @Nullable List<E> otherList) {
+        // do not place indicator if the dragged entry must only return to its original list and this is not the original list
+        if (draggedEntryState.mustReturnToOriginalList && listThatWontReorder != draggedEntryState.originalContainer) {
+            if (clearListIndicators(listThatWontReorder, otherList)) runForDrawChange.run();
+            // allow sounds as we must have moved the drag, should have already been set by placeIndicatorOutsideOfLists(),
+            // but may have been missed if the user has really low fps
+            draggedEntryState.allowDropSound();
+            return;
+        }
+
         if (listThatWontReorder.contains(indicatorEntry)) return; // nothing to do
 
         draggedEntryState.allowDropSound();
@@ -533,8 +542,9 @@ public class
         // if the drag has left the lists then we will allow the drop sound even if it returns to its original spot
         draggedEntryState.allowDropSound();
 
-        // place the indicator entry in the original locator to indicate where it will snap back too
-        if (draggedEntryState.originalContainer.get(draggedEntryState.originalIndex) != indicatorEntry) {
+        // place the indicator entry in the original location to indicate where it will snap back too
+        if (draggedEntryState.originalContainer.size() == draggedEntryState.originalIndex // was the last entry and there is no indicator replacing it yet
+                || draggedEntryState.originalContainer.get(draggedEntryState.originalIndex) != indicatorEntry) {
             clearListIndicators(list, otherList);
             draggedEntryState.originalContainer.add(draggedEntryState.originalIndex, indicatorEntry);
             runForDrawChange.run();

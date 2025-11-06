@@ -11,11 +11,13 @@
  */
 package gg.essential.config
 
+import com.sparkuniverse.toolbox.relationships.enums.FriendRequestPrivacySetting
 import gg.essential.gui.common.modal.DangerConfirmationEssentialModal
 import gg.essential.gui.common.modal.configure
 import gg.essential.gui.elementa.state.v2.*
 import gg.essential.gui.elementa.state.v2.combinators.*
 import gg.essential.gui.overlay.ModalManager
+import gg.essential.gui.screenshot.toast.ScreenshotPreviewAction
 import gg.essential.gui.screenshot.toast.ScreenshotPreviewActionSlot
 import gg.essential.mod.vigilance2.Vigilant2
 import gg.essential.util.GuiEssentialPlatform
@@ -35,8 +37,7 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
     val sendServerUpdatesState = property("Privacy.General.Display Current Server", false)
     var sendServerUpdates by sendServerUpdatesState
 
-    // options = ["Anyone", "Friends Of Friends", "Nobody"]
-    val friendRequestPrivacyState = property("Privacy.General.Friend Privacy Settings", 0)
+    val friendRequestPrivacyState = property("Privacy.General.Friend Privacy Settings", FriendRequestPrivacySetting.ANY_ONE)
     var friendRequestPrivacy by friendRequestPrivacyState
 
     val streamerModeState = property("General.General.Streamer Mode", false)
@@ -69,8 +70,12 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
     val spsIPWarningState = property("Notifications.General.Host World IP Warning", true)
     var spsIPWarning by spsIPWarningState
 
-    // options = ["3", "5", "7"] (seconds)
-    val screenshotToastDurationState = property("Notifications.General.Screenshot Toast Duration", 1)
+    enum class ScreenshotToastDuration(val seconds: Int) {
+        SHORT(3),
+        MEDIUM(5),
+        LONG(7),
+    }
+    val screenshotToastDurationState = property("Notifications.General.Screenshot Toast Duration", ScreenshotToastDuration.MEDIUM)
     var screenshotToastDuration by screenshotToastDurationState
 
     val zoomSmoothCameraState = property("Quality of Life.Zoom.Smooth Camera when Zoomed", true)
@@ -105,8 +110,10 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
     val autoUpdateState = mutableStateOf(false)
     var autoUpdate by autoUpdateState
 
-    // options = ["Full", "Minimal", "Off"]
-    val essentialMenuLayoutState = property("General.Experience.Essential Menu Layout", 0)
+    enum class EssentialMenuLayout(val label: String) {
+        FULL("Full"), MINIMAL("Minimal"), OFF("Off")
+    }
+    val essentialMenuLayoutState = property("General.Experience.Essential Menu Layout", EssentialMenuLayout.FULL)
     var essentialMenuLayout by essentialMenuLayoutState
 
     val closerMenuSidebarState = property("General.Experience.Closer placement of Minimal Essential Menu", true)
@@ -155,13 +162,16 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
     val disableCosmeticsInInventoryState = property("Cosmetics.General.Disable cosmetics in inventory", false)
     var disableCosmeticsInInventory: Boolean by disableCosmeticsInInventoryState
 
-    // options = ["Only show armor", "Only show cosmetics", "Show cosmetics and armor"]
-    val cosmeticArmorSettingSelfState = property("Cosmetics.General.Cosmetic & Armor Conflict - On Myself", 0)
-    var cosmeticArmorSettingSelf: Int by cosmeticArmorSettingSelfState
+    enum class CosmeticOrArmor(val label: String) {
+        ONLY_ARMOR("Only armor"),
+        ONLY_COSMETICS("Only cosmetics"),
+        BOTH("Cosmetics and armor"),
+    }
+    val cosmeticArmorSettingSelfState = property("Cosmetics.General.Cosmetic & Armor Conflict - On Myself", CosmeticOrArmor.ONLY_ARMOR)
+    var cosmeticArmorSettingSelf by cosmeticArmorSettingSelfState
 
-    // options = ["Only show armor", "Only show cosmetics", "Show cosmetics and armor"]
-    val cosmeticArmorSettingOtherState = property("Cosmetics.General.Cosmetic & Armor Conflict - On Others", 0)
-    var cosmeticArmorSettingOther: Int by cosmeticArmorSettingOtherState
+    val cosmeticArmorSettingOtherState = property("Cosmetics.General.Cosmetic & Armor Conflict - On Others", CosmeticOrArmor.ONLY_ARMOR)
+    var cosmeticArmorSettingOther by cosmeticArmorSettingOtherState
 
     // Choose whether to use rear or front facing third person perspective when emoting.
     // options = ["Rear", "Front"]
@@ -205,22 +215,26 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
      * Remember to change in both places at once
      */
 
-    val screenshotOverlayTopLeftActionState = property("Quality of Life.Screenshots.Screenshot Quick Action #1 - Top Left", ScreenshotPreviewActionSlot.TOP_LEFT.defaultAction.ordinal)
+    val screenshotOverlayTopLeftActionState = property("Quality of Life.Screenshots.Screenshot Quick Action #1 - Top Left", ScreenshotPreviewActionSlot.TOP_LEFT.defaultAction)
     var screenshotOverlayTopLeftAction by screenshotOverlayTopLeftActionState
 
-    val screenshotOverlayTopRightActionState = property("Quality of Life.Screenshots.Screenshot Quick Action #2 - Top Right", ScreenshotPreviewActionSlot.TOP_RIGTH.defaultAction.ordinal)
+    val screenshotOverlayTopRightActionState = property("Quality of Life.Screenshots.Screenshot Quick Action #2 - Top Right", ScreenshotPreviewActionSlot.TOP_RIGTH.defaultAction)
     var screenshotOverlayTopRightAction by screenshotOverlayTopRightActionState
 
-    val screenshotOverlayBottomLeftActionState = property("Quality of Life.Screenshots.Screenshot Quick Action #3 - Bottom Left", ScreenshotPreviewActionSlot.BOTTOM_LEFT.defaultAction.ordinal)
+    val screenshotOverlayBottomLeftActionState = property("Quality of Life.Screenshots.Screenshot Quick Action #3 - Bottom Left", ScreenshotPreviewActionSlot.BOTTOM_LEFT.defaultAction)
     var screenshotOverlayBottomLeftAction by screenshotOverlayBottomLeftActionState
 
-    val screenshotOverlayBottomRightActionState = property("Quality of Life.Screenshots.Screenshot Quick Action #4 - Bottom Right", ScreenshotPreviewActionSlot.BOTTOM_RIGHT.defaultAction.ordinal)
+    val screenshotOverlayBottomRightActionState = property("Quality of Life.Screenshots.Screenshot Quick Action #4 - Bottom Right", ScreenshotPreviewActionSlot.BOTTOM_RIGHT.defaultAction)
     var screenshotOverlayBottomRightAction by screenshotOverlayBottomRightActionState
 
     //endregion
 
-    // options = ["Nothing", "Copy Image", "Copy URL"]
-    val postScreenshotActionState = property("Quality of Life.Screenshots.Post Screenshot Action", 0)
+    enum class PostScreenshotAction(val label: String) {
+        NOTHING("Nothing"),
+        COPY_IMAGE("Copy Image"),
+        COPY_URL("Copy URL"),
+    }
+    val postScreenshotActionState = property("Quality of Life.Screenshots.Post Screenshot Action", PostScreenshotAction.NOTHING)
     var postScreenshotAction by postScreenshotActionState
 
     override val useVanillaButtonForRetexturing = property("General.Experience.Use vanilla button texture", false)
@@ -228,8 +242,8 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
     val shouldDarkenRetexturedButtonsState = property("General.Experience.Darken re-textured menu buttons", false)
     override var shouldDarkenRetexturedButtons by shouldDarkenRetexturedButtonsState
 
-    // options = ["12 Hour", "24 Hour"]
-    val timeFormatState = property("General.General.Timestamps Format", 0)
+    enum class TimeFormat(val label: String) { AM_PM("12 Hour"), REGULAR("24 Hour") }
+    val timeFormatState = property("General.General.Timestamps Format", TimeFormat.AM_PM)
     var timeFormat by timeFormatState
 
     val showQuickActionBarState = property("General.Experience.Quick Action Bar", true)
@@ -383,7 +397,7 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
                 selector(timeFormatState) {
                     name = "Timestamps format"
                     description = "Choose between using 12 or 24 hour time for dates/timestamps in Essential menus."
-                    options = listOf("12 Hour", "24 Hour")
+                    options = TimeFormat.entries.map { it.label }
                 }
             }
         }
@@ -434,18 +448,22 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
                             description = "Hide particle effects coming from your equipped cosmetics in first person."
                         }
 
-                        val swapFirstTwo: (Int) -> Int = { if (it in 0..1) (it + 1) % 2 else it }
+                        val cosmeticArmorSettingsOrdered = listOf(
+                            CosmeticOrArmor.ONLY_COSMETICS,
+                            CosmeticOrArmor.ONLY_ARMOR,
+                            CosmeticOrArmor.BOTH,
+                        )
 
-                        selector(cosmeticArmorSettingSelfState.bimap(swapFirstTwo, swapFirstTwo)) {
+                        selector(cosmeticArmorSettingSelfState, cosmeticArmorSettingsOrdered) {
                             name = "Cosmetics & armor visibility on me"
                             description = "Cosmetics and armor may conflict with each other on your player. This setting does not affect what other players see."
-                            options = listOf("Only cosmetics", "Only armor", "Cosmetics and armor")
+                            options = cosmeticArmorSettingsOrdered.map { it.label }
                         }
 
-                        selector(cosmeticArmorSettingOtherState.bimap(swapFirstTwo, swapFirstTwo)) {
+                        selector(cosmeticArmorSettingOtherState, cosmeticArmorSettingsOrdered) {
                             name = "Cosmetics & armor visibility on others"
                             description = "Cosmetics and armor may conflict with each other on other players. This setting does not affect what other players see."
-                            options = listOf("Only cosmetics", "Only armor", "Cosmetics and armor")
+                            options = cosmeticArmorSettingsOrdered.map { it.label }
                         }
 
                         switch(disableCosmeticsInInventoryState) {
@@ -509,7 +527,7 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
                 selector(essentialMenuLayoutState) {
                     name = "Essential menu layout"
                     description = "Choose the layout of the Essential buttons on the main and pause menu."
-                    options = listOf("Full", "Minimal", "Off")
+                    options = EssentialMenuLayout.entries.map { it.label }
                 }
                 switch(useVanillaButtonForRetexturing) {
                     name = "Use Minecraft button texture"
@@ -563,37 +581,37 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
                     name = "Screenshot preview"
                     description = "Shows a screenshot preview with quick-actions on capture."
                 }
-                val quickActionOptions = listOf("Share to Friends", "Copy Picture", "Copy Link", "Favorite", "Edit", "Delete")
 
-                selector(screenshotOverlayTopLeftActionState.reorderScreenshotQuickActions()) {
+                val quickActionOptions = ScreenshotPreviewAction.DISPLAY_ORDER
+                selector(screenshotOverlayTopLeftActionState, quickActionOptions) {
                     name = "Screenshot quick-action #1"
                     description = "Select an action for the top left screenshot quick-action slot."
-                    options = quickActionOptions
+                    options = quickActionOptions.map { it.displayName }
                 }
-                selector(screenshotOverlayTopRightActionState.reorderScreenshotQuickActions()) {
+                selector(screenshotOverlayTopRightActionState, quickActionOptions) {
                     name = "Screenshot quick-action #2"
                     description = "Select an action for the top right screenshot quick-action slot."
-                    options = quickActionOptions
+                    options = quickActionOptions.map { it.displayName }
                 }
-                selector(screenshotOverlayBottomLeftActionState.reorderScreenshotQuickActions()) {
+                selector(screenshotOverlayBottomLeftActionState, quickActionOptions) {
                     name = "Screenshot quick-action #3"
                     description = "Select an action for the bottom left screenshot quick-action slot."
-                    options = quickActionOptions
+                    options = quickActionOptions.map { it.displayName }
                 }
-                selector(screenshotOverlayBottomRightActionState.reorderScreenshotQuickActions()) {
+                selector(screenshotOverlayBottomRightActionState, quickActionOptions) {
                     name = "Screenshot quick-action #4"
                     description = "Select an action for the bottom right screenshot quick-action slot."
-                    options = quickActionOptions
+                    options = quickActionOptions.map { it.displayName }
                 }
                 selector(postScreenshotActionState) {
                     name = "Post screenshot action"
                     description = "Automatically trigger an action after taking a screenshot."
-                    options = listOf("Nothing", "Copy Image", "Copy URL")
+                    options = PostScreenshotAction.entries.map { it.label }
                 }
                 selector(screenshotToastDurationState) {
                     name = "Screenshot preview duration"
                     description = "Control for how long the screenshot preview will be shown."
-                    options = listOf("3 seconds", "5 seconds", "7 seconds")
+                    options = ScreenshotToastDuration.entries.map { "${it.seconds} seconds" }
                 }
                 switch(screenshotSoundsState) {
                     name = "Screenshot sounds"
@@ -648,7 +666,13 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
                 selector(friendRequestPrivacyState) {
                     name = "Friend request permission"
                     description = "Determines who can send you a friend request on Essential."
-                    options = listOf("Everyone", "Friends of friends", "Nobody")
+                    options = FriendRequestPrivacySetting.entries.map { option ->
+                        when (option) {
+                            FriendRequestPrivacySetting.ANY_ONE -> "Everyone"
+                            FriendRequestPrivacySetting.FRIEND_OF_FRIENDS -> "Friends of friends"
+                            FriendRequestPrivacySetting.NO_ONE -> "Nobody"
+                        }
+                    }
                 }
                 button(::revokeTosButton) {
                     name = "Terms of Service and Privacy Policy"
@@ -667,7 +691,6 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
     private operator fun <T> MutableState<T>.setValue(essentialConfig: EssentialConfig, property: KProperty<*>, value: T) {
         set(value)
     }
-    private fun MutableState<Int>.reorderScreenshotQuickActions() = reorder(1, 2, 3, 5, 0, 4)
 
     class RevokeTOSModal(manager: ModalManager) : DangerConfirmationEssentialModal(manager, "Confirm", false) {
         init {

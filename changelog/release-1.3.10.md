@@ -1,11 +1,12 @@
-Title: Bug Patch
-Summary: Minor bug fixes
+Title: Player safety
+Summary: Improved player and chat safety
 
 ## Social
 - Added Community Rules modal, which must be accepted before being able to engage with social features
 - Added modal to mute or block user after reporting them
 - Added notification to confirm when a user has been successfully muted
 - Added modals to communicate why and for how long you were suspended
+- Improved reporting modal
 - Improved Social Menu to show when you cannot talk to a user because they are suspended
 - Improved Terms of Use and Privacy Policy modal design
 

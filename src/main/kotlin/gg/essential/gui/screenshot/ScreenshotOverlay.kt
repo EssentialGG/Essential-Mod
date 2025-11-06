@@ -314,13 +314,7 @@ class ScreenshotPreviewToast(val file: File) : ScreenshotToast() {
             image.animate {
                 setColorAnimation(Animations.LINEAR, 0.5f, Color.WHITE.toConstraint())
             }
-            val time =
-                when (EssentialConfig.screenshotToastDuration) {
-                    1 -> 5
-                    2 -> 7
-                    else -> 3
-                }
-            timeMsRemaining = time * 1000
+            timeMsRemaining = EssentialConfig.screenshotToastDuration.seconds * 1000
         })
     }
 

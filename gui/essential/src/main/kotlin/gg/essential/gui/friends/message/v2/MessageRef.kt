@@ -15,8 +15,9 @@ import com.sparkuniverse.toolbox.chat.enums.ChannelType
 import com.sparkuniverse.toolbox.chat.model.Channel
 import com.sparkuniverse.toolbox.chat.model.CreatedInfo
 import com.sparkuniverse.toolbox.util.DateTime
-import gg.essential.elementa.state.BasicState
-import gg.essential.gui.common.WeakState
+import gg.essential.gui.elementa.state.v2.MutableState
+import gg.essential.gui.elementa.state.v2.State
+import gg.essential.gui.elementa.state.v2.mutableStateOf
 import gg.essential.util.GuiEssentialPlatform.Companion.platform
 import java.util.*
 
@@ -28,13 +29,13 @@ data class MessageRef(
     val messageId: Long,
 ) : Lazy<ClientMessage> {
 
-    private val privateState = BasicState<ClientMessage?>(null)
+    private val privateState: MutableState<ClientMessage?> = mutableStateOf(null)
 
-    val asWeakState: WeakState<ClientMessage?>
-        get() = WeakState(privateState)
+    val asState: State<ClientMessage?>
+        get() = privateState
 
     override val value: ClientMessage
-        get() = privateState.get() ?: throw IllegalStateException("MessageRef has not been initialized")
+        get() = privateState.getUntracked() ?: throw IllegalStateException("MessageRef has not been initialized")
 
     init {
         // When a message is deleted, replies to that message will have their replyTo id set to -1
@@ -61,7 +62,7 @@ data class MessageRef(
      * Returns true when the message is resolved
      */
     override fun isInitialized(): Boolean {
-        return privateState.get() != null
+        return privateState.getUntracked() != null
     }
 
     companion object {

@@ -44,7 +44,7 @@ import kotlin.contracts.contract
 //#endif
 
 object GuiUtil : GuiUtil, OverlayManager by OverlayManagerImpl, ModalManager by ModalManagerImpl(OverlayManagerImpl) {
-    private var display: (() -> GuiScreen?)? = null
+    private var action: (() -> Unit)? = null
 
     /**
      * Creates a new [ModalManager] and queues the modal on it (which will result in it being pushed immediately).
@@ -74,7 +74,7 @@ object GuiUtil : GuiUtil, OverlayManager by OverlayManagerImpl, ModalManager by 
         launchModalFlow(ModalManagerImpl(this), block)
     }
 
-    inline fun <reified T : GuiScreen> openScreen(noinline screen: () -> T?) {
+    inline fun <reified T : GuiScreen> openScreen(noinline screen: () -> T) {
         // Guard against T not being inferred well enough. If there's a compile-time way to do this please tell me.
         when (T::class.java) {
             WindowScreen::class.java,
@@ -89,7 +89,7 @@ object GuiUtil : GuiUtil, OverlayManager by OverlayManagerImpl, ModalManager by 
     }
 
     @JvmStatic
-    fun <T : GuiScreen> openScreen(type: Class<T>, screen: () -> T?) {
+    fun <T : GuiScreen> openScreen(type: Class<T>, screen: () -> T) {
         val essential = Essential.getInstance()
         val connectionManager = essential.connectionManager
         val screenRequiresTOS = GuiRequiresTOS::class.java.isAssignableFrom(type)
@@ -132,14 +132,14 @@ object GuiUtil : GuiUtil, OverlayManager by OverlayManagerImpl, ModalManager by 
     }
 
     private fun doOpenScreen(screen: () -> GuiScreen?) {
-        display = { screen()?.also { screen ->
+        action = { screen()?.also { screen ->
             Essential.getInstance().connectionManager.telemetryManager.enqueue(
                 ClientTelemetryPacket(
                     "GUI_OPEN",
                     mapOf(Pair("name", screen.javaClass.name))
                 )
             )
-        } }
+        }?.let { UMinecraft.getMinecraft().displayGuiScreen(it) } }
     }
 
     override fun openedScreen(): GuiScreen? {
@@ -166,12 +166,6 @@ object GuiUtil : GuiUtil, OverlayManager by OverlayManagerImpl, ModalManager by 
 
     @Subscribe
     fun tick(event: ClientTickEvent?) {
-        display?.also { factory ->
-            val screen = factory()
-            if (screen != null)
-                UMinecraft.getMinecraft().displayGuiScreen(screen)
-            display = null
-            return
-        }
+        action?.also { action = null }?.invoke()
     }
 }

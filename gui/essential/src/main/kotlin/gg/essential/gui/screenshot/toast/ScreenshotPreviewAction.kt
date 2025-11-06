@@ -11,8 +11,10 @@
  */
 package gg.essential.gui.screenshot.toast
 
-// The order of these actions is used/replicated in the settings.
-// Remember to change in both places at once
+import kotlin.collections.listOf
+
+// Note: Actions are stored in the config by their ordinal.
+//       Do not remove or reorder (without a corresponding config migration).
 enum class ScreenshotPreviewAction(val displayName: String) {
 
     COPY_PICTURE("Copy Picture"),
@@ -23,4 +25,14 @@ enum class ScreenshotPreviewAction(val displayName: String) {
     EDIT("Edit"),
     ;
 
+    companion object {
+        val DISPLAY_ORDER = listOf<ScreenshotPreviewAction>(
+            SHARE,
+            COPY_PICTURE,
+            COPY_LINK,
+            FAVORITE,
+            EDIT,
+            DELETE,
+        ).also { assert(it.sorted() == ScreenshotPreviewAction.entries) }
+    }
 }

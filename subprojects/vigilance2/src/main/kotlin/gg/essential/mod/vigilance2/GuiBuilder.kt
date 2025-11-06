@@ -31,6 +31,7 @@ import gg.essential.vigilance.data.PropertyType
 import gg.essential.vigilance.data.PropertyValue
 import java.awt.Color
 import java.io.File
+import kotlin.enums.enumEntries
 
 class GuiBuilder internal constructor(
     private val instance: Vigilant,
@@ -128,9 +129,13 @@ class GuiBuilder internal constructor(
         fun selector(state: MutableState<Int>, configure: SelectorPropertyBuilder.() -> Unit) =
             property(state, PropertyType.SELECTOR, configure)
 
+        fun <T> selector(state: MutableState<T>, options: List<T>, configure: SelectorPropertyBuilder.() -> Unit) =
+            selector(state.bimap({ options.indexOf(it) }, { options[it] }), configure)
+
+        @OptIn(ExperimentalStdlibApi::class) // `enumEntries` became stable with 2.0
         @JvmName("selectorEnum")
         inline fun <reified T : Enum<T>> selector(state: MutableState<T>, noinline configure: SelectorPropertyBuilder.() -> Unit) =
-            selector(state.bimap({ it.ordinal }, { T::class.java.enumConstants[it] }), configure)
+            selector(state, enumEntries<T>(), configure)
 
         fun button(func: () -> Unit, configure: ButtonPropertyBuilder.() -> Unit) =
             property(KFunctionBackedPropertyValue(func), PropertyType.BUTTON, configure)

@@ -43,7 +43,7 @@ class PendingUserEntry(
 
     // True when this request was unseen and holds as true for the lifetime of this entry
     private val displayAsNewRequest = BasicState(false).apply {
-        hasUnseenRequest.onSetValueAndNow {
+        hasUnseenRequest.onSetValueAndNow(this@PendingUserEntry) {
             if (it) {
                 set(true)
             }

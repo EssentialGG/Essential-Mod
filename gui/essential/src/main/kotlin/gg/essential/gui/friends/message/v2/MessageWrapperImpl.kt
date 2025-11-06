@@ -31,6 +31,7 @@ import gg.essential.gui.elementa.GuiScaleOffsetConstraint
 import gg.essential.gui.elementa.state.v2.add
 import gg.essential.gui.elementa.state.v2.color.toConstraint
 import gg.essential.gui.elementa.state.v2.combinators.and
+import gg.essential.gui.elementa.state.v2.combinators.letState
 import gg.essential.gui.elementa.state.v2.combinators.map
 import gg.essential.gui.elementa.state.v2.combinators.not
 import gg.essential.gui.elementa.state.v2.combinators.or
@@ -66,8 +67,7 @@ class MessageWrapperImpl(
 ) : MessageWrapper(message) {
 
     private val replyTo = message.replyTo
-    private val replyToWeakState = replyTo?.asWeakState // As field so it doesn't get GC'd
-    private val replyToIsDeleted = replyToWeakState?.map { it == MessageRef.DELETED }
+    private val replyToState = replyTo?.asState
 
     private val isEditing = messageScreen.editingMessage.map { it == message }
     private val isEdited = stateOf(message.lastEditTime != null)
@@ -114,9 +114,9 @@ class MessageWrapperImpl(
         height = ChildBasedMaxSizeConstraint()
         width = ChildBasedSizeConstraint()
     }.apply {
-        val replyToWeakState = replyToWeakState ?: return@apply
+        val replyToState = replyToState ?: return@apply
 
-        bindParent(usernameTimestampBox, replyToWeakState.map { it != null }, index = if (usernameVisible) {
+        bindParent(usernameTimestampBox, replyToState.letState { it != null }, index = if (usernameVisible) {
             1
         } else {
             0
@@ -125,7 +125,7 @@ class MessageWrapperImpl(
         val hovered = hoveredState()
         val colorState = EssentialPalette.getTextColor(hovered)
 
-        replyToWeakState.onSetValueAndNow { replyTo ->
+        replyToState.onSetValueAndNow(this@MessageWrapperImpl) { replyTo ->
             clearChildren()
             fun UIComponent.applyConstraints() = apply {
                 constrain {
@@ -180,11 +180,11 @@ class MessageWrapperImpl(
         }
 
     }.onLeftClick {
-        if (replyToWeakState != null) {
-            when (val messageRef = replyToWeakState.get()) {
+        if (replyToState != null) {
+            when (val messageRef = replyToState.getUntracked()) {
                 null -> {
                     // Wait for the message to be resolved and then scroll
-                    replyToWeakState.onSetValue {
+                    replyToState.onSetValue(this) {
                         if (it != null) {
                             messageScreen.scrollToMessage(it)
                         }

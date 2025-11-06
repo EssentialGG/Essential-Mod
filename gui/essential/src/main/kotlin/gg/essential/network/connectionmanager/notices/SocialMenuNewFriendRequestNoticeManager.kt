@@ -11,8 +11,9 @@
  */
 package gg.essential.network.connectionmanager.notices
 
-import gg.essential.elementa.state.BasicState
-import gg.essential.gui.common.WeakState
+import gg.essential.gui.elementa.state.v2.MutableState
+import gg.essential.gui.elementa.state.v2.State
+import gg.essential.gui.elementa.state.v2.mutableStateOf
 import gg.essential.notices.NoticeType
 import gg.essential.notices.model.Notice
 import java.util.UUID
@@ -22,8 +23,8 @@ class SocialMenuNewFriendRequestNoticeManager(
 ) : NoticeListener {
 
     private val unseenFriendRequests = mutableMapOf<UUID, Notice>()
-    private val unseenFriendRequestStates = mutableMapOf<UUID, BasicState<Boolean>>()
-    private val unseenFriendRequestCount = BasicState(0)
+    private val unseenFriendRequestStates = mutableMapOf<UUID, MutableState<Boolean>>()
+    private val unseenFriendRequestCount = mutableStateOf(0)
 
     override fun noticeAdded(notice: Notice) {
         if (notice.type != NoticeType.FRIEND_REQUEST_NEW_INDICATOR) {
@@ -31,7 +32,7 @@ class SocialMenuNewFriendRequestNoticeManager(
         }
         val uuid = UUID.fromString(notice.metadata["uuid"] as? String ?: return)
         unseenFriendRequests[uuid] = notice
-        unseenFriendRequestStates.getOrPut(uuid) { BasicState(false) }.set { true }
+        unseenFriendRequestStates.getOrPut(uuid) { mutableStateOf(false) }.set { true }
         unseenFriendRequestCount.set(unseenFriendRequests.size)
     }
 
@@ -45,8 +46,8 @@ class SocialMenuNewFriendRequestNoticeManager(
         unseenFriendRequestCount.set(unseenFriendRequests.size)
     }
 
-    fun hasUnseenFriendRequests(uuid: UUID): WeakState<Boolean> {
-        return WeakState(unseenFriendRequestStates.getOrPut(uuid) { BasicState(false) })
+    fun hasUnseenFriendRequests(uuid: UUID): State<Boolean> {
+        return unseenFriendRequestStates.getOrPut(uuid) { mutableStateOf(false) }
     }
 
     fun clearUnseenFriendRequests(uuid: UUID) {
@@ -56,8 +57,8 @@ class SocialMenuNewFriendRequestNoticeManager(
         unseenFriendRequestStates[uuid]?.set { false }
     }
 
-    fun unseenFriendRequestCount(): WeakState<Int> {
-        return WeakState(unseenFriendRequestCount)
+    fun unseenFriendRequestCount(): State<Int> {
+        return unseenFriendRequestCount
     }
 
     override fun onConnect() {

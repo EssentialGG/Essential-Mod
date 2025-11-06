@@ -26,10 +26,9 @@ sealed class PostScreenshotAction {
         @JvmStatic
         fun current(): PostScreenshotAction {
             return when (EssentialConfig.postScreenshotAction) {
-                0 -> Nothing
-                1 -> CopyImage
-                2 -> CopyURL
-                else -> Nothing
+                EssentialConfig.PostScreenshotAction.NOTHING -> Nothing
+                EssentialConfig.PostScreenshotAction.COPY_IMAGE -> CopyImage
+                EssentialConfig.PostScreenshotAction.COPY_URL -> CopyURL
             }
         }
     }

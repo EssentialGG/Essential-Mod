@@ -26,7 +26,10 @@ const val DATE_FORMAT_NO_YEAR = "MMM dd"
 
 fun getTimeFormat(includeSeconds: Boolean): String {
     val seconds = if (includeSeconds) ":ss" else ""
-    return if (EssentialConfig.timeFormat == 0) "h:mm$seconds a" else "HH:mm$seconds"
+    return when (EssentialConfig.timeFormat) {
+        EssentialConfig.TimeFormat.AM_PM -> "h:mm$seconds a"
+        EssentialConfig.TimeFormat.REGULAR -> "HH:mm$seconds"
+    }
 }
 
 fun formatDate(date: LocalDate, displayYear: Boolean = true) =

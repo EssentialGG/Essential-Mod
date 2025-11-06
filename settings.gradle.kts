@@ -59,6 +59,7 @@ val subprojects = listOf(
     ":libs",
     ":lwjgl3",
     ":lwjgl3:impl",
+    ":minecraft-auth",
     ":mixin-compat",
     ":plasmo",
     ":pseudotcp",

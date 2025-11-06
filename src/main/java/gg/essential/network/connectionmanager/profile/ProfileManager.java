@@ -341,5 +341,4 @@ public class ProfileManager extends StateCallbackManager<IStatusManager> impleme
                 this.removePlayerActivity(uuid);
         }
     }
-
 }

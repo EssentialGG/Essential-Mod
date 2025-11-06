@@ -11,7 +11,6 @@
  */
 package gg.essential.config
 
-import com.sparkuniverse.toolbox.relationships.enums.FriendRequestPrivacySetting
 import gg.essential.Essential
 import gg.essential.api.gui.Slot
 import gg.essential.commands.EssentialCommandRegistry
@@ -48,10 +47,9 @@ object McEssentialConfig {
     fun hookUp() {
         EssentialConfig.doRevokeTos = ::revokeTos
 
-        friendRequestPrivacyState.onSetValue(referenceHolder) { it ->
+        friendRequestPrivacyState.onSetValue(referenceHolder) { privacy ->
             if (hasAcceptedTos()) {
                 val connectionManager = Essential.getInstance().connectionManager
-                val privacy = FriendRequestPrivacySetting.values()[it]
 
                 connectionManager.send(FriendRequestPrivacySettingPacket(privacy)) {
                     val get = it.orElse(null)

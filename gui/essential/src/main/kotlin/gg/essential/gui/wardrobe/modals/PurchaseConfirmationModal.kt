@@ -153,7 +153,10 @@ class PurchaseConfirmationModal(
         primaryAndCancelButtons(
             "Purchase",
             "Cancel",
-            { this@PurchaseConfirmationModal.primaryAction() }
+            {
+                this@PurchaseConfirmationModal.primaryAction()
+                close()
+            }
         )
     }
 

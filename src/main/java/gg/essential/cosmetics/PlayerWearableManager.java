@@ -13,6 +13,7 @@ package gg.essential.cosmetics;
 
 import com.mojang.authlib.minecraft.MinecraftProfileTexture;
 import gg.essential.api.cosmetics.RenderCosmetic;
+import gg.essential.config.EssentialConfig;
 import gg.essential.event.entity.PlayerTickEvent;
 import gg.essential.gui.common.EmulatedUI3DPlayer;
 import gg.essential.gui.elementa.state.v2.State;
@@ -192,8 +193,8 @@ public class PlayerWearableManager {
     }
 
     private ArmorSlots getArmourFromPlayer(AbstractClientPlayer player) {
-        int armorSetting = ArmorRenderingUtil.getCosmeticArmorSetting(player);
-        if (armorSetting > 0) {
+        EssentialConfig.CosmeticOrArmor armorSetting = ArmorRenderingUtil.getCosmeticArmorSetting(player);
+        if (armorSetting != EssentialConfig.CosmeticOrArmor.ONLY_ARMOR) {
             return new ArmorSlots((byte) 0);
         }
 

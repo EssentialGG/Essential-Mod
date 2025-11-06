@@ -328,7 +328,7 @@ class MenuButton @JvmOverloads constructor(
     ) = apply {
         tooltip = EssentialTooltip(
             this,
-            position = EssentialTooltip.Position.ABOVE,
+            position = if (above) EssentialTooltip.Position.ABOVE else EssentialTooltip.Position.BELOW,
             notchSize = notchSize
         ).constrain {
             x = (if (followCursorX) {

@@ -144,9 +144,6 @@ public class Plugin implements IMixinConfigPlugin {
         }
 
         //#if FORGE
-        if (mixinClassName.endsWith("MixinFramebuffer")) {
-            return false; // Forge already includes this patch
-        }
         if (mixinClassName.endsWith("Mixin_FixKeyBindingCategorySortingNPE")) {
             return false; // Forge already includes this patch
         }

@@ -87,6 +87,7 @@ Cosmetic Visibility Toggle=Show/Hide My Cosmetics
 keybind.name.CHAT_PEEK=Chat Peek
 keybind.name.INVITE_FRIENDS=Invite Friends
 keybind.name.SCREENSHOT_MANAGER=Screenshot Manager
+keybind.name.MENU_ACCESS=Open Quick Access Menu
 # Emote Keybinds
 keybind.name.EMOTE_WHEEL=Open Emote Wheel
 keybind.name.EMOTE_SLOT_1=Play Top Left Emote

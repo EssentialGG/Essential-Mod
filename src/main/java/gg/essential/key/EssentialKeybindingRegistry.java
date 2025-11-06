@@ -20,6 +20,7 @@ import gg.essential.elementa.utils.OptionsKt;
 import gg.essential.event.client.ClientTickEvent;
 import gg.essential.gui.emotes.EmoteWheel;
 import gg.essential.gui.friends.SocialMenu;
+import gg.essential.gui.modals.QuickAccessModal;
 import gg.essential.gui.overlay.Layer;
 import gg.essential.gui.overlay.OverlayManagerImpl;
 import gg.essential.gui.screenshot.components.ScreenshotBrowser;
@@ -57,6 +58,7 @@ public class EssentialKeybindingRegistry {
     private static final EssentialKeybindingRegistry INSTANCE = new EssentialKeybindingRegistry();
     private EssentialKeybinding cosmetics_visibility_toggle;
     private EssentialKeybinding emote_wheel_open;
+    private EssentialKeybinding quick_access_open;
     private EssentialKeybinding zoom;
     private boolean holdingChatPeek;
 
@@ -162,6 +164,10 @@ public class EssentialKeybindingRegistry {
         EssentialKeybinding invite = new EssentialKeybinding("INVITE_FRIENDS", CATEGORY, UKeyboard.KEY_NONE)
             .withInitialPress(() -> PauseMenuDisplay.Companion.showInviteOrHostModal(SPSSessionSource.KEYBIND));
 
+        quick_access_open = new EssentialKeybinding("MENU_ACCESS", CATEGORY, UKeyboard.KEY_G)
+                .withInitialPress(QuickAccessModal::openInGame)
+                .requiresEssentialFull();
+
         {
             emote_wheel_open = new EssentialKeybinding("EMOTE_WHEEL", CATEGORY, UKeyboard.KEY_R).requiresEssentialFull()
                     .withRepeatedHold(() -> EmoteWheel.open()).withRelease(() -> EmoteWheel.emoteClicked = false);
@@ -224,6 +230,11 @@ public class EssentialKeybindingRegistry {
     @NotNull
     public EssentialKeybinding getOpenEmoteWheel() {
         return emote_wheel_open;
+    }
+
+    @NotNull
+    public EssentialKeybinding getOpenQuickAccess() {
+        return quick_access_open;
     }
 
     public EssentialKeybinding getZoom() {

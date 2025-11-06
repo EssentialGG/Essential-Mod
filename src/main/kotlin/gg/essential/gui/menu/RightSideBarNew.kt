@@ -33,7 +33,6 @@ import gg.essential.gui.elementa.state.v2.combinators.zip
 import gg.essential.gui.elementa.state.v2.memo
 import gg.essential.gui.elementa.state.v2.stateOf
 import gg.essential.gui.elementa.state.v2.toV1
-import gg.essential.gui.elementa.state.v2.toV2
 import gg.essential.gui.friends.SocialMenu
 import gg.essential.gui.layoutdsl.Alignment
 import gg.essential.gui.layoutdsl.Arrangement
@@ -68,7 +67,6 @@ import gg.essential.vigilance.utils.onLeftClick
 class RightSideBarNew(
     menuType: PauseMenuDisplay.MenuType,
     private val isMinimal: State<Boolean>,
-    menuVisible: State<Boolean>,
     private val accountManager: AccountManager,
 ) : UIContainer() {
 
@@ -89,7 +87,7 @@ class RightSideBarNew(
     private val worldSettingsVisible = isHostingWorld
 
     private val messageCount = connectionManager.chatManager.unreadMessageCount
-        .zip(connectionManager.socialMenuNewFriendRequestNoticeManager.unseenFriendRequestCount().toV2())
+        .zip(connectionManager.socialMenuNewFriendRequestNoticeManager.unseenFriendRequestCount())
         .map { (messages, friends) -> messages + friends }
         .map {
             if (it > 98) "99+" else it.toString()
@@ -115,7 +113,7 @@ class RightSideBarNew(
             Arrangement.spacedBy(4f),
             Alignment.End
         ) {
-            if_(menuVisible) {
+            if (true) { // for indent, may be removed when convenient
                 if (isMinimal.getUntracked()) {
                     worldSettingsButton()
                 }
@@ -199,9 +197,6 @@ class RightSideBarNew(
         }
     }
 
-    private fun hostOrInviteButtonPressed() {
-        PauseMenuDisplay.showInviteOrHostModal(SPSSessionSource.PAUSE_MENU)
-    }
 
     private fun LayoutScope.inviteOrHostButton() {
         mountWithProxy("invite_host") {
@@ -326,6 +321,10 @@ class RightSideBarNew(
     companion object {
 
         const val BUTTON_WIDTH = 80f
+
+        fun hostOrInviteButtonPressed() {
+            PauseMenuDisplay.showInviteOrHostModal(SPSSessionSource.PAUSE_MENU)
+        }
 
     }
 

@@ -72,7 +72,7 @@ class SocialMenu @JvmOverloads constructor(
 
     val tabsSelector by TabsSelector(
         selectedTab,
-        connectionManager.socialMenuNewFriendRequestNoticeManager.unseenFriendRequestCount().toV2()
+        connectionManager.socialMenuNewFriendRequestNoticeManager.unseenFriendRequestCount()
     ).constrain {
         width = 215.pixels.coerceAtMost(50.percent).coerceAtLeast(ChildBasedSizeConstraint())
         height = 27.pixels

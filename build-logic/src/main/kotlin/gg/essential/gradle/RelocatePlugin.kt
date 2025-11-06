@@ -135,6 +135,7 @@ private fun Project.createAbiValidationTasks(relocateTask: TaskProvider<Relocate
             "gg.essential.image",
             "gg.essential.key",
             "gg.essential.main",
+            "gg.essential.minecraftauth",
             "gg.essential.mixins",
             "gg.essential.mod",
             "gg.essential.model",

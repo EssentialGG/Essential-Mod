@@ -90,8 +90,8 @@ public interface CosmeticsRenderState {
             if (!EssentialModelRenderer.shouldRender(player)) {
                 return Collections.emptySet();
             }
-            int armorHidingSetting = ArmorRenderingUtil.getCosmeticArmorSetting(player);
-            if (armorHidingSetting != 1) {
+            EssentialConfig.CosmeticOrArmor armorHidingSetting = ArmorRenderingUtil.getCosmeticArmorSetting(player);
+            if (armorHidingSetting != EssentialConfig.CosmeticOrArmor.ONLY_COSMETICS) {
                 return Collections.emptySet();
             }
             return playerExt().getCosmeticsState().getPartsEquipped();

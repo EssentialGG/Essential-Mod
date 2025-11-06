@@ -21,7 +21,6 @@ import gg.essential.elementa.dsl.*
 import gg.essential.elementa.state.BasicState
 import gg.essential.gui.EssentialPalette
 import gg.essential.gui.common.*
-import gg.essential.gui.elementa.state.v2.combinators.and
 import gg.essential.gui.elementa.state.v2.combinators.map
 import gg.essential.gui.elementa.state.v2.flatten
 import gg.essential.gui.elementa.state.v2.memo
@@ -43,13 +42,11 @@ import gg.essential.util.GuiEssentialPlatform.Companion.platform
 import gg.essential.util.USession
 import gg.essential.util.toShortString
 import gg.essential.vigilance.utils.onLeftClick
-import gg.essential.gui.elementa.state.v2.State as StateV2
 
 class LeftSideBar(
     window: Window,
     private val topButtonAndMultiplayer: UIContainer,
     private val bottomButton: UIContainer,
-    menuVisible: StateV2<Boolean>,
     rightSideBar: UIContainer,
     leftContainer: UIContainer,
 ) : UIContainer() {
@@ -163,7 +160,7 @@ class LeftSideBar(
             width = width.coerceIn(72.pixels, 78.pixels)
         }.onLeftClick {
             openWardrobe(WardrobeCategory.get(currentSale.get()?.category))
-        }.bindParent(this, isSale and menuVisible).apply {
+        }.bindParent(this, isSale).apply {
             bindEssentialTooltip(hoveredState() and currentSale.map { it?.tooltip != null }.toV1(this), currentSale.map { it?.tooltip ?: ""}.toV1(this), EssentialTooltip.Position.ABOVE)
         }
 
@@ -179,7 +176,7 @@ class LeftSideBar(
             x = 3.pixels(alignOpposite = true, alignOutside = true) boundTo wardrobeButton
         }.onLeftClick { wardrobeButton.runAction() }.bindParent(
             leftContainer,
-            hasAnyNewCosmetics and menuVisible,
+            hasAnyNewCosmetics,
             delayed = true,
         )
 

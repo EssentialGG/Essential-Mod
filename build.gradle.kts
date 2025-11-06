@@ -81,6 +81,7 @@ dependencies {
     implementation(bundle(project(":clipboard"))!!)
     implementation(bundle(project(":utils"))!!)
     implementation(bundle(project(":plasmo"))!!)
+    implementation(bundle(project(":minecraft-auth"))!!)
     if (platform.mcVersion >= 11800) {
         implementation(bundle(project(":immediatelyfast"))!!)
     }

@@ -47,7 +47,6 @@ import gg.essential.gui.EssentialPalette
 import gg.essential.gui.common.MenuButton
 import gg.essential.gui.common.TextFlag
 import gg.essential.gui.common.bindConstraints
-import gg.essential.gui.common.bindParent
 import gg.essential.gui.common.modal.ConfirmDenyModal
 import gg.essential.gui.common.modal.Modal
 import gg.essential.gui.common.modal.configure
@@ -148,6 +147,8 @@ class PauseMenuDisplay {
     }
 
     fun initContent(screen: GuiScreen, window: Window) {
+        if (EssentialConfig.essentialMenuLayout == EssentialConfig.EssentialMenuLayout.OFF) return
+
         run { // for indent
             window.addTag(MenuButton.WindowSupportsButtonRetexturingMarker)
 
@@ -185,12 +186,10 @@ class PauseMenuDisplay {
                 height = 20.pixels
             } childOf window
 
-            val isCompact = BasicState(EssentialConfig.essentialMenuLayout == 1) or bottomButton.pollingState {
+            val isCompact = BasicState(EssentialConfig.essentialMenuLayout == EssentialConfig.EssentialMenuLayout.MINIMAL) or bottomButton.pollingState {
                     getRightSideMenuX(window, topButtonAndMultiplayer, fullRightMenuPixelWidth).getXPosition(window) +
                         fullRightMenuPixelWidth.value + rightMenuMinPadding >= window.getRight()
                 }
-
-            val menuVisible = bottomButton.pollingState { EssentialConfig.essentialMenuLayout != 2 }
 
             val rightContainer by UIContainer().constrain {
                 height = ChildBasedMaxSizeConstraint()
@@ -214,10 +213,9 @@ class PauseMenuDisplay {
             } childOf window
 
             val accountManager = AccountManager()
-            RightSideBarNew(menuType, isCompact.toV2(), menuVisible.toV2(), accountManager).bindParent(rightContainer, menuVisible)
+            RightSideBarNew(menuType, isCompact.toV2(), accountManager) childOf rightContainer
 
-            LeftSideBar(window, topButtonAndMultiplayer, bottomButton, menuVisible.toV2(), rightContainer, leftContainer)
-                .bindParent(leftContainer, menuVisible)
+            LeftSideBar(window, topButtonAndMultiplayer, bottomButton, rightContainer, leftContainer) childOf leftContainer
 
             if (menuType == MenuType.MAIN
                 && Instant.now() < NewServerDiscoveryManager.NEW_TAG_END_DATE

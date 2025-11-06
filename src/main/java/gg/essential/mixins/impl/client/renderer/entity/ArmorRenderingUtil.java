@@ -16,7 +16,7 @@ import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.entity.Entity;
 
 public class ArmorRenderingUtil {
-    public static int getCosmeticArmorSetting(Entity entity) {
+    public static EssentialConfig.CosmeticOrArmor getCosmeticArmorSetting(Entity entity) {
         if (entity instanceof EntityPlayerSP) {
             return EssentialConfig.INSTANCE.getCosmeticArmorSettingSelf();
         } else {
