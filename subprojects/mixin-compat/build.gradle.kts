@@ -37,7 +37,7 @@ val fatMixin by configurations.creating {
 }
 
 dependencies {
-    fatMixin("org.spongepowered:mixin:0.8.4")
+    fatMixin("org.spongepowered:mixin:0.8.7")
     // this is usually provided by MC but 1.8.9's is too old, so we need to bundle (and relocate) our own
     fatMixin("com.google.guava:guava:21.0")
 
