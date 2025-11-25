@@ -21,4 +21,5 @@ enum class CosmeticSettingType(
     PLAYER_POSITION_ADJUSTMENT("Player Position Adjustment", true),
     SIDE("Side", true),
     VARIANT("Variant", true),
+    ANIMATION_VARIANT("Animation Variant", true),
 }

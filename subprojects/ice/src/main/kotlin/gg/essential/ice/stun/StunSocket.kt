@@ -96,6 +96,7 @@ class StunSocket(
             // instead use UNDISPATCHED and yield as soon as we're inside our try-finally.
             hostSocket.use { socket ->
                 yield()
+                val sha256 = MessageDigest.getInstance("SHA-256")
                 val knownUnreachable = mutableSetOf<InetAddress>()
                 for ((packet, deferred) in hostSendChannel) {
                     if (packet.address in knownUnreachable) {
@@ -133,6 +134,7 @@ class StunSocket(
 
         val packetsToBeSorted = Channel<ReceivedPacket>(10)
         hostSocketScope.launch(Dispatchers.IO) {
+            val sha256 = MessageDigest.getInstance("SHA-256")
             val buf = DatagramPacket(ByteArray(1500), 1500)
             while (coroutineContext.isActive) {
                 try {
@@ -583,7 +585,6 @@ class StunSocket(
     
     companion object {
         private val LOG_UDP_PACKET_CONTENT = System.getProperty("essential.sps.log_udp_packet_content").toBoolean()
-        private val sha256 = MessageDigest.getInstance("SHA-256")
 
         private fun ByteArray.maybeSliceArray(offset: Int, length: Int) =
             if (offset == 0 && length == size) this else sliceArray(offset until offset + length)

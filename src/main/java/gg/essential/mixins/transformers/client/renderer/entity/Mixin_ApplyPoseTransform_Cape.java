@@ -34,6 +34,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 //$$ import net.minecraft.client.renderer.IRenderTypeBuffer;
 //$$ import net.minecraft.client.renderer.entity.layers.LayerRenderer;
 //$$ import net.minecraft.client.renderer.entity.model.PlayerModel;
+//$$ import net.minecraft.util.math.vector.Matrix3f;
 //#else
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.entity.RenderPlayer;
@@ -104,7 +105,7 @@ public abstract class Mixin_ApplyPoseTransform_Cape
     ) {
         CosmeticsRenderState cState = new CosmeticsRenderState.Live(player);
         PlayerPoseManager poseManager = cState.poseManager();
-        if (poseManager != null) {
+        if (poseManager == null) {
             return;
         }
         // We want MC's cape transformations only, not any transformations applied outside of the renderer.
@@ -113,6 +114,7 @@ public abstract class Mixin_ApplyPoseTransform_Cape
         // from them or multiply them on top of the existing stack if we don't need to animate the cape.
         //#if MC>=11600
         //$$ matrixStack.getLast().getMatrix().setIdentity();
+        //$$ matrixStack.getLast().getNormal().setIdentity();
         //#else
         GlStateManager.loadIdentity();
         //#endif
@@ -139,7 +141,7 @@ public abstract class Mixin_ApplyPoseTransform_Cape
     ) {
         CosmeticsRenderState cState = new CosmeticsRenderState.Live(player);
         PlayerPoseManager poseManager = cState.poseManager();
-        if (poseManager != null) {
+        if (poseManager == null) {
             return;
         }
         //#if MC>=11600
@@ -150,6 +152,7 @@ public abstract class Mixin_ApplyPoseTransform_Cape
         // Read the matrix which MC has constructed on our freshly cleared matrix stack
         //#if MC>=11600
         //$$ MutableMat4 capeMatrix = GLUtil.INSTANCE.glGetMatrix(matrixStack, scale);
+        //$$ Matrix3f capeMatrixNormals = new Matrix3f(matrixStack.getLast().getNormal());
         //#else
         MutableMat4 capeMatrix = GLUtil.INSTANCE.glGetMatrix(scale);
         //#endif
@@ -187,6 +190,7 @@ public abstract class Mixin_ApplyPoseTransform_Cape
             // in case we need them separate (turns out we didn't this time round).
             //#if MC>=11600
             //$$ GLUtil.INSTANCE.glMultMatrix(matrixStack, capeMatrix, scale);
+            //$$ matrixStack.getLast().getNormal().mul(capeMatrixNormals);
             //#else
             GLUtil.INSTANCE.glMultMatrix(capeMatrix, scale);
             //#endif

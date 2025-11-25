@@ -11,8 +11,8 @@
  */
 package gg.essential.mixins.impl.client.gui;
 
-import gg.essential.universal.UMatrixStack;
+import gg.essential.util.UDrawContext;
 
 public interface EssentialPostScreenDrawHook {
-    void essential$afterDraw(UMatrixStack matrixStack, int mouseX, int mouseY, float partialTicks);
+    void essential$afterDraw(UDrawContext drawContext, int mouseX, int mouseY, float partialTicks);
 }

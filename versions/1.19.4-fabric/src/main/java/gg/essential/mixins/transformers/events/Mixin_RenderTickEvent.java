@@ -15,6 +15,7 @@ import gg.essential.Essential;
 import gg.essential.event.render.RenderTickEvent;
 import gg.essential.universal.UMatrixStack;
 import gg.essential.universal.UMinecraft;
+import gg.essential.util.UDrawContext;
 import net.minecraft.client.render.GameRenderer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -27,6 +28,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 //$$ import net.minecraft.client.render.RenderTickCounter;
 //#endif
 
+//#if MC>=12000
+//$$ import com.llamalad7.mixinextras.sugar.Local;
+//$$ import net.minecraft.client.gui.DrawContext;
+//#endif
+
 @Mixin(GameRenderer.class)
 public class Mixin_RenderTickEvent {
 
@@ -36,28 +42,34 @@ public class Mixin_RenderTickEvent {
     //#else
     private void renderTickPre(float tickDelta, long startTime, boolean tick, CallbackInfo callbackInfo) {
     //#endif
-        fireTickEvent(true, tickDelta);
+        fireTickEvent(true, null, tickDelta);
     }
 
     @Inject(method = "render", at = @At(value = "CONSTANT", args = "stringValue=toasts"))
     //#if MC>=12100
-    //$$ private void renderTickPost(RenderTickCounter tickDelta, boolean tick, CallbackInfo callbackInfo) {
+    //$$ private void renderTickPost(RenderTickCounter tickDelta, boolean tick, CallbackInfo callbackInfo, @Local DrawContext vDrawContext) {
+    //$$     UDrawContext drawContext = new UDrawContext(vDrawContext, new UMatrixStack());
+    //#elseif MC>=12000
+    //$$ private void renderTickPost(float tickDelta, long startTime, boolean tick, CallbackInfo callbackInfo, @Local DrawContext vDrawContext) {
+    //$$     UDrawContext drawContext = new UDrawContext(vDrawContext, new UMatrixStack());
     //#else
     private void renderTickPost(float tickDelta, long startTime, boolean tick, CallbackInfo callbackInfo) {
+        UDrawContext drawContext = new UDrawContext(new UMatrixStack());
     //#endif
-        fireTickEvent(false, tickDelta);
+        fireTickEvent(false, drawContext, tickDelta);
     }
 
     @Unique
     private void fireTickEvent(
         boolean pre,
+        UDrawContext drawContext,
         //#if MC>=12100
         //$$ RenderTickCounter counter
         //#else
         float tickDelta
         //#endif
     ) {
-        UMatrixStack matrixStack = new UMatrixStack();
+        UMatrixStack matrixStack = drawContext != null ? drawContext.getMatrixStack() : new UMatrixStack();
         //#if MC>=12100
         //$$ float partialTicksMenu = ((DynamicRenderTickCounterAccessor) UMinecraft.getMinecraft().getRenderTickCounter()).essential$getRawTickDelta();
         //$$ float partialTicksInGame = counter.getTickDelta(false);
@@ -65,7 +77,7 @@ public class Mixin_RenderTickEvent {
         float partialTicksMenu = UMinecraft.getMinecraft().getTickDelta();
         float partialTicksInGame = tickDelta;
         //#endif
-        Essential.EVENT_BUS.post(new RenderTickEvent(pre, false, matrixStack, partialTicksMenu, partialTicksInGame));
+        Essential.EVENT_BUS.post(new RenderTickEvent(pre, false, drawContext, matrixStack, partialTicksMenu, partialTicksInGame));
     }
 
 }

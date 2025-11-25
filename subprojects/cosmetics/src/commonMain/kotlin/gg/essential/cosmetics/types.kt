@@ -11,6 +11,8 @@
  */
 package gg.essential.cosmetics
 
+import gg.essential.mod.cosmetics.database.GitRepoCosmeticsDatabase
+
 typealias CosmeticId = String
 typealias CosmeticTypeId = String
 typealias CosmeticCategoryId = String
@@ -18,4 +20,7 @@ typealias BoneId = String
 typealias CosmeticBundleId = String
 typealias FeaturedPageWidth = Int
 typealias FeaturedPageCollectionId = String
+typealias ImplicitOwnershipId = String
+typealias ImplicitOwnership = GitRepoCosmeticsDatabase.CosmeticImplicitOwnership
+typealias ImplicitOwnershipCriterion = GitRepoCosmeticsDatabase.ImplicitOwnershipCriterion
 typealias SkinId = String

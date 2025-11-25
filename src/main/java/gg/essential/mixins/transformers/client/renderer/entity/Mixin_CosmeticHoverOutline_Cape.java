@@ -17,7 +17,6 @@ import gg.essential.cosmetics.EquippedCosmetic;
 import gg.essential.gui.common.CosmeticHoverOutlineEffect;
 import gg.essential.mod.cosmetics.CosmeticSlot;
 import gg.essential.network.cosmetics.Cosmetic;
-import kotlin.Unit;
 import net.minecraft.client.entity.AbstractClientPlayer;
 import net.minecraft.client.renderer.entity.layers.LayerCape;
 import org.spongepowered.asm.mixin.Mixin;
@@ -28,6 +27,10 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import static gg.essential.mod.cosmetics.CapeDisabledKt.CAPE_DISABLED_COSMETIC;
+
+//#if MC>=12109
+//$$ import net.minecraft.client.render.command.OrderedRenderCommandQueue;
+//#endif
 
 //#if MC>=12102
 //$$ import gg.essential.mixins.impl.client.model.PlayerEntityRenderStateExt;
@@ -51,7 +54,9 @@ public abstract class Mixin_CosmeticHoverOutline_Cape
     //#endif
 {
 
-    //#if MC>=12102
+    //#if MC>=12109
+    //$$ private static final String RENDER_LAYER = "render(Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/command/OrderedRenderCommandQueue;ILnet/minecraft/client/render/entity/state/PlayerEntityRenderState;FF)V";
+    //#elseif MC>=12102
     //$$ private static final String RENDER_LAYER = "render(Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;ILnet/minecraft/client/render/entity/state/PlayerEntityRenderState;FF)V";
     //#elseif MC>=11600
     //$$ private static final String RENDER_LAYER = "render(Lcom/mojang/blaze3d/matrix/MatrixStack;Lnet/minecraft/client/renderer/IRenderTypeBuffer;ILnet/minecraft/client/entity/player/AbstractClientPlayerEntity;FFFFFF)V";
@@ -66,7 +71,11 @@ public abstract class Mixin_CosmeticHoverOutline_Cape
     private void renderIntoHoverOutlineFrameBuffer(
         //#if MC>=11400
         //$$ MatrixStack matrixStack,
+        //#if MC>=12109
+        //$$ OrderedRenderCommandQueue commandQueue,
+        //#else
         //$$ IRenderTypeBuffer buffer,
+        //#endif
         //$$ int light,
         //#endif
         //#if MC>=12102
@@ -109,7 +118,8 @@ public abstract class Mixin_CosmeticHoverOutline_Cape
             //$$ if (buffer instanceof IRenderTypeBuffer.Impl) ((IRenderTypeBuffer.Impl) buffer).finish();
             //#endif
 
-            outlineEffect.allocOutlineBuffer(cosmetic).use(() -> {
+            outlineEffect.beginOutlineRender(cosmetic);
+            {
                 //#if MC>=12102
                 //$$ render(matrixStack, buffer, light, state, netHeadYaw, headPitch);
                 //#elseif MC>=11400
@@ -121,9 +131,8 @@ public abstract class Mixin_CosmeticHoverOutline_Cape
                 //#if MC>=11600
                 //$$ if (buffer instanceof IRenderTypeBuffer.Impl) ((IRenderTypeBuffer.Impl) buffer).finish();
                 //#endif
-
-                return Unit.INSTANCE;
-            });
+            }
+            outlineEffect.endOutlineRender(cosmetic);
 
             outlinePass = false;
         }

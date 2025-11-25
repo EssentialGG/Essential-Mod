@@ -11,7 +11,6 @@
  */
 package gg.essential.network.connectionmanager.cosmetics;
 
-import com.google.common.collect.ImmutableMap;
 import com.sparkuniverse.toolbox.util.DateTime;
 import gg.essential.Essential;
 import gg.essential.config.EssentialConfig;
@@ -21,11 +20,11 @@ import gg.essential.connectionmanager.common.packet.cosmetic.*;
 import gg.essential.connectionmanager.common.packet.cosmetic.categories.ServerCosmeticCategoriesPopulatePacket;
 import gg.essential.connectionmanager.common.packet.response.ResponseActionPacket;
 import gg.essential.cosmetics.EquippedCosmetic;
+import gg.essential.cosmetics.EquippedCosmeticId;
 import gg.essential.cosmetics.model.CosmeticUnlockData;
 import gg.essential.connectionmanager.common.packet.wardrobe.ClientWardrobeSettingsPacket;
 import gg.essential.connectionmanager.common.packet.wardrobe.ServerWardrobeSettingsPacket;
 import gg.essential.connectionmanager.common.packet.wardrobe.ServerWardrobeStoreBundlePacket;
-import gg.essential.data.OnboardingData;
 import gg.essential.elementa.state.v2.ReferenceHolder;
 import gg.essential.event.client.ClientTickEvent;
 import gg.essential.event.network.server.ServerJoinEvent;
@@ -35,7 +34,6 @@ import gg.essential.gui.elementa.state.v2.ReferenceHolderImpl;
 import gg.essential.gui.elementa.state.v2.State;
 import gg.essential.gui.elementa.state.v2.StateKt;
 import gg.essential.gui.elementa.state.v2.collections.TrackedList;
-import gg.essential.gui.modals.TOSModal;
 import gg.essential.gui.notification.Notifications;
 import gg.essential.mod.EssentialAsset;
 import gg.essential.mod.cosmetics.*;
@@ -45,11 +43,11 @@ import gg.essential.network.connectionmanager.handler.cosmetics.*;
 import gg.essential.network.connectionmanager.handler.wardrobe.ServerWardrobeStoreBundlePacketHandler;
 import gg.essential.network.connectionmanager.queue.PacketQueue;
 import gg.essential.network.connectionmanager.queue.SequentialPacketQueue;
-import gg.essential.network.connectionmanager.sps.SPSManager;
 import gg.essential.network.cosmetics.Cosmetic;
 import gg.essential.network.cosmetics.cape.CapeCosmeticsManager;
+import gg.essential.sps.SpsAddress;
 import gg.essential.universal.UMinecraft;
-import gg.essential.util.GuiUtil;
+import gg.essential.util.USession;
 import kotlin.Pair;
 import kotlin.Unit;
 import kotlin.collections.MapsKt;
@@ -67,7 +65,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import static gg.essential.gui.elementa.state.v2.combinators.StateKt.map;
-import static gg.essential.gui.notification.HelpersKt.sendTosNotification;
 import static gg.essential.network.connectionmanager.cosmetics.ConnectionManagerKt.*;
 import static gg.essential.network.connectionmanager.cosmetics.CosmeticsManagerKt.onNewCosmetic;
 
@@ -96,7 +93,7 @@ public class CosmeticsManager implements NetworkedManager, ICosmeticsManager {
     @Nullable
     private final CosmeticsDataWithChanges cosmeticsDataWithChanges;
     @NotNull
-    private final EquippedCosmeticsManager equippedCosmeticsManager;
+    private final InfraEquippedOutfitsManager infraEquippedOutfitsManager;
     @NotNull
     private final MutableState<Map<String, CosmeticUnlockData>> unlockedCosmeticsData = StateKt.mutableStateOf(new HashMap<>());
     @NotNull
@@ -107,7 +104,7 @@ public class CosmeticsManager implements NetworkedManager, ICosmeticsManager {
     private final ModelLoader modelLoader;
 
     @NotNull
-    private CompletableFuture<Void> cosmeticsLoadedFuture = new CompletableFuture<>();
+    private MutableState<Boolean> cosmeticsLoaded = StateKt.mutableStateOf(false);
     private boolean receivedUnlockPacket = false;
 
     // If we've warned the user about cosmetics not working on offline mode servers
@@ -129,7 +126,10 @@ public class CosmeticsManager implements NetworkedManager, ICosmeticsManager {
 
         this.infraCosmeticsData = new InfraCosmeticsData(connectionManager, assetLoader);
 
-        Path repoPath = baseDir.toPath().resolve("cosmetics");
+        Path repoPath = baseDir.toPath().resolve("configuration");
+        if (Files.notExists(repoPath)) {
+            repoPath = baseDir.toPath().resolve("cosmetics");
+        }
         if (Files.exists(repoPath)) {
             this.localCosmeticsData = new LocalCosmeticsData(repoPath, assetLoader);
             this.cosmeticsDataWithChanges = new CosmeticsDataWithChanges(localCosmeticsData);
@@ -140,7 +140,7 @@ public class CosmeticsManager implements NetworkedManager, ICosmeticsManager {
             this.cosmeticsDataWithChanges = null;
         }
 
-        this.equippedCosmeticsManager = new EquippedCosmeticsManager(
+        this.infraEquippedOutfitsManager = new InfraEquippedOutfitsManager(
             this.connectionManager,
             this.connectionManager.getSubscriptionManager(),
             (hash) -> {
@@ -149,10 +149,6 @@ public class CosmeticsManager implements NetworkedManager, ICosmeticsManager {
             },
             this.cosmeticsData,
             this.infraCosmeticsData,
-            (uuid, skin) -> {
-                Essential.getInstance().getGameProfileManager().updatePlayerSkin(uuid, skin.getHash(), skin.getModel().getType());
-                return Unit.INSTANCE;
-            },
             (enabled) -> {
                 EquippedCosmeticsManagerMcKt.setCapeModelPartEnabled(enabled);
                 return Unit.INSTANCE;
@@ -162,7 +158,7 @@ public class CosmeticsManager implements NetworkedManager, ICosmeticsManager {
         onNewCosmetic(this.cosmeticsData, refHolder, cosmetic -> {
             primeCache(modelLoader, assetLoader, cosmetic);
 
-            connectionManager.getNoticesManager().getCosmeticNotices().cosmeticAdded(cosmetic.getId());
+            connectionManager.getCosmeticNotices().cosmeticAdded(cosmetic.getId());
 
             // If we're side-loading, auto-unlock all cosmetics
             if (localCosmeticsData != null) {
@@ -178,7 +174,6 @@ public class CosmeticsManager implements NetworkedManager, ICosmeticsManager {
         connectionManager.registerPacketHandler(ServerCosmeticsRevokePurchasePacket.class, new ServerCosmeticsRevokePurchasePacketHandler());
         connectionManager.registerPacketHandler(ServerCosmeticAnimationTriggerPacket.class, new ServerCosmeticAnimationTriggerPacketHandler());
         connectionManager.registerPacketHandler(ServerCosmeticsUserEquippedVisibilityPacket.class, new ServerCosmeticsUserEquippedVisibilityPacketHandler());
-        connectionManager.registerPacketHandler(ServerCosmeticsSkinTexturePacket.class, new ServerCosmeticSkinTexturePacketHandler());
         connectionManager.registerPacketHandler(ServerCosmeticCategoriesPopulatePacket.class, new ServerCosmeticCategoriesPopulatePacketHandler(this));
         connectionManager.registerPacketHandler(ServerWardrobeSettingsPacket.class, new ServerWardrobeSettingsPacketHandler());
         connectionManager.registerPacketHandler(ServerWardrobeStoreBundlePacket.class, new ServerWardrobeStoreBundlePacketHandler());
@@ -202,21 +197,13 @@ public class CosmeticsManager implements NetworkedManager, ICosmeticsManager {
     }
 
     @NotNull
-    public EquippedCosmeticsManager getEquippedCosmeticsManager() {
-        return this.equippedCosmeticsManager;
+    public InfraEquippedOutfitsManager getInfraEquippedOutfitsManager() {
+        return this.infraEquippedOutfitsManager;
     }
 
     @NotNull
     public State<TrackedList<Cosmetic>> getCosmetics() {
         return cosmeticsData.getCosmetics();
-    }
-
-    public boolean getOwnCosmeticsVisible() {
-        return this.equippedCosmeticsManager.getOwnCosmeticsVisible();
-    }
-
-    public void setOwnCosmeticsVisible(final boolean state) {
-        this.equippedCosmeticsManager.setOwnCosmeticsVisible(state);
     }
 
     @NotNull
@@ -241,13 +228,13 @@ public class CosmeticsManager implements NetworkedManager, ICosmeticsManager {
     }
 
     @NotNull
-    public Map<CosmeticSlot, String> getEquippedCosmetics() {
-        return this.equippedCosmeticsManager.getEquippedCosmetics();
+    public Map<CosmeticSlot, EquippedCosmeticId> getEquippedCosmetics() {
+        return this.infraEquippedOutfitsManager.getEquippedCosmetics().getCosmetics();
     }
 
     @NotNull
-    public ImmutableMap<CosmeticSlot, EquippedCosmetic> getVisibleCosmetics(UUID playerId) {
-        return this.equippedCosmeticsManager.getVisibleCosmetics(playerId);
+    public Map<CosmeticSlot, EquippedCosmetic> getVisibleCosmetics(UUID playerId) {
+        return this.infraEquippedOutfitsManager.getVisibleCosmeticsState(playerId).getUntracked();
     }
 
     @Nullable
@@ -278,7 +265,7 @@ public class CosmeticsManager implements NetworkedManager, ICosmeticsManager {
         this.updateQueue.reset();
         this.clearUnlockedCosmetics(true);
         this.infraCosmeticsData.resetState();
-        this.cosmeticsLoadedFuture = new CompletableFuture<>();
+        this.cosmeticsLoaded.set(false);
         this.receivedUnlockPacket = false;
         connectionManager.send(new ClientWardrobeSettingsPacket());
     }
@@ -313,58 +300,13 @@ public class CosmeticsManager implements NetworkedManager, ICosmeticsManager {
         }
 
         // Unlock SPS cosmetics if user is joining, not hosting, an SPS session
-        SPSManager spsManager = connectionManager.getSpsManager();
-        if (spsManager.isSpsAddress(event.getServerData().serverIP) && spsManager.getLocalSession() == null) {
+        SpsAddress spsAddress = SpsAddress.parse(event.getServerData().serverIP);
+        if (spsAddress != null && !spsAddress.getHost().equals(USession.Companion.activeNow().getUuid())) {
             unlockSpsCosmetics(connectionManager);
         }
 
         // Get any cosmetics that should be unlocked for joining the server
         unlockServerCosmetics(connectionManager, event.getServerData().serverIP);
-    }
-
-    /**
-     * Toggles the users cosmetic visibility state or print error if not connected to the Connection Manager
-     */
-    public void toggleOwnCosmeticVisibility(boolean notification) {
-        final boolean nextState = !getOwnCosmeticsVisible();
-        setOwnCosmeticVisibility(notification, nextState);
-    }
-
-    /**
-     * Sets the users cosmetic visibility state or print error if not connected to the Connection Manager
-     */
-    public void setOwnCosmeticVisibility(boolean notification, final boolean visible) {
-        if (!connectionManager.isAuthenticated()) {
-            if (OnboardingData.hasAcceptedTos()) {
-                gg.essential.gui.notification.ExtensionsKt.error(
-                    Notifications.INSTANCE,
-                    "Essential Network Error", "Unable to establish connection with the Essential Network.",
-                    () -> Unit.INSTANCE, () -> Unit.INSTANCE, b -> Unit.INSTANCE
-                );
-            } else {
-                if (GuiUtil.INSTANCE.openedScreen() == null) {
-                    // Show a notification when we're not in any menu, so it's less intrusive
-                    sendTosNotification(() -> {
-                        GuiUtil.INSTANCE.pushModal(
-                            (manager) -> new TOSModal(manager, false, true, (it) -> Unit.INSTANCE, () -> Unit.INSTANCE)
-                        );
-                        return Unit.INSTANCE;
-                    });
-                } else {
-                    GuiUtil.INSTANCE.pushModal(
-                        (manager) -> new TOSModal(manager, false, true, (it) -> Unit.INSTANCE, () -> Unit.INSTANCE)
-                    );
-                }
-            }
-            return;
-        }
-
-        if (visible != getOwnCosmeticsVisible()) {
-            connectionManager.send(
-                new ClientCosmeticsUserEquippedVisibilityTogglePacket(visible),
-                new CosmeticEquipVisibilityResponse(visible, notification)
-            );
-        }
     }
 
     public CompletableFuture<Boolean> claimFreeItems(@NotNull Set<String> ids) {
@@ -408,16 +350,16 @@ public class CosmeticsManager implements NetworkedManager, ICosmeticsManager {
     }
 
     /**
-     * Returns a future completed when client has received all cosmetic data from infra.
+     * Returns a boolean state which is true when client has received all cosmetic data from infra.
      */
-    public @NotNull CompletableFuture<Void> getCosmeticsLoadedFuture() {
-        return cosmeticsLoadedFuture;
+    public @NotNull State<Boolean> getCosmeticsLoaded() {
+        return cosmeticsLoaded;
     }
 
     @Subscribe
     public void tick(ClientTickEvent tickEvent) {
-        if (!cosmeticsLoadedFuture.isDone() && cosmeticDataLoadedFromInfra()) {
-            cosmeticsLoadedFuture.complete(null);
+        if (!this.cosmeticsLoaded.getUntracked() && cosmeticDataLoadedFromInfra()) {
+            this.cosmeticsLoaded.set(true);
         }
     }
 

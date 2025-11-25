@@ -11,12 +11,22 @@
  */
 package gg.essential.forge;
 
-//#if FORGE
 import gg.essential.Essential;
+
+//#if NEOFORGE
+//$$ import net.neoforged.fml.common.Mod;
+//#elseif FORGE
 import net.minecraftforge.fml.common.Mod;
 //#endif
 
-//#if FORGE
+//#if NEOFORGE && MC>=12104
+//$$ import gg.essential.util.HelpersKt;
+//$$ import gg.essential.util.ResourceManagerUtil;
+//$$ import net.neoforged.fml.ModList;
+//$$ import net.neoforged.neoforge.client.event.AddClientReloadListenersEvent;
+//#endif
+
+//#if FORGELIKE
 //#if MC>=11400
 //$$ @Mod(Essential.MODID)
 //#else
@@ -24,4 +34,35 @@ import net.minecraftforge.fml.common.Mod;
 //#endif
 //#endif
 public class EssentialForgeMod {
+    public static final boolean USE_NEW_NEOFORGE_RESOURCE_EVENT;
+    static {
+        //#if NEOFORGE && MC>=12104
+        //$$ boolean eventExists;
+        //$$ try {
+        //$$     Class.forName("net.neoforged.neoforge.client.event.AddClientReloadListenersEvent");
+        //$$     eventExists = true;
+        //$$ } catch (ClassNotFoundException e) {
+        //$$     eventExists = false;
+        //$$ }
+        //$$ USE_NEW_NEOFORGE_RESOURCE_EVENT = eventExists;
+        //#else
+        USE_NEW_NEOFORGE_RESOURCE_EVENT = false;
+        //#endif
+    }
+
+    public EssentialForgeMod() {
+        //#if NEOFORGE && MC>=12104
+        //$$ if (USE_NEW_NEOFORGE_RESOURCE_EVENT) {
+        //$$   // Note: Using an anonymous class instead of a lambda so we don't end up with synthetic methods using
+        //$$   // missing classes in its signature, which will lead to NoClassDefFoundError when accessed via reflection.
+        //$$   class Handler implements java.util.function.Consumer<AddClientReloadListenersEvent> {
+        //$$       @Override
+        //$$       public void accept(AddClientReloadListenersEvent event) {
+        //$$           event.addListener(HelpersKt.identifier("essential", "resource_manager"), ResourceManagerUtil.INSTANCE);
+        //$$       }
+        //$$   }
+        //$$   ModList.get().getModContainerById(Essential.MODID).get().getEventBus().addListener(new Handler());
+        //$$ }
+        //#endif
+    }
 }

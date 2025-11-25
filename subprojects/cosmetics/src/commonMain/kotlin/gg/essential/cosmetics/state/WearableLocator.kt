@@ -14,9 +14,12 @@ package gg.essential.cosmetics.state
 import gg.essential.model.ParticleSystem
 
 /** A wrapper which becomes invalid when this particular cosmetic instance is unequipped. */
-class WearableLocator(override val parent: ParticleSystem.Locator) : ParticleSystem.Locator by parent {
+class WearableLocator(override val parent: ParticleSystem.Locator,
+                      var wearableVisible: Boolean) : ParticleSystem.Locator by parent {
     private var wearableIsValid = true
     override var isValid: Boolean
         get() = parent.isValid && wearableIsValid
         set(value) { wearableIsValid = value }
+    override val isVisible: Boolean
+        get() = parent.isVisible && wearableVisible
 }

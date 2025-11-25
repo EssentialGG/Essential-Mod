@@ -2,6 +2,7 @@ com.mojang.blaze3d.systems.RenderSystem enableAlphaTest() net.minecraft.client.r
 com.mojang.blaze3d.systems.RenderSystem disableAlphaTest() net.minecraft.client.renderer.GlStateManager disableAlpha()
 com.mojang.blaze3d.systems.RenderSystem net.minecraft.client.renderer.GlStateManager
 com.mojang.datafixers.DataFixer net.minecraft.util.datafix.DataFixer
+net.minecraft.client.Minecraft getResourcePackList() getResourcePackRepository()
 net.minecraft.client.entity.player.RemoteClientPlayerEntity net.minecraft.client.entity.EntityOtherPlayerMP
 net.minecraft.client.gui.NewChatGui net.minecraft.client.gui.GuiNewChat
 net.minecraft.client.gui.NewChatGui func_238493_a_() setChatLine()
@@ -29,6 +30,7 @@ net.minecraft.client.gui.widget.list.AbstractList headerHeight net.minecraft.cli
 net.minecraft.client.gui.widget.list.AbstractList itemHeight net.minecraft.client.gui.GuiSlot slotHeight
 net.minecraft.client.gui.widget.list.AbstractList getMaxPosition() net.minecraft.client.gui.GuiSlot getContentHeight()
 net.minecraft.client.gui.widget.list.AbstractList getEntryAtPosition() net.minecraft.client.gui.GuiSlot getSlotIndexFromScreenCoords()
+net.minecraft.client.gui.widget.list.AbstractList getScrollAmount() net.minecraft.client.gui.GuiSlot getAmountScrolled()
 net.minecraft.client.gui.widget.list.AbstractList net.minecraft.client.gui.GuiSlot
 net.minecraft.client.renderer.FirstPersonRenderer net.minecraft.client.renderer.ItemRenderer
 net.minecraft.client.renderer.culling.ClippingHelper net.minecraft.client.renderer.culling.ICamera
@@ -50,6 +52,7 @@ net.minecraft.nbt.CompoundNBT net.minecraft.nbt.NBTTagCompound
 net.minecraft.nbt.CompoundNBT put() setTag()
 net.minecraft.nbt.ListNBT net.minecraft.nbt.NBTTagList
 net.minecraft.nbt.ListNBT size() tagCount()
+net.minecraft.network.login.ServerLoginNetHandler$1 net.minecraft.server.network.NetHandlerLoginServer$2
 net.minecraft.network.PacketDirection net.minecraft.network.EnumPacketDirection
 net.minecraft.profiler.IProfiler net.minecraft.profiler.Profiler
 net.minecraft.resources.FilePack net.minecraft.client.resources.FileResourcePack
@@ -63,6 +66,9 @@ net.minecraft.resources.IResourcePack net.minecraft.client.resources.IResourcePa
 net.minecraft.resources.IResourcePack getName() getPackName()
 net.minecraft.resources.ResourcePack net.minecraft.client.resources.AbstractResourcePack
 net.minecraft.resources.ResourcePack file resourcePackFile
+net.minecraft.resources.ResourcePackList net.minecraft.client.resources.ResourcePackRepository
+net.minecraft.resources.ResourcePackList reloadPacksFromFinders() updateRepositoryEntriesAll()
+net.minecraft.resources.ResourcePackList getAllPacks() getRepositoryEntriesAll()
 net.minecraft.resources.SimpleReloadableResourceManager net.minecraft.client.resources.SimpleReloadableResourceManager
 net.minecraft.util.concurrent.ThreadTaskExecutor net.minecraft.util.IThreadListener
 net.minecraft.world.GameRules get() net.minecraft.world.GameRules getString()
@@ -74,3 +80,8 @@ net.minecraftforge.eventbus.api.IEventBus net.minecraftforge.fml.common.eventhan
 net.minecraftforge.fml.client.gui.screen.ModListScreen net.minecraftforge.fml.client.GuiModList
 net.minecraftforge.versions.forge.ForgeVersion net.minecraftforge.common.ForgeVersion
 net.minecraft.util.concurrent.ThreadTaskExecutor isOnExecutionThread() net.minecraft.util.IThreadListener isCallingFromMinecraftThread()
+net.minecraft.client.gui.widget.list.ResourcePackList.ResourcePackEntry net.minecraft.client.resources.ResourcePackListEntry
+net.minecraft.client.gui.widget.list.ResourcePackList net.minecraft.client.gui.GuiResourcePackList
+net.minecraft.client.gui.screen.Screen hasShiftDown() isShiftKeyDown()
+net.minecraft.client.gui.widget.list.ResourcePackList.ResourcePackEntry func_238920_a_() showHoverOverlay()
+net.minecraft.client.renderer.entity.layers.HeldItemLayer net.minecraft.client.renderer.entity.layers.LayerHeldItem

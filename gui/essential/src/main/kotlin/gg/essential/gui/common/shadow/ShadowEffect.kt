@@ -16,23 +16,21 @@ import gg.essential.elementa.components.UIContainer
 import gg.essential.elementa.components.UIImage
 import gg.essential.elementa.constraints.CenterConstraint
 import gg.essential.elementa.effects.Effect
-import gg.essential.elementa.state.BasicState
-import gg.essential.elementa.state.State
 import gg.essential.gui.EssentialPalette
 import gg.essential.gui.common.LoadingIcon
 import gg.essential.gui.common.SequenceAnimatedUIImage
+import gg.essential.gui.elementa.state.v2.State
+import gg.essential.gui.elementa.state.v2.stateOf
 import gg.essential.universal.UGraphics
 import gg.essential.universal.UMatrixStack
 import java.awt.Color
 
-
-class ShadowEffect(
-    shadowColor: Color = EssentialPalette.COMPONENT_BACKGROUND
-) : Effect() {
-
-    private val shadowColorState = BasicState(shadowColor).map { it }
+class ShadowEffect(private val shadowColorState: State<Color>) : Effect() {
+    constructor(shadowColor: Color = EssentialPalette.COMPONENT_BACKGROUND) :
+            this(stateOf(shadowColor))
 
     override fun beforeDraw(matrixStack: UMatrixStack) {
+        val shadowColor = shadowColorState.getUntracked()
         when (val boundComponent = boundComponent) {
             is EssentialUIText -> {
 
@@ -49,13 +47,12 @@ class ShadowEffect(
                 val fontProvider = constraints.fontProvider
                 val x = boundComponent.getLeft()
                 val y = boundComponent.getTop() + (if (constraints.y is CenterConstraint) fontProvider.getBelowLineHeight() * scale else 0f)
-                val color = shadowColorState.get()
 
                 UGraphics.enableBlend()
 
                 fontProvider.drawString(
                     matrixStack,
-                    text, color, x + 1, y + 1,
+                    text, shadowColor, x + 1, y + 1,
                     10f, scale, false
                 )
             }
@@ -67,7 +64,7 @@ class ShadowEffect(
                     boundComponent.getTop() + 1.0,
                     boundComponent.getWidth().toDouble(),
                     boundComponent.getHeight().toDouble(),
-                    shadowColorState.get()
+                    shadowColor
                 )
             }
             is UIBlock, is UIContainer -> {
@@ -80,9 +77,7 @@ class ShadowEffect(
                 val x2 = boundComponent.getRight().toDouble()
                 val y2 = boundComponent.getBottom().toDouble()
 
-                val color = shadowColorState.get()
-
-                UIBlock.drawBlock(matrixStack, color, x+1, y+1, x2+1, y2+1)
+                UIBlock.drawBlock(matrixStack, shadowColor, x+1, y+1, x2+1, y2+1)
             }
             is UIImage -> {
                 boundComponent.drawImage(
@@ -91,7 +86,7 @@ class ShadowEffect(
                     boundComponent.getTop() + 1.0,
                     boundComponent.getWidth().toDouble(),
                     boundComponent.getHeight().toDouble(),
-                    shadowColorState.get()
+                    shadowColor
                 )
             }
             is LoadingIcon -> {
@@ -104,17 +99,13 @@ class ShadowEffect(
                     yCenter + boundComponent.scale.toInt(),
                     boundComponent.scale,
                     boundComponent.time,
-                    shadowColorState.get()
+                    shadowColor
                 )
             }
             else -> {
                 throw UnsupportedOperationException("Shadow effect cannot be applied to ${getDebugInfo()}")
             }
         }
-    }
-
-    fun rebindColor(state: State<Color>) = apply {
-        shadowColorState.rebind(state)
     }
 
     private fun getDebugInfo(): String {

@@ -12,11 +12,9 @@
 package gg.essential.mixins.impl.client.model;
 
 import gg.essential.model.backend.PlayerPose;
+import kotlin.Pair;
 import org.jetbrains.annotations.Nullable;
 
 public interface ElytraPoseSupplier {
-    @Nullable
-    PlayerPose.Part getLeftWingPose();
-    @Nullable
-    PlayerPose.Part getRightWingPose();
+    @Nullable Pair<PlayerPose.Part, PlayerPose.Part> getWingsPose();
 }

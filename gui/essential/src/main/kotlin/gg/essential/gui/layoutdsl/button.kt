@@ -11,6 +11,7 @@
  */
 package gg.essential.gui.layoutdsl
 
+import gg.essential.elementa.components.inspector.Inspector
 import gg.essential.gui.EssentialPalette
 import gg.essential.gui.common.IconButton
 import gg.essential.gui.common.MenuButton
@@ -109,4 +110,9 @@ fun LayoutScope.menuButton(
     )
     menuButton(modifier)
     return menuButton
+}
+
+@Suppress("unused")
+private val init = run {
+    Inspector.registerComponentFactory(null)
 }

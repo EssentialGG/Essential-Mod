@@ -21,12 +21,12 @@ import kotlinx.serialization.json.JsonTransformingSerializer
 import kotlinx.serialization.json.buildJsonObject
 
 @Serializable
-class SoundDefinitionsFile(
+data class SoundDefinitionsFile(
     @SerialName("sound_definitions")
     val definitions: Map<String, Definition>,
 ) {
     @Serializable
-    class Definition(
+    data class Definition(
         val category: SoundCategory,
         // Note: Min distance is not currently implemented. Minecraft uses a fixed 0 for all sounds.
         @SerialName("min_distance")
@@ -43,7 +43,7 @@ class SoundDefinitionsFile(
     )
 
     @Serializable
-    class Sound(
+    data class Sound(
         val name: String,
         val stream: Boolean = false,
         val interruptible: Boolean = false,

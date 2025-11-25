@@ -17,11 +17,14 @@ import gg.essential.connectionmanager.common.packet.Packet;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /** Sent by the server to the client to inform them which cosmetics they just unlocked. */
 public class ServerCosmeticsUserUnlockedPacket extends Packet {
+    public static final Set<String> suppressNotifications = new HashSet<>();
 
     // a: unlocked - list of unlocked items (deprecated for unlockedCosmetics)
 

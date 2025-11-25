@@ -37,7 +37,7 @@ import java.util.UUID
 /**
  * An input modal that allows completion if the username is valid
  */
-class UsernameInputModal(
+open class UsernameInputModal(
     modalManager: ModalManager,
     placeholderText: String,
     initialText: String = "",

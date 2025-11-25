@@ -20,7 +20,6 @@ import gg.essential.gui.common.FullEssentialToggle
 import gg.essential.gui.common.onSetValueAndNow
 import gg.essential.gui.common.shadow.ShadowEffect
 import gg.essential.gui.elementa.state.v2.mutableListStateOf
-import gg.essential.gui.elementa.state.v2.toV1
 import gg.essential.gui.layoutdsl.*
 import gg.essential.gui.vigilancev2.palette.VigilancePalette
 import gg.essential.mod.vigilance2.builder.StateBackedPropertyValue
@@ -70,7 +69,7 @@ fun LayoutScope.settingContainer(data: PropertyData) {
 
 // FIXME: Use LayoutDSL to make use of State
 fun LayoutScope.setting(data: PropertyData) = when (data.attributesExt.type) {
-    PropertyType.SWITCH -> FullEssentialToggle(getAsBooleanState(data), VigilancePalette.SETTING_BACKGROUND)()
+    PropertyType.SWITCH -> FullEssentialToggle(getAsBooleanState(data))()
     PropertyType.SELECTOR -> {
         val options = mutableListStateOf(*data.attributesExt.options.mapIndexed { value, text ->
             EssentialDropDown.Option(text, value)
@@ -142,5 +141,5 @@ private fun SettingComponent.registerStateValueChangeListener(data: PropertyData
 }
 
 @Suppress("UNCHECKED_CAST") // By using this function, you are saying that the T of `StateBackedPropertyValue` is `Boolean`.
-private fun LayoutScope.getAsBooleanState(data: PropertyData) =
-    (data.value as StateBackedPropertyValue<Boolean>).state.toV1(this.stateScope)
+private fun getAsBooleanState(data: PropertyData) =
+    (data.value as StateBackedPropertyValue<Boolean>).state

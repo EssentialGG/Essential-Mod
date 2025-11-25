@@ -139,6 +139,7 @@ sealed class WardrobeCategory(
             CosmeticSlot.EARS,
             CosmeticSlot.HEAD,
             CosmeticSlot.FULL_BODY,
+            CosmeticSlot.SKIRT,
             CosmeticSlot.TOP,
             CosmeticSlot.ACCESSORY,
             CosmeticSlot.PANTS,

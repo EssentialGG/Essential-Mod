@@ -12,6 +12,7 @@
 package gg.essential.mixins;
 
 import org.objectweb.asm.tree.ClassNode;
+import org.slf4j.LoggerFactory;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfig;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
@@ -91,5 +92,25 @@ public class IntegrationTestsPlugin implements IMixinConfigPlugin {
         } catch (NoSuchFieldException | IllegalAccessException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public static void registerUncaughtExceptionHandler() {
+        if (!ENABLED) {
+            return;
+        }
+
+        if (Thread.getDefaultUncaughtExceptionHandler() != null) {
+            return;
+        }
+        Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
+            try {
+                LoggerFactory.getLogger("UncaughtExceptionHandler")
+                    .error("Uncaught exception in thread \"{}\"", thread.getName(), throwable);
+            } catch (Throwable t) {
+                throwable.addSuppressed(t);
+                //noinspection CallToPrintStackTrace
+                throwable.printStackTrace();
+            }
+        });
     }
 }

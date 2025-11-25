@@ -13,10 +13,12 @@ package gg.essential.gui.layoutdsl
 
 import gg.essential.elementa.UIComponent
 import gg.essential.elementa.components.UIBlock
+import gg.essential.elementa.components.inspector.Inspector
 import gg.essential.elementa.dsl.boundTo
 import gg.essential.elementa.dsl.percent
 import gg.essential.elementa.dsl.pixels
 import gg.essential.elementa.effects.Effect
+import gg.essential.elementa.utils.elementaDev
 import gg.essential.gui.common.Spacer
 import java.awt.Color
 
@@ -34,6 +36,11 @@ sealed interface WidthDesc
 sealed interface HeightDesc
 private object Desc : WidthDesc, HeightDesc
 
+@Suppress("unused")
+private val init = run {
+    Inspector.registerComponentFactory(null)
+}
+
 // How is this not in the stdlib?
 internal inline fun <T> Iterable<T>.sumOf(selector: (T) -> Float): Float {
     var sum = 0f
@@ -41,6 +48,23 @@ internal inline fun <T> Iterable<T>.sumOf(selector: (T) -> Float): Float {
         sum += selector(element)
     }
     return sum
+}
+
+fun UIComponent.automaticComponentName(default: String) {
+    if (!elementaDev) return
+
+    componentName = Throwable().stackTrace
+        .asSequence()
+        .filterNot { it.lineNumber == 1 } // synthetic accessor methods
+        .filterNot { it.methodName.endsWith("\$default") } // synthetic Kotlin defaults methods
+        .map { it.methodName }
+        .distinct() // collapse overloads
+        .drop(1) // "automaticComponentName"
+        .drop(1) // caller method (e.g. "box")
+        .firstOrNull()
+        ?.takeUnless { it == "invoke" } // anonymous component (the `block` of `LayoutScope.invoke`)
+        ?.takeUnless { it == "<init>" } // anonymous component (likely direct child of a class component)
+        ?: default
 }
 
 fun UIComponent.getChildModifier() =

@@ -11,7 +11,7 @@
  */
 package gg.essential.mixins.transformers.resources;
 
-import gg.essential.mixins.ext.client.resource.FileResourcePackExt;
+import gg.essential.mixins.ext.client.resource.ResourcePackWithPath;
 import net.minecraft.resource.ZipResourcePack;
 import org.spongepowered.asm.mixin.Mixin;
 
@@ -20,10 +20,10 @@ import java.lang.reflect.Field;
 import java.nio.file.Path;
 
 @Mixin(ZipResourcePack.class)
-public class ZipResourcePackMixin_Ext implements FileResourcePackExt {
+public class ZipResourcePackMixin_Ext implements ResourcePackWithPath {
 
     @Override
-    public Path getEssential$file() {
+    public Path getEssential$path() {
         try {
             for (Field field : ZipResourcePack.class.getDeclaredFields()) {
                 if (!ZipFileWrapperAccessor.class.isAssignableFrom(field.getType())) {

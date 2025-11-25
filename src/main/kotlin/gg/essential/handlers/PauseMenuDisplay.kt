@@ -19,50 +19,94 @@ import gg.essential.data.ABTestingData
 import gg.essential.data.OnboardingData
 import gg.essential.data.VersionData
 import gg.essential.data.VersionInfo
-import gg.essential.elementa.components.UIBlock
 import gg.essential.elementa.components.UIContainer
-import gg.essential.elementa.components.UIText
 import gg.essential.elementa.components.Window
-import gg.essential.elementa.constraints.*
-import gg.essential.elementa.dsl.*
+import gg.essential.elementa.constraints.CenterConstraint
+import gg.essential.elementa.constraints.ChildBasedMaxSizeConstraint
+import gg.essential.elementa.constraints.ChildBasedSizeConstraint
+import gg.essential.elementa.constraints.SiblingConstraint
+import gg.essential.elementa.constraints.WidthConstraint
+import gg.essential.elementa.constraints.XConstraint
+import gg.essential.elementa.dsl.boundTo
+import gg.essential.elementa.dsl.childOf
+import gg.essential.elementa.dsl.coerceAtLeast
+import gg.essential.elementa.dsl.coerceAtMost
+import gg.essential.elementa.dsl.constrain
+import gg.essential.elementa.dsl.div
+import gg.essential.elementa.dsl.minus
+import gg.essential.elementa.dsl.percent
+import gg.essential.elementa.dsl.pixels
+import gg.essential.elementa.dsl.plus
+import gg.essential.elementa.dsl.provideDelegate
 import gg.essential.elementa.state.BasicState
 import gg.essential.event.essential.InitMainMenuEvent
 import gg.essential.event.gui.GuiDrawScreenEvent
 import gg.essential.event.gui.GuiOpenEvent
+import gg.essential.event.gui.InitGuiEvent
 import gg.essential.gui.EssentialPalette
-import gg.essential.gui.common.*
+import gg.essential.gui.common.MenuButton
+import gg.essential.gui.common.TextFlag
+import gg.essential.gui.common.bindConstraints
 import gg.essential.gui.common.modal.ConfirmDenyModal
 import gg.essential.gui.common.modal.Modal
 import gg.essential.gui.common.modal.configure
+import gg.essential.gui.common.or
 import gg.essential.gui.elementa.VanillaButtonConstraint.Companion.constrainTo
 import gg.essential.gui.elementa.VanillaButtonGroupConstraint.Companion.constrainTo
+import gg.essential.gui.elementa.state.v2.combinators.not
 import gg.essential.gui.elementa.state.v2.stateOf
-import gg.essential.gui.layoutdsl.*
 import gg.essential.gui.elementa.state.v2.toV2
+import gg.essential.gui.layoutdsl.Alignment
+import gg.essential.gui.layoutdsl.Arrangement
+import gg.essential.gui.layoutdsl.LayoutScope
+import gg.essential.gui.layoutdsl.Modifier
+import gg.essential.gui.layoutdsl.alignBoth
+import gg.essential.gui.layoutdsl.alignVertical
+import gg.essential.gui.layoutdsl.checkboxAlt
+import gg.essential.gui.layoutdsl.color
+import gg.essential.gui.layoutdsl.column
+import gg.essential.gui.layoutdsl.hoverColor
+import gg.essential.gui.layoutdsl.hoverScope
+import gg.essential.gui.layoutdsl.inheritHoverScope
+import gg.essential.gui.layoutdsl.layout
+import gg.essential.gui.layoutdsl.row
+import gg.essential.gui.layoutdsl.shadow
+import gg.essential.gui.layoutdsl.spacer
+import gg.essential.gui.layoutdsl.text
 import gg.essential.gui.menu.AccountManager
+import gg.essential.gui.menu.RightSideBarNew
 import gg.essential.gui.menu.LeftSideBar
-import gg.essential.gui.menu.full.FullRightSideBar
-import gg.essential.gui.menu.compact.CompactRightSideBar
 import gg.essential.gui.modal.sps.FirewallBlockingModal
-import gg.essential.gui.modals.*
+import gg.essential.gui.modals.EssentialAutoInstalledModal
+import gg.essential.gui.modals.FeaturesEnabledModal
+import gg.essential.gui.modals.NotAuthenticatedModal
+import gg.essential.gui.modals.TOSModal
+import gg.essential.gui.modals.UpdateAvailableModal
+import gg.essential.gui.modals.UpdateNotificationModal
+import gg.essential.gui.modals.ensurePrerequisites
 import gg.essential.gui.notification.Notifications
 import gg.essential.gui.notification.error
+import gg.essential.gui.notification.toastButton
 import gg.essential.gui.notification.warning
+import gg.essential.gui.overlay.Layer
 import gg.essential.gui.overlay.LayerPriority
 import gg.essential.gui.overlay.ModalManager
+import gg.essential.gui.overlay.launchModalFlow
 import gg.essential.gui.sps.InviteFriendsModal
 import gg.essential.gui.sps.WorldSelectionModal
+import gg.essential.gui.util.addTag
 import gg.essential.universal.UMinecraft
 import gg.essential.util.AutoUpdate
 import gg.essential.util.GuiUtil
 import gg.essential.util.findButtonByLabel
-import gg.essential.gui.util.onAnimationFrame
 import gg.essential.gui.util.pollingState
 import gg.essential.network.connectionmanager.serverdiscovery.NewServerDiscoveryManager
 import gg.essential.network.connectionmanager.sps.SPSSessionSource
+import gg.essential.network.connectionmanager.suspension.suspensionModal
+import gg.essential.sps.SpsAddress
+import gg.essential.universal.USound
 import gg.essential.util.FirewallUtil
 import gg.essential.util.MinecraftUtils
-import gg.essential.util.findChildOfTypeOrNull
 import gg.essential.util.isMainMenu
 import gg.essential.vigilance.utils.onLeftClick
 import me.kbrewster.eventbus.Subscribe
@@ -71,6 +115,7 @@ import net.minecraft.client.gui.GuiIngameMenu
 import net.minecraft.client.gui.GuiMultiplayer
 import net.minecraft.client.gui.GuiScreen
 import net.minecraft.world.storage.WorldSummary
+import java.awt.Color
 import java.time.Instant
 import java.util.*
 
@@ -84,18 +129,28 @@ import java.util.*
 class PauseMenuDisplay {
 
     private val fullRightMenuPixelWidth = 104.pixels
-    private val collapsedRightMenuPixelWidth = 68.pixels
     private val rightMenuMinPadding = 5
-    private var init = false
 
-    fun init(screen: GuiScreen) {
-        init = true
+    private var layer: Layer? = null
+    private var initContent = false
+    private var initModals = false
 
-        if (screen.isMainMenu) {
-            Essential.EVENT_BUS.post(InitMainMenuEvent())
-        }
+    private fun initContent(screen: GuiScreen) {
+        initContent = true
 
         if (EssentialConfig.essentialFull) {
+            val window = GuiUtil.addLayer(LayerPriority.AboveScreenContent)
+                .also { layer = it }
+                .window
+            initContent(screen, window)
+        }
+    }
+
+    fun initContent(screen: GuiScreen, window: Window) {
+        if (EssentialConfig.essentialMenuLayout == EssentialConfig.EssentialMenuLayout.OFF) return
+
+        run { // for indent
+            window.addTag(MenuButton.WindowSupportsButtonRetexturingMarker)
 
             val menuType =
                 if (screen.isMainMenu) MenuType.MAIN
@@ -103,17 +158,25 @@ class PauseMenuDisplay {
                 else MenuType.SINGLEPLAYER
 
             // Create containers around the top and bottom buttons, so we can use them for GUI alignment
-            val topButton by UIContainer().constrainTo(
-                listOf(
-                    screen.findButtonByLabel("menu.singleplayer", "menu.returnToGame"),
-                    screen.findButtonByLabel("menu.multiplayer")
-                )
+            val topButtonGetter = screen.findButtonByLabel("menu.singleplayer", "menu.returnToGame")
+            // topButtonAndMultiplayer is used to calculate x positioning for when single and multiplayer buttons
+            //  are side by side
+            val topButtonAndMultiplayer by UIContainer().constrainTo(
+                listOf(topButtonGetter, screen.findButtonByLabel("menu.multiplayer"))
             ) {
                 x = CenterConstraint()
                 y = 25.percent + 48.pixels
                 width = 200.pixels
                 height = 20.pixels
             } childOf window
+
+            val topButton by UIContainer().constrainTo(listOf(topButtonGetter)) {
+                x = CenterConstraint()
+                y = 25.percent + 48.pixels
+                width = 200.pixels
+                height = 20.pixels
+            } childOf window
+
             val bottomButton by UIContainer().constrainTo(
                 screen.findButtonByLabel("menu.quit", "menu.returnToMenu", "menu.disconnect", "replaymod.gui.exit")
             ) {
@@ -123,46 +186,26 @@ class PauseMenuDisplay {
                 height = 20.pixels
             } childOf window
 
-            val isCompact = BasicState(EssentialConfig.essentialMenuLayout == 1)
-
-            val collapsed = bottomButton.pollingState {
-                    getRightSideMenuX(topButton, fullRightMenuPixelWidth).getXPosition(window) +
+            val isCompact = BasicState(EssentialConfig.essentialMenuLayout == EssentialConfig.EssentialMenuLayout.MINIMAL) or bottomButton.pollingState {
+                    getRightSideMenuX(window, topButtonAndMultiplayer, fullRightMenuPixelWidth).getXPosition(window) +
                         fullRightMenuPixelWidth.value + rightMenuMinPadding >= window.getRight()
                 }
 
-            val menuVisible = bottomButton.pollingState { EssentialConfig.essentialMenuLayout != 2 }
-
             val rightContainer by UIContainer().constrain {
                 height = ChildBasedMaxSizeConstraint()
-            }.bindConstraints(collapsed.zip(isCompact)) { (collapse, isCompact) ->
+            }.bindConstraints(isCompact) { isCompact ->
                 if (isCompact) {
-                    x = if (EssentialConfig.closerMenuSidebar) {
-                        (13.pixels(alignOpposite = true) boundTo window).coerceIn(
-                            (0.pixels(alignOpposite = true) boundTo topButton) + 24.pixels,
-                            (SiblingConstraint(maxSpaceBetweenSides + 20f) boundTo topButton) - basicXConstraint { it.getWidth() },
-                        )
-                    } else {
-                        (13.pixels(alignOpposite = true) boundTo window)
-                            .coerceAtLeast((0.pixels(alignOpposite = true) boundTo topButton) + 24.pixels)
-                    }.coerceAtMost(rightMenuMinPadding.pixels(alignOpposite = true) boundTo window)
-                    y = (((CenterConstraint() boundTo bottomButton) + (CenterConstraint() boundTo topButton)) / 2)
-                            .coerceAtMost(40.pixels(alignOpposite = true) boundTo window)
-                            .coerceAtLeast(0.pixels(alignOpposite = true) boundTo bottomButton)
+                    x = (13.pixels(alignOpposite = true) boundTo window)
+                            .coerceAtLeast((0.pixels(alignOpposite = true) boundTo topButtonAndMultiplayer) + 24.pixels).coerceAtMost(rightMenuMinPadding.pixels(alignOpposite = true) boundTo window)
                     width = ChildBasedSizeConstraint()
                 } else {
-                    width = if (collapse) collapsedRightMenuPixelWidth else fullRightMenuPixelWidth
-                    x = getRightSideMenuX(topButton, width).coerceAtMost(rightMenuMinPadding.pixels(alignOpposite = true) boundTo window)
-                    y = 28.pixels.coerceAtLeast((0.pixels boundTo topButton) - 100.pixels)
+                    width = fullRightMenuPixelWidth
+                    x = getRightSideMenuX(window, topButtonAndMultiplayer, width).coerceAtMost(rightMenuMinPadding.pixels(alignOpposite = true) boundTo window)
                 }
+                y = (((CenterConstraint() boundTo bottomButton) + (CenterConstraint() boundTo topButton)) / 2)
+                    .coerceAtMost(16.pixels(alignOpposite = true) boundTo window)
+                    .coerceAtLeast(4.pixels)
             } childOf window
-
-            bottomButton.onAnimationFrame {
-                isCompact.set(
-                    getRightSideMenuX(topButton, collapsedRightMenuPixelWidth).getXPosition(rightContainer) +
-                        collapsedRightMenuPixelWidth.value + rightMenuMinPadding >= window.getRight()
-                        || EssentialConfig.essentialMenuLayout == 1
-                )
-            }
 
             val leftContainer by UIContainer().constrain {
                 width = 50.percent
@@ -170,13 +213,9 @@ class PauseMenuDisplay {
             } childOf window
 
             val accountManager = AccountManager()
-            CompactRightSideBar(menuType, menuVisible, rightContainer, accountManager)
-                .bindParent(rightContainer, menuVisible and isCompact)
-            FullRightSideBar(menuType, topButton, bottomButton, collapsed, menuVisible and !isCompact)
-                .bindParent(rightContainer, menuVisible and !isCompact)
+            RightSideBarNew(menuType, isCompact.toV2(), accountManager) childOf rightContainer
 
-            LeftSideBar(topButton, bottomButton, menuVisible.toV2(), collapsed.toV2(), isCompact.toV2(), menuType, rightContainer, leftContainer, accountManager)
-                .bindParent(leftContainer, menuVisible)
+            LeftSideBar(window, topButtonAndMultiplayer, bottomButton, rightContainer, leftContainer) childOf leftContainer
 
             if (menuType == MenuType.MAIN
                 && Instant.now() < NewServerDiscoveryManager.NEW_TAG_END_DATE
@@ -214,6 +253,15 @@ class PauseMenuDisplay {
                 } childOf window
             }
         }
+    }
+
+    private fun initModals(screen: GuiScreen) {
+        initModals = true
+
+        if (screen.isMainMenu) {
+            // only triggers a modal currently
+            Essential.EVENT_BUS.post(InitMainMenuEvent())
+        }
 
         EssentialAutoInstalledModal.showModal()
 
@@ -222,13 +270,13 @@ class PauseMenuDisplay {
             fun showUpdateToast(message: String? = null) {
                 var updateClicked = false
 
-                val updateButton = UIBlock().apply {
-                    layout(Modifier.childBasedWidth(10f).childBasedHeight(4.5f)
-                            .color(EssentialPalette.GREEN_BUTTON).hoverColor(EssentialPalette.GREEN_BUTTON_HOVER).hoverScope()
-                    ) {
-                        text("Update", Modifier.alignBoth(Alignment.Center(true)).color(EssentialPalette.TEXT_HIGHLIGHT).shadow(EssentialPalette.TEXT_SHADOW))
-                    }
-                }
+                val updateButton = toastButton("Install",
+                    backgroundModifier = Modifier.color(EssentialPalette.GREEN_BUTTON)
+                        .hoverColor(EssentialPalette.GREEN_BUTTON_HOVER)
+                        .shadow(Color.BLACK),
+                    textModifier = Modifier.color(EssentialPalette.TEXT_HIGHLIGHT)
+                        .shadow(EssentialPalette.TEXT_SHADOW)
+                )
 
                 Notifications.pushPersistentToast(AutoUpdate.getNotificationTitle(false), message ?: " ", {
                     GuiUtil.pushModal { manager -> UpdateAvailableModal(manager) }
@@ -238,6 +286,7 @@ class PauseMenuDisplay {
                     }
                 }, {
                     withCustomComponent(Slot.ACTION, updateButton)
+                    withCustomComponent(Slot.ICON, EssentialPalette.DOWNLOAD_7X8.create())
                     trimMessage = true
                     AutoUpdate.dismissUpdateToast = {
                         updateClicked = true
@@ -249,6 +298,15 @@ class PauseMenuDisplay {
             AutoUpdate.changelog.whenCompleteAsync({ changelog, _ -> showUpdateToast(changelog) }, Window::enqueueRenderOperation)
 
             AutoUpdate.seenUpdateToast = true
+        }
+
+        // Suspension modal
+        Essential.getInstance().connectionManager.suspensionManager.activeSuspension.getUntracked()?.let { suspension ->
+            if (suspension.unseen) {
+                GuiUtil.launchModalFlow {
+                    suspensionModal(suspension)
+                }
+            }
         }
 
         // Update Notification Modal
@@ -279,6 +337,17 @@ class PauseMenuDisplay {
     }
 
     @Subscribe
+    fun guiInit(event: InitGuiEvent) {
+        // re init so that our buttons can re-attach to the proxy vanilla buttons on screen resize
+        // this massively simplifies re-attachment to the [EssentialProxyElement]'s and syncs our button lifecycles with those of vanilla
+
+        // same as refresh() but only for screen content
+        layer?.let { GuiUtil.removeLayer(it) }
+        layer = null
+        initContent = false
+    }
+
+    @Subscribe
     fun drawScreen(event: GuiDrawScreenEvent) {
         val screen = event.screen
         if (screen !is GuiIngameMenu && !screen.isMainMenu) {
@@ -286,40 +355,41 @@ class PauseMenuDisplay {
         }
 
         //#if MC>=11600
-        //$$ if (screen is IngameMenuScreen && screen is GuiScreenAccessor &&
-        //$$     (screen.`essential$getChildren`().isEmpty() || (screen.`essential$getChildren`().size == 1 &&
-        //$$             screen.`essential$getChildren`().any { it is Widget && it.message == textTranslatable("menu.paused") } ))) {
+        //$$ if (screen is IngameMenuScreen && screen.title == textTranslatable("menu.paused")) {
         //$$     return // F3+Esc
         //$$ }
         //#endif
 
-        if (!init) {
-            init(screen)
+        if (!initContent) {
+            initContent(screen)
+        }
+
+        if (!initModals) {
+            initModals(screen)
         }
     }
 
     fun refresh() {
-        window.clearChildren()
-        init = false
+        layer?.let { GuiUtil.removeLayer(it) }
+        layer = null
+        initContent = false
+        initModals = false
     }
 
-    private fun getRightSideMenuX(topButton: UIContainer, width: WidthConstraint): XConstraint {
-        // This maintains the appropriate distance from both the accessibility button and edges of the screen as much as possible
-        return ((SiblingConstraint() boundTo topButton) +
-            (((0.pixels(alignOpposite = true) boundTo window) - (0.pixels(alignOpposite = true) boundTo topButton)) / 2f - (width / 2)))
-            .coerceIn(
-                SiblingConstraint(28f) boundTo topButton,
-                SiblingConstraint(65f) boundTo topButton
-            )
+    private fun getRightSideMenuX(window: Window, topButton: UIContainer, width: WidthConstraint): XConstraint {
+        return run {
+            // Keep right menu in the of middle the vanilla buttons and right side of the screen
+            //  (Right menu buttons are aligned to the right with extra space to the left so remove that extra space when aligning)
+            //  with some padding between it and the vanilla buttons
+            ((SiblingConstraint() boundTo topButton) - (width - RightSideBarNew.BUTTON_WIDTH.pixels) +
+                    (((0.pixels(alignOpposite = true) boundTo window) - (0.pixels(alignOpposite = true) boundTo topButton)) / 2f - (RightSideBarNew.BUTTON_WIDTH.pixels / 2)))
+                .coerceAtLeast(SiblingConstraint(28f) boundTo topButton)
+        }
     }
 
     companion object {
-        var window: Window = GuiUtil.createPersistentLayer(LayerPriority.AboveScreenContent).window
-
         @JvmStatic
         val minWidth = 404
-        @JvmStatic
-        val maxSpaceBetweenSides = 187f
 
         @JvmStatic
         fun canRescale(screen: GuiScreen): Boolean {
@@ -333,21 +403,43 @@ class PauseMenuDisplay {
             source: SPSSessionSource,
             prepopulatedInvites: Set<UUID> = emptySet(),
             worldSummary: WorldSummary? = null,
-            previousModal: Modal? = null,
+            showIPWarning: Boolean = true,
+            callback: () -> Unit = {},
+        ) {
+            GuiUtil.launchModalFlow {
+                ensurePrerequisites(social = true, rules = false)
+
+                awaitModal {
+                    object : Modal(modalManager) {
+                        override fun onOpen() {
+                            super.onOpen()
+                            showInviteOrHostModalInternal(source, prepopulatedInvites, worldSummary, this, showIPWarning, callback)
+                        }
+
+                        override val modalName: String? get() = null
+                        override fun LayoutScope.layoutModal() {}
+                        override fun handleEscapeKeyPress() {}
+                    }
+                }
+            }
+        }
+
+        fun showInviteOrHostModalInternal(
+            source: SPSSessionSource,
+            prepopulatedInvites: Set<UUID> = emptySet(),
+            worldSummary: WorldSummary? = null,
+            previousModal: Modal,
             showIPWarning: Boolean = true,
             callback: () -> Unit = {},
         ) {
             val connectionManager = Essential.getInstance().connectionManager
+
             val currentServerData = UMinecraft.getMinecraft().currentServerData
             val spsManager = connectionManager.spsManager
 
             // Attempts to replace the previously opened modal, or, push a new modal if one is not open.
             fun pushModal(builder: (ModalManager) -> Modal) {
-                if (previousModal != null) {
-                    previousModal.replaceWith(builder(previousModal.modalManager))
-                } else {
-                    GuiUtil.pushModal(builder)
-                }
+                previousModal.replaceWith(builder(previousModal.modalManager))
             }
 
             // Attempts to show the user various warnings (TOS, Connection Manager, Firewall, etc.) before pushing
@@ -357,7 +449,7 @@ class PauseMenuDisplay {
                 builder: (ModalManager) -> Modal
             ) {
                 fun Modal.retryModal(showIPWarningOverride: Boolean = showIPWarning) {
-                    showInviteOrHostModal(
+                    showInviteOrHostModalInternal(
                         source,
                         prepopulatedInvites,
                         worldSummary,
@@ -416,7 +508,18 @@ class PauseMenuDisplay {
                 return
             }
 
-            if (UMinecraft.getMinecraft().integratedServer != null) {
+
+            if (worldSummary != null) {
+                pushModalAndWarnings(showNetworkRelatedWarnings = true) { manager ->
+                    InviteFriendsModal.createWorldSettingsModal(
+                        manager,
+                        prepopulatedInvites,
+                        justStarted = true,
+                        worldSummary,
+                        source = source,
+                    )
+                }
+            } else if (UMinecraft.getMinecraft().integratedServer != null) {
                 if (MinecraftUtils.isHostingSPS()) {
                     pushModalAndWarnings(showNetworkRelatedWarnings = false) { manager ->
                         InviteFriendsModal.createSelectFriendsModal(
@@ -441,7 +544,7 @@ class PauseMenuDisplay {
                 }
             } else if (currentServerData != null) {
                 val serverAddress = currentServerData.serverIP
-                val isSPSServer = connectionManager.spsManager.isSpsAddress(serverAddress)
+                val isSPSServer = SpsAddress.parse(serverAddress) != null
                 if (isSPSServer) {
                     Notifications.warning("Only hosts can send invites", "")
                     return
@@ -454,23 +557,14 @@ class PauseMenuDisplay {
                         onComplete = callback
                     )
                 }
-            } else if (worldSummary != null) {
-                pushModalAndWarnings(showNetworkRelatedWarnings = true) { manager ->
-                    InviteFriendsModal.createWorldSettingsModal(
-                        manager,
-                        prepopulatedInvites,
-                        justStarted = true,
-                        worldSummary,
-                        source = source,
-                    )
-                }
             } else {
                 // Realms, ReplayMod, etc.
                 Notifications.error("Can't invite to this world", "")
+                previousModal.close()
             }
         }
 
-        private fun createIPAddressWarningModal(modalManager: ModalManager, callback: Modal.() -> Unit): Modal {
+        fun createIPAddressWarningModal(modalManager: ModalManager, callback: Modal.() -> Unit): Modal {
             return ConfirmDenyModal(
                 modalManager,
                 false
@@ -483,29 +577,19 @@ class PauseMenuDisplay {
 
                 onPrimaryAction { callback(this) }
             }.configureLayout { customContent ->
-                val notifyContainer by UIContainer().constrain {
-                    x = CenterConstraint()
-                    y = SiblingConstraint()
-                    width = ChildBasedSizeConstraint()
-                    height = ChildBasedMaxSizeConstraint()
-                }.onLeftClick { findChildOfTypeOrNull<Checkbox>()?.toggle() } childOf customContent
-
-                val notifyToggle by Checkbox(checkmarkColor = BasicState(EssentialPalette.TEXT)).constrain {
-                    width = 9.pixels
-                    height = AspectConstraint()
-                    y = CenterConstraint()
-                } childOf notifyContainer
-
-                UIText("Do not show this warning again", shadow = false).constrain {
-                    x = SiblingConstraint(5f)
-                    y = CenterConstraint()
-                    color = EssentialPalette.TEXT_DISABLED.toConstraint()
-                } childOf notifyContainer
-
-                val notifySpacer by Spacer(height = 14f) childOf customContent
-
-                notifyToggle.isChecked.onSetValue {
-                    EssentialConfig.spsIPWarning = !it
+                customContent.layout {
+                    val checkBoxState = !EssentialConfig.spsIPWarningState
+                    column(Modifier.alignBoth(Alignment.Center)) {
+                        row(Modifier.hoverScope(), Arrangement.spacedBy(5f)) {
+                            checkboxAlt(checkBoxState, Modifier.shadow(EssentialPalette.BLACK).inheritHoverScope())
+                            text("Don't show this warning again", modifier = Modifier.alignVertical(Alignment.Center(true)).color(EssentialPalette.TEXT_DISABLED).shadow(EssentialPalette.BLACK))
+                        }.onLeftClick {
+                            it.stopPropagation()
+                            USound.playButtonPress()
+                            checkBoxState.set { !it }
+                        }
+                        spacer(height = 14f)
+                    }
                 }
             }
         }

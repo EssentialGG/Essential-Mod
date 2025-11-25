@@ -41,6 +41,8 @@ public class FeatureFlags {
 
     private static final Logger LOGGER = LogManager.getLogger("Essential Logger");
 
+    public static final String NEVER = "NEVER";
+
 
     // Add any features here that should be displayed in the FeaturesEnabledModal
     public static final Map<String, Pair<String, Boolean>> abTestingFlags = new HashMap<>();

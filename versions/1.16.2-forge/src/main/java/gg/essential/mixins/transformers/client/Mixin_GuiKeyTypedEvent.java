@@ -62,14 +62,14 @@ public class Mixin_GuiKeyTypedEvent {
     //#endif
         int action,
         //#if MC>=11700
-        //#if FORGE && MC>=11800
+        //#if FORGE && MC>=11800 && MC<12006
         //$$ // Forge 1.18+ moves this to after `result`
         //#else
         //$$ Screen screen,
         //#endif
         //#endif
         boolean[] result,
-        //#if FORGE && MC>=11800
+        //#if FORGE && MC>=11800 && MC<12006
         //$$ Screen screen,
         //#endif
         //#if FORGE
@@ -102,18 +102,18 @@ public class Mixin_GuiKeyTypedEvent {
     //$$ static
     //#endif
     private void onCharTypedSingle(
-        //#if FORGE
+        //#if FORGELIKE
         //#if MC>=11800
         //$$ Screen screen,
         //#endif
         int typedChar, int modifiers,
         //#endif
-        //#if MC>=11800 && FORGE
+        //#if MC>=11800 && FORGELIKE
         //$$ // Forge 1.18+ doesn't have this argument
         //#else
         IGuiEventListener handler,
         //#endif
-        //#if FORGE==0
+        //#if FORGELIKE==0
         //$$ int typedChar, int modifiers,
         //#endif
         CallbackInfo ci
@@ -135,18 +135,18 @@ public class Mixin_GuiKeyTypedEvent {
     //$$ static
     //#endif
     private void onCharTypedMulti(
-        //#if FORGE
+        //#if FORGELIKE
         //#if MC>=11800
         //$$ Screen screen,
         //#endif
         char typedChar, int modifiers,
         //#endif
-        //#if MC>=11800 && FORGE
+        //#if MC>=11800 && FORGELIKE
         //$$ // Forge 1.18+ doesn't have this argument
         //#else
         IGuiEventListener handler,
         //#endif
-        //#if FORGE==0
+        //#if FORGELIKE==0
         //$$ char typedChar, int modifiers,
         //#endif
         CallbackInfo ci

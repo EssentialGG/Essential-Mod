@@ -16,7 +16,6 @@ package gg.essential.mod.cosmetics
 import gg.essential.mod.EssentialAsset
 import gg.essential.model.util.Instant
 import gg.essential.model.util.InstantAsMillisSerializer
-import gg.essential.model.util.now
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 
@@ -33,12 +32,6 @@ data class CosmeticCategory(
     val availableAfter: Instant? = null,
     val availableUntil: Instant? = null,
 ) {
-    fun isAvailable(at: Instant = now()): Boolean {
-        val isAvailableAfterNow = availableAfter != null && availableAfter < at
-        val isAvailableBeforeNow = availableUntil == null || availableUntil > at
-        return isAvailableAfterNow && isAvailableBeforeNow
-    }
-
     fun isEmoteCategory() = tags.contains(EMOTE_CATEGORY_TAG)
 
     fun isHidden() = tags.contains(HIDDEN_CATEGORY_TAG)

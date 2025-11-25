@@ -20,13 +20,13 @@ import gg.essential.mod.cosmetics.CosmeticSlot
 import gg.essential.mod.cosmetics.CosmeticTier
 import gg.essential.mod.cosmetics.CosmeticType
 import gg.essential.mod.cosmetics.SkinLayer
+import gg.essential.mod.cosmetics.database.LOCAL_PATH
 import gg.essential.mod.cosmetics.settings.CosmeticProperty
 import gg.essential.mod.cosmetics.settings.CosmeticPropertyType
 import gg.essential.mod.cosmetics.settings.CosmeticSetting
 import gg.essential.mod.cosmetics.settings.CosmeticSettings
 import gg.essential.mod.cosmetics.settings.variant
 import gg.essential.model.Side
-import gg.essential.model.util.now
 import gg.essential.model.util.Instant
 import gg.essential.model.util.InstantAsMillisSerializer
 import kotlinx.serialization.Serializable
@@ -40,13 +40,14 @@ data class Cosmetic(
     val tier: CosmeticTier,
     val displayNames: Map<String, String>,
     val files: Map<String, EssentialAsset>,
-    val properties: List<CosmeticProperty>,
+    val allProperties: List<CosmeticProperty>,
     val storePackageId: Int,
     val prices: Map<String, Double>,
     val tags: Set<String>,
     val createdAt: Instant,
     val availableAfter: Instant?,
     val availableUntil: Instant?,
+    val showTimerAfter: Instant?,
     val skinLayers: Map<SkinLayer, Boolean>,
     val categories: Map<String, Int>,
     val defaultSortWeight: Int,
@@ -76,15 +77,17 @@ data class Cosmetic(
     fun assets(variant: String): CosmeticAssets = assetVariants[variant] ?: baseAssets
     fun assets(settings: CosmeticSettings) = assets(settings.variant ?: defaultVariantName)
 
+    val properties: List<CosmeticProperty> = allProperties.filter { @Suppress("DEPRECATION") it.enabled }
+    val disabledProperties: List<CosmeticProperty> = allProperties.filterNot { @Suppress("DEPRECATION") it.enabled }
+
     val displayName: String
         get() = displayNames["en_us"] ?: id
 
+    val localPath: String
+        get() = displayNames[LOCAL_PATH] ?: "<$id>"
+
     val isLegacy: Boolean
         get() = "LEGACY" in tags
-
-    // Rename to isNew when removing flag
-    val isCosmeticNew: Boolean
-        get() = "NEW" in tags
 
     val priceCoinsNullable = prices["coins"]?.toInt()
 
@@ -113,14 +116,6 @@ data class Cosmetic(
 
     val defaultVariantSetting: CosmeticSetting.Variant?
         get() = defaultVariant?.let { CosmeticSetting.Variant(id, true, CosmeticSetting.Variant.Data(it.name)) }
-
-    fun isAvailable(): Boolean {
-        return availableAfter != null && isAvailableAt(now())
-    }
-
-    fun isAvailableAt(dateTime: Instant): Boolean {
-        return availableAfter != null && availableAfter < dateTime && (availableUntil == null || availableUntil > dateTime)
-    }
 
     fun getDisplayName(locale: String): String? {
         return displayNames[locale]
@@ -164,6 +159,7 @@ data class Cosmetic(
     val emoteInterruptionTriggers: CosmeticProperty.InterruptsEmote.Data =
         property<CosmeticProperty.InterruptsEmote>()?.data
             ?: CosmeticProperty.InterruptsEmote.Data()
+
 
     inline fun <reified T : CosmeticProperty> property(): T? {
         return properties.firstNotNullOfOrNull { it as? T }

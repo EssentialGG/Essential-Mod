@@ -17,7 +17,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Currency;
-import java.util.Set;
 
 public class ClientCheckoutCoinBundlePacket extends Packet {
 
@@ -29,14 +28,10 @@ public class ClientCheckoutCoinBundlePacket extends Packet {
     @SerializedName("partner_code")
     private final @Nullable String partnerCode;
 
-    @SerializedName("partnered_mod_ids")
-    private final @NotNull Set<String> partneredModIds;
-
-    public ClientCheckoutCoinBundlePacket(@NotNull String bundleID, @NotNull Currency currency, @Nullable String partnerCode, @NotNull Set<String> partneredModIds) {
+    public ClientCheckoutCoinBundlePacket(@NotNull String bundleID, @NotNull Currency currency, @Nullable String partnerCode) {
         this.bundleID = bundleID;
         this.currency = currency;
         this.partnerCode = partnerCode;
-        this.partneredModIds = partneredModIds;
     }
 
     public @NotNull Currency getCurrency() {

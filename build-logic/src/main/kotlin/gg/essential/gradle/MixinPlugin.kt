@@ -17,6 +17,7 @@ import net.fabricmc.loom.api.LoomGradleExtensionAPI
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.*
+import org.gradle.language.jvm.tasks.ProcessResources
 
 open class MixinPlugin : Plugin<Project> {
     override fun apply(project: Project) {
@@ -27,6 +28,17 @@ open class MixinPlugin : Plugin<Project> {
 }
 
 private fun Project.configureMixin(platform: Platform) {
+    // For versions which use mojmap at runtime, there is no need for refmap files and therefore the mixin AP
+    val usesMojmapAtRuntime = platform.isNeoForge || (platform.isForge && platform.mcVersion >= 12006)
+    if (usesMojmapAtRuntime) {
+        tasks.named<ProcessResources>("processResources") {
+            filesMatching("mixins.*.json") {
+                filter { line -> if ("\"refmap\":" in line) "" else line }
+            }
+        }
+        return
+    }
+
     configureLoomMixin()
 
     if (!platform.isFabric) {

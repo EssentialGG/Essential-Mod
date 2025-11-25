@@ -66,6 +66,7 @@ fun Project.universalLibs() {
         compileOnly("com.google.guava:guava:17.0")
         compileOnly("commons-codec:commons-codec:1.9")
         compileOnly("org.apache.httpcomponents:httpclient:4.3.3") // TODO ideally switch to one of the libs we bundle
+        compileOnly("io.netty:netty-all:4.0.23.Final")
         // These versions are configured in gradle/libs.versions.toml
         compileOnly("gg.essential:universalcraft-1.8.9-forge:${getVersion("universalcraft")}") {
             attributes { attribute(universalAttr, true) }

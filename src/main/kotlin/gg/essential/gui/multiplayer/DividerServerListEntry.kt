@@ -58,6 +58,14 @@ class DividerServerListEntry(
     : GuiListExtended.IGuiListEntry
     //#endif
 {
+    //#if MC>=12109
+    //$$ override fun setHeight(height: Int) {
+    //$$     super.setHeight(DIVIDER_ENTRY_HEIGHT)
+    //$$ }
+    //#else
+    //$$ // Custom height is handled by Mixin_SelectionListDividers_GuiList(Extended) mixins
+    //$$ // see also [ENTRY_HEIGHT_DIFFERENCE]
+    //#endif
 
     override fun drawEntry(
         //#if MC>=12000
@@ -65,6 +73,7 @@ class DividerServerListEntry(
         //#elseif MC>=11600
         //$$ mcMatrixStack: MatrixStack,
         //#endif
+        //#if MC<12109
         slotIndex: Int,
         //#if MC>=11600
         //$$ y: Int,
@@ -75,6 +84,7 @@ class DividerServerListEntry(
         //#endif
         entryWidth: Int,
         entryHeight: Int,
+        //#endif
         mouseX: Int,
         mouseY: Int,
         isSelected: Boolean,
@@ -82,7 +92,16 @@ class DividerServerListEntry(
         partialTicks: Float
         //#endif
     ) {
-        //#if MC>=12000
+        //#if MC>=12109
+        //$$ val x = this.x
+        //$$ val y = this.contentY
+        //$$ val entryWidth = this.width
+        //#endif
+        //#if MC>=12106
+        //$$ // FIXME This is a bit wasteful, but there should only be at most two of these at any one time.
+        //$$ //       But once we have a more general DrawContext in UC/Elementa, we should get rid of this.
+        //$$ gg.essential.util.AdvancedDrawContext.drawImmediate(drawContext) { matrixStack ->
+        //#elseif MC>=12000
         //$$ val matrixStack = UMatrixStack(drawContext.matrices)
         //#elseif MC>=11600
         //$$ val matrixStack = UMatrixStack(mcMatrixStack)
@@ -133,6 +152,9 @@ class DividerServerListEntry(
             matrixStack, EssentialPalette.TEXT_DISABLED, (x + titleWidth + 5).toDouble(),
             (textY + 3).toDouble(), (x + entryWidth - rightPadding - 1).toDouble(), (textY + 4).toDouble()
         )
+        //#if MC>=12106
+        //$$ }
+        //#endif
     }
 
     //#if MC>=11900
@@ -143,7 +165,11 @@ class DividerServerListEntry(
 
     //#if MC>=11600
     //$$ // Prevent selecting the divider entries
+    //#if MC>=12109
+    //$$ override fun mouseClicked(click: net.minecraft.client.gui.Click, doubled: Boolean): Boolean = false
+    //#else
     //$$ override fun mouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean = false
+    //#endif
     //#else
     //#if MC>=11200
     override fun func_192633_a(i: Int, j: Int, k: Int, f: Float) {}
@@ -163,6 +189,13 @@ class DividerServerListEntry(
     }
 
     override fun mouseReleased(slotIndex: Int, x: Int, y: Int, mouseEvent: Int, relativeX: Int, relativeY: Int) {}
+    //#endif
+
+    //#if MC>=12109
+    //$$ override fun connect() {}
+    //$$ // this appears to be an "equals"-kind of function, used to keep selection on the same entry on refresh
+    //$$ @Suppress("unused") // method, which is required, is package private, so we can't actually `override` it
+    //$$ fun isOfSameType(entry: MultiplayerServerListWidget.Entry) = false
     //#endif
 
     companion object {

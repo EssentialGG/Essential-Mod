@@ -20,7 +20,7 @@ import gg.essential.elementa.utils.OptionsKt;
 import gg.essential.event.client.ClientTickEvent;
 import gg.essential.gui.emotes.EmoteWheel;
 import gg.essential.gui.friends.SocialMenu;
-import gg.essential.gui.overlay.EphemeralLayer;
+import gg.essential.gui.modals.QuickAccessModal;
 import gg.essential.gui.overlay.Layer;
 import gg.essential.gui.overlay.OverlayManagerImpl;
 import gg.essential.gui.screenshot.components.ScreenshotBrowser;
@@ -45,10 +45,20 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
+//#if MC>=12109
+//$$ import net.minecraft.util.Identifier;
+//#endif
+
 public class EssentialKeybindingRegistry {
+    //#if MC>=12109
+    //$$ private static final KeyBinding.Category CATEGORY = KeyBinding.Category.create(Identifier.of("essential", "general"));
+    //#else
     public static final String CATEGORY = "Essential";
+    //#endif
+    private static final EssentialKeybindingRegistry INSTANCE = new EssentialKeybindingRegistry();
     private EssentialKeybinding cosmetics_visibility_toggle;
     private EssentialKeybinding emote_wheel_open;
+    private EssentialKeybinding quick_access_open;
     private EssentialKeybinding zoom;
     private boolean holdingChatPeek;
 
@@ -82,19 +92,19 @@ public class EssentialKeybindingRegistry {
     public KeyBinding[] registerKeyBinds(KeyBinding[] allBindings) {
         new EssentialKeybinding("ESSENTIAL_FRIENDS", CATEGORY, UKeyboard.KEY_H).requiresEssentialFull().withInitialPress(() -> {
             if (!UKeyboard.isKeyDown(UKeyboard.KEY_F3) && UMinecraft.getMinecraft().currentScreen == null) {
-                Multithreading.runAsync(() -> GuiUtil.openScreen(SocialMenu.class, SocialMenu::new));
+                GuiUtil.openScreen(SocialMenu.class, SocialMenu::new);
             }
         });
 
         EssentialKeybinding studio = new EssentialKeybinding("COSMETIC_STUDIO", CATEGORY, UKeyboard.KEY_B).withInitialPress(() -> {
             if (!UKeyboard.isKeyDown(UKeyboard.KEY_F3) && UMinecraft.getMinecraft().currentScreen == null) {
-                Multithreading.runAsync(() -> GuiUtil.openScreen(Wardrobe.class, Wardrobe::new));
+                GuiUtil.openScreen(Wardrobe.class, Wardrobe::new);
             }
         });
 
         new EssentialKeybinding("SCREENSHOT_MANAGER", CATEGORY, UKeyboard.KEY_I).requiresEssentialFull().withInitialPress(() -> {
             if (!UKeyboard.isKeyDown(UKeyboard.KEY_F3) && UMinecraft.getMinecraft().currentScreen == null) {
-                Multithreading.runAsync(() -> GuiUtil.openScreen(ScreenshotBrowser.class, ScreenshotBrowser::new));
+                GuiUtil.openScreen(ScreenshotBrowser.class, ScreenshotBrowser::new);
             }
         });
 
@@ -135,8 +145,12 @@ public class EssentialKeybindingRegistry {
 
         int cosmeticToggleKey = UKeyboard.KEY_NONE;
         cosmetics_visibility_toggle = new EssentialKeybinding("COSMETICS_VISIBILITY_TOGGLE", CATEGORY, cosmeticToggleKey, false).withInitialPress(() -> {
-            if (OverlayManagerImpl.INSTANCE.getFocusedLayer() == null && !(OverlayManagerImpl.INSTANCE.getHoveredLayer() instanceof EphemeralLayer)) {
-                Essential.getInstance().getConnectionManager().getCosmeticsManager().toggleOwnCosmeticVisibility(true);
+            if (OverlayManagerImpl.INSTANCE.getFocusedLayer() == null
+                    && !EssentialConfig.INSTANCE.getDisableCosmetics()
+            ) {
+                EssentialConfig.INSTANCE.getOwnCosmeticsVisibleStateWithSource().set(pair ->
+                        new kotlin.Pair<>(!pair.component1(), EssentialConfig.CosmeticsVisibilitySource.UserWithNotification)
+                );
             }
         });
 
@@ -149,6 +163,10 @@ public class EssentialKeybindingRegistry {
 
         EssentialKeybinding invite = new EssentialKeybinding("INVITE_FRIENDS", CATEGORY, UKeyboard.KEY_NONE)
             .withInitialPress(() -> PauseMenuDisplay.Companion.showInviteOrHostModal(SPSSessionSource.KEYBIND));
+
+        quick_access_open = new EssentialKeybinding("MENU_ACCESS", CATEGORY, UKeyboard.KEY_G)
+                .withInitialPress(QuickAccessModal::openInGame)
+                .requiresEssentialFull();
 
         {
             emote_wheel_open = new EssentialKeybinding("EMOTE_WHEEL", CATEGORY, UKeyboard.KEY_R).requiresEssentialFull()
@@ -214,11 +232,20 @@ public class EssentialKeybindingRegistry {
         return emote_wheel_open;
     }
 
+    @NotNull
+    public EssentialKeybinding getOpenQuickAccess() {
+        return quick_access_open;
+    }
+
     public EssentialKeybinding getZoom() {
         return zoom;
     }
 
     public boolean isHoldingChatPeek() {
         return holdingChatPeek;
+    }
+
+    public static EssentialKeybindingRegistry getInstance() {
+        return INSTANCE;
     }
 }

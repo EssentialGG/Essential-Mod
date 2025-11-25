@@ -12,21 +12,21 @@
 package gg.essential.gui.notification
 
 import gg.essential.elementa.UIComponent
-import gg.essential.elementa.components.UIContainer
 import gg.essential.gui.EssentialPalette
+import gg.essential.gui.layoutdsl.Alignment
 import gg.essential.gui.layoutdsl.Modifier
-import gg.essential.gui.layoutdsl.box
+import gg.essential.gui.layoutdsl.TransparentBlock
+import gg.essential.gui.layoutdsl.alignHorizontal
 import gg.essential.gui.layoutdsl.childBasedHeight
-import gg.essential.gui.layoutdsl.childBasedSize
 import gg.essential.gui.layoutdsl.childBasedWidth
 import gg.essential.gui.layoutdsl.color
 import gg.essential.gui.layoutdsl.hoverColor
 import gg.essential.gui.layoutdsl.hoverScope
-import gg.essential.gui.layoutdsl.layout
+import gg.essential.gui.layoutdsl.layoutAsColumn
 import gg.essential.gui.layoutdsl.shadow
 import gg.essential.gui.layoutdsl.spacer
 import gg.essential.gui.layoutdsl.text
-import gg.essential.util.onLeftClick
+import gg.essential.vigilance.utils.onLeftClick
 
 fun toastButton(
     text: String,
@@ -36,20 +36,19 @@ fun toastButton(
     //       https://discord.com/channels/887304453500325900/887708890127536128/1214112758786826270
     backgroundModifier: Modifier = Modifier.color(EssentialPalette.GRAY_BUTTON).shadow(EssentialPalette.BLACK).hoverColor(EssentialPalette.GRAY_BUTTON_HOVER),
     textModifier: Modifier = Modifier.color(EssentialPalette.TEXT).shadow(EssentialPalette.TEXT_SHADOW).hoverColor(EssentialPalette.TEXT_HIGHLIGHT),
-    action: () -> Unit,
+    action: () -> Unit = {},
 ): UIComponent {
     val sizeModifier = if (isCompact) {
-        Modifier.childBasedSize(5f)
+        Modifier.childBasedWidth(5f)
     } else {
-        Modifier.childBasedWidth(10f).childBasedHeight(5f)
+        Modifier.childBasedWidth(10f)
     }
 
-    return UIContainer().apply {
-        layout(Modifier.childBasedSize()) {
-            box(backgroundModifier.hoverScope().then(sizeModifier)) {
-                text(text, textModifier)
-            }.onLeftClick { action() }
-            spacer(width = 1f, height = 1f) // Extra pixel for button shadow
-        }
+    return TransparentBlock().apply {
+        layoutAsColumn(Modifier.childBasedHeight().then(sizeModifier).then(backgroundModifier).hoverScope()) {
+            spacer(height = 5f)
+            text(text, textModifier.alignHorizontal(Alignment.Center(true)))
+            spacer(height = 4f)
+        }.onLeftClick { action() }
     }
 }

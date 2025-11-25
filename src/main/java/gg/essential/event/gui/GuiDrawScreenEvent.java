@@ -29,12 +29,13 @@
 package gg.essential.event.gui;
 
 import gg.essential.universal.UMatrixStack;
+import gg.essential.util.UDrawContext;
 import net.minecraft.client.gui.GuiScreen;
 
 public class GuiDrawScreenEvent {
 
     private final GuiScreen screen;
-    private final UMatrixStack matrixStack;
+    private final UDrawContext drawContext;
     private final int originalMouseX;
     private final int originalMouseY;
     private int mouseX;
@@ -52,9 +53,9 @@ public class GuiDrawScreenEvent {
      * @param partialTicks Render partial ticks, used to make things smoother
      * @param post Whether the event is posted before (f) or after (t) the gui has been drawn
      */
-    public GuiDrawScreenEvent(GuiScreen screen, UMatrixStack matrixStack, int mouseX, int mouseY, float partialTicks, boolean post) {
+    public GuiDrawScreenEvent(GuiScreen screen, UDrawContext drawContext, int mouseX, int mouseY, float partialTicks, boolean post) {
         this.screen = screen;
-        this.matrixStack = matrixStack;
+        this.drawContext = drawContext;
         this.originalMouseX = mouseX;
         this.originalMouseY = mouseY;
         this.mouseX = mouseX;
@@ -67,8 +68,12 @@ public class GuiDrawScreenEvent {
         return screen;
     }
 
+    public UDrawContext getDrawContext() {
+        return drawContext;
+    }
+
     public UMatrixStack getMatrixStack() {
-        return matrixStack;
+        return drawContext.getMatrixStack();
     }
 
     public int getOriginalMouseX() {
@@ -105,14 +110,18 @@ public class GuiDrawScreenEvent {
         return partialTicks;
     }
 
+    public boolean isPost() {
+        return post;
+    }
+
     public boolean isPre() {
         return !post;
     }
 
     /** Similar to the parent class but before (for pre) / after (for post) other mods did their thing. */
     public static class Priority extends GuiDrawScreenEvent {
-        public Priority(GuiScreen screen, UMatrixStack matrixStack, int mouseX, int mouseY, float partialTicks, boolean post) {
-            super(screen, matrixStack, mouseX, mouseY, partialTicks, post);
+        public Priority(GuiScreen screen, UDrawContext drawContext, int mouseX, int mouseY, float partialTicks, boolean post) {
+            super(screen, drawContext, mouseX, mouseY, partialTicks, post);
         }
     }
 }

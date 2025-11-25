@@ -17,6 +17,7 @@ import net.minecraft.client.gui.GuiButton;
 //#if MC>=11700
 //$$ import net.minecraft.client.gui.Drawable;
 //$$ import net.minecraft.client.gui.Selectable;
+//$$ import org.spongepowered.asm.mixin.gen.Invoker;
 //#else
 //$$ import net.minecraft.client.gui.widget.Widget;
 //#endif
@@ -25,6 +26,7 @@ import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
+import org.spongepowered.asm.mixin.gen.Invoker;
 
 import java.util.List;
 
@@ -40,6 +42,8 @@ public interface GuiScreenAccessor {
     //$$ List<Drawable> getDrawables();
     //$$ @Accessor
     //$$ List<Selectable> getSelectables();
+    //$$ @Invoker("addDrawableChild")
+    //$$ <T extends Element & Drawable & Selectable> T essential$addDrawableChild(T drawable);
     //#else
     //$$ @Accessor("buttons")
     //$$ List<Widget> getButtonList();
@@ -49,4 +53,9 @@ public interface GuiScreenAccessor {
     //$$ List<IGuiEventListener> essential$getChildren();
     //#endif
 
+    //#if MC>=11400
+    //#else
+    @Invoker
+    void invokeMouseReleased(int mouseX, int mouseY, int button);
+    //#endif
 }

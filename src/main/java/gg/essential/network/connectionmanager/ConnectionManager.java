@@ -31,30 +31,42 @@ import gg.essential.network.connectionmanager.cosmetics.CosmeticsManager;
 import gg.essential.network.connectionmanager.cosmetics.EmoteWheelManager;
 import gg.essential.network.connectionmanager.cosmetics.OutfitManager;
 import gg.essential.network.connectionmanager.cosmetics.PacketHandlers;
+import gg.essential.network.connectionmanager.features.DisabledFeaturesManager;
 import gg.essential.network.connectionmanager.handler.PacketHandler;
 import gg.essential.network.connectionmanager.handler.connection.ClientConnectionDisconnectPacketHandler;
 import gg.essential.network.connectionmanager.handler.connection.ServerConnectionReconnectPacketHandler;
 import gg.essential.network.connectionmanager.handler.mojang.ServerUuidNameMapPacketHandler;
 import gg.essential.network.connectionmanager.handler.multiplayer.ServerMultiplayerJoinServerPacketHandler;
-import gg.essential.network.connectionmanager.ice.IIceManager;
+import gg.essential.network.connectionmanager.ice.IceManager;
 import gg.essential.network.connectionmanager.ice.IceManagerMcImpl;
 import gg.essential.network.connectionmanager.knownservers.KnownServersManager;
 import gg.essential.network.connectionmanager.media.ScreenshotManager;
+import gg.essential.network.connectionmanager.notices.CosmeticNotices;
+import gg.essential.network.connectionmanager.notices.FriendRequestToastNoticeListener;
+import gg.essential.network.connectionmanager.notices.GiftedCosmeticNoticeListener;
+import gg.essential.network.connectionmanager.notices.NoticeBannerManager;
 import gg.essential.network.connectionmanager.notices.NoticesManager;
+import gg.essential.network.connectionmanager.notices.PersistentToastNoticeListener;
+import gg.essential.network.connectionmanager.notices.SaleNoticeManager;
+import gg.essential.network.connectionmanager.notices.SocialMenuNewFriendRequestNoticeManager;
 import gg.essential.network.connectionmanager.profile.ProfileManager;
+import gg.essential.network.connectionmanager.profile.SuspensionDisconnectHandler;
 import gg.essential.network.connectionmanager.relationship.RelationshipManager;
 import gg.essential.network.connectionmanager.serverdiscovery.NewServerDiscoveryManager;
 import gg.essential.network.connectionmanager.serverdiscovery.ServerDiscoveryManager;
+import gg.essential.network.connectionmanager.skins.PlayerSkinLookup;
 import gg.essential.network.connectionmanager.skins.SkinsManager;
+import gg.essential.network.connectionmanager.social.RulesManager;
 import gg.essential.network.connectionmanager.social.SocialManager;
 import gg.essential.network.connectionmanager.sps.SPSManager;
 import gg.essential.network.connectionmanager.subscription.SubscriptionManager;
+import gg.essential.network.connectionmanager.suspension.McSuspensionManager;
+import gg.essential.network.connectionmanager.suspension.SuspensionManager;
 import gg.essential.network.connectionmanager.telemetry.TelemetryManager;
 import gg.essential.sps.McIntegratedServerManager;
-import gg.essential.universal.UMinecraft;
 import gg.essential.util.ModLoaderUtil;
 import gg.essential.util.Multithreading;
-import gg.essential.util.UUIDUtil;
+import gg.essential.util.USession;
 import gg.essential.util.lwjgl3.Lwjgl3Loader;
 import kotlin.Unit;
 import kotlin.collections.MapsKt;
@@ -87,6 +99,8 @@ public class ConnectionManager extends ConnectionManagerKt {
     @NotNull
     private final NoticesManager noticesManager;
     @NotNull
+    private final DisabledFeaturesManager disabledFeaturesManager;
+    @NotNull
     private final SubscriptionManager subscriptionManager;
     @NotNull
     private final RelationshipManager relationshipManager;
@@ -103,7 +117,7 @@ public class ConnectionManager extends ConnectionManagerKt {
     @NotNull
     private final SocialManager socialManager;
     @NotNull
-    private final IIceManager iceManager;
+    private final IceManager iceManager;
     @NotNull
     private final ScreenshotManager screenshotManager;
     @NotNull
@@ -120,14 +134,25 @@ public class ConnectionManager extends ConnectionManagerKt {
     private /* final */ NewServerDiscoveryManager newServerDiscoveryManager;
     // @NotNull
     private /* final */ KnownServersManager knownServersManager;
+    @NotNull
+    private final CosmeticNotices cosmeticNotices;
+    @NotNull
+    private final SaleNoticeManager saleNoticeManager;
+    @NotNull
+    private final SocialMenuNewFriendRequestNoticeManager socialMenuNewFriendRequestNoticeManager;
+    @NotNull
+    private final NoticeBannerManager noticeBannerManager;
+    private /* final */ SuspensionManager suspensionManager;
+    private /* final */ RulesManager rulesManager;
 
-    private boolean modsLoaded = false;
     private boolean modsSent = false;
+    private int previouslyConnectedProtocol = 1;
 
     public enum Status {
         NO_TOS,
         ESSENTIAL_DISABLED,
         OUTDATED,
+        USER_SUSPENDED,
         CANCELLED,
         ALREADY_CONNECTED,
         NO_RESPONSE,
@@ -166,10 +191,19 @@ public class ConnectionManager extends ConnectionManagerKt {
         // Notices
         this.managers.add((this.noticesManager = new NoticesManager(this)));
 
+        noticesManager.register(noticeBannerManager = new NoticeBannerManager(noticesManager));
+        noticesManager.register(new PersistentToastNoticeListener(noticesManager));
+
+        // Disabled Features
+        this.managers.add(this.disabledFeaturesManager = new DisabledFeaturesManager(this));
+
         // Cosmetics
         this.cosmeticsManager = new CosmeticsManager(this, baseDir);
         this.managers.add(this.cosmeticsManager);
-        this.managers.add(this.cosmeticsManager.getEquippedCosmeticsManager());
+        this.managers.add(this.cosmeticsManager.getInfraEquippedOutfitsManager());
+        noticesManager.register(cosmeticNotices = new CosmeticNotices(noticesManager, cosmeticsManager.getCosmeticsData()));
+        noticesManager.register(saleNoticeManager = new SaleNoticeManager());
+        noticesManager.register(new GiftedCosmeticNoticeListener(noticesManager, cosmeticsManager.getCosmeticsData()));
 
         // Relationships
         this.relationshipManager = new RelationshipManager(this);
@@ -193,6 +227,8 @@ public class ConnectionManager extends ConnectionManagerKt {
 
         // Social Manager
         this.managers.add(this.socialManager = new SocialManager(this));
+        noticesManager.register(new FriendRequestToastNoticeListener(this, noticesManager));
+        noticesManager.register(socialMenuNewFriendRequestNoticeManager = new SocialMenuNewFriendRequestNoticeManager(noticesManager));
 
         // Ice
         this.iceManager = new IceManagerMcImpl(
@@ -229,7 +265,7 @@ public class ConnectionManager extends ConnectionManagerKt {
             this,
             this.cosmeticsManager.getCosmeticsData(),
             this.cosmeticsManager.getUnlockedCosmetics(),
-            this.cosmeticsManager.getEquippedCosmeticsManager(),
+            this.cosmeticsManager.getInfraEquippedOutfitsManager(),
             map(this.skinsManager.getSkins(), map -> MapsKt.mapValues(map, it -> it.getValue().getSkin()))
         );
         this.managers.add(this.outfitManager);
@@ -239,8 +275,9 @@ public class ConnectionManager extends ConnectionManagerKt {
             Model model = skin.getModel();
             String hash = skin.getHash();
             String url = String.format(Locale.ROOT, GameProfileManager.SKIN_URL, hash);
-            Essential.getInstance().getGameProfileManager().updatePlayerSkin(UUIDUtil.getClientUUID(), hash, model.getType());
-            Essential.getInstance().getSkinManager().changeSkin(UMinecraft.getMinecraft().getSession().getToken(), model, url);
+            USession session = USession.Companion.activeNow();
+            Essential.getInstance().getSkinManager().changeSkin(session.getToken(), model, url);
+            PlayerSkinLookup.INSTANCE.put(session.getUuid(), skin);
             return Unit.INSTANCE;
         });
 
@@ -253,6 +290,12 @@ public class ConnectionManager extends ConnectionManagerKt {
             this.knownServersManager,
             this.telemetryManager::enqueue
         ));
+
+        this.managers.add(this.suspensionManager = new McSuspensionManager(this));
+        this.managers.add(this.rulesManager = new RulesManager(this));
+        SuspensionDisconnectHandler.INSTANCE.setupEffects(this);
+
+        PlayerSkinLookup.INSTANCE.register(this);
     }
 
     @NotNull
@@ -263,6 +306,11 @@ public class ConnectionManager extends ConnectionManagerKt {
     @NotNull
     public NoticesManager getNoticesManager() {
         return noticesManager;
+    }
+
+    @NotNull
+    public DisabledFeaturesManager getDisabledFeaturesManager() {
+        return disabledFeaturesManager;
     }
 
     @NotNull
@@ -306,7 +354,7 @@ public class ConnectionManager extends ConnectionManagerKt {
     }
 
     @NotNull
-    public IIceManager getIceManager() {
+    public IceManager getIceManager() {
         return this.iceManager;
     }
 
@@ -345,6 +393,30 @@ public class ConnectionManager extends ConnectionManagerKt {
         return this.knownServersManager;
     }
 
+    public @NotNull CosmeticNotices getCosmeticNotices() {
+        return this.cosmeticNotices;
+    }
+
+    public @NotNull SaleNoticeManager getSaleNoticeManager() {
+        return saleNoticeManager;
+    }
+
+    public @NotNull SocialMenuNewFriendRequestNoticeManager getSocialMenuNewFriendRequestNoticeManager() {
+        return socialMenuNewFriendRequestNoticeManager;
+    }
+
+    public @NotNull NoticeBannerManager getNoticeBannerManager() {
+        return noticeBannerManager;
+    }
+
+    public @NotNull SuspensionManager getSuspensionManager() {
+        return this.suspensionManager;
+    }
+
+    public @NotNull RulesManager getRulesManager() {
+        return this.rulesManager;
+    }
+
     @Override
     public boolean isOpen() {
         Connection connection = this.connection;
@@ -381,13 +453,14 @@ public class ConnectionManager extends ConnectionManagerKt {
 
     protected void completeConnection(Connection connection) {
         this.connection = connection;
+        this.getMutableConnectionUriState().set(connection.getURI().toString());
 
         for (NetworkedManager manager : this.managers) {
             manager.onConnected();
         }
 
         // Do not want to block the current thread for this (reads mod files to create checksums)
-        if (modsLoaded && !modsSent) {
+        if (ModLoaderUtil.areModsLoaded.getUntracked() && !modsSent) {
             Multithreading.runAsync(() -> {
                 send(ModLoaderUtil.createModsAnnouncePacket());
             });
@@ -396,7 +469,11 @@ public class ConnectionManager extends ConnectionManagerKt {
     }
 
     protected void onClose() {
-        this.connection = null;
+        if (this.connection != null) {
+            this.previouslyConnectedProtocol = this.connection.getUsingProtocol();
+            this.connection = null;
+            this.getMutableConnectionUriState().set((ignored) -> null);
+        }
         this.modsSent = false;
 
         JobKt.cancelChildren(getConnectionScope().getCoroutineContext(), CancellationException("Connection closed.", null));
@@ -475,7 +552,7 @@ public class ConnectionManager extends ConnectionManagerKt {
 
     @Subscribe
     public void onPostInit(PostInitializationEvent event) {
-        modsLoaded = true;
+        ModLoaderUtil.setModsLoaded();
         if (!modsSent && isAuthenticated()) {
             Multithreading.runAsync(() -> {
                 send(ModLoaderUtil.createModsAnnouncePacket());
@@ -497,4 +574,8 @@ public class ConnectionManager extends ConnectionManagerKt {
         }
     }
 
+    @Override
+    protected int getPreviouslyConnectedProtocol() {
+        return previouslyConnectedProtocol;
+    }
 }

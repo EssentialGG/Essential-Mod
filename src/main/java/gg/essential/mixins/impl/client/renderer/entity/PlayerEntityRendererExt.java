@@ -12,10 +12,13 @@
 package gg.essential.mixins.impl.client.renderer.entity;
 
 import dev.folomeev.kotgl.matrix.matrices.Mat4;
+import gg.essential.cosmetics.EssentialModelRenderer;
 import net.minecraft.client.entity.AbstractClientPlayer;
 
 public interface PlayerEntityRendererExt {
     Iterable<?> essential$getFeatures();
 
     Mat4 essential$getTransform(AbstractClientPlayer player, float yaw, float partialTicks);
+
+    EssentialModelRenderer essential$getEssentialModelRenderer();
 }

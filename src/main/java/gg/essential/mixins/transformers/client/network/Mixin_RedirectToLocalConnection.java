@@ -14,7 +14,7 @@ package gg.essential.mixins.transformers.client.network;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import gg.essential.Essential;
-import gg.essential.network.connectionmanager.ice.IIceManager;
+import gg.essential.network.connectionmanager.ice.IceManager;
 import gg.essential.network.pingproxy.ProxyPingServer;
 import gg.essential.network.pingproxy.ProxyPingServerKt;
 import io.netty.bootstrap.Bootstrap;
@@ -36,7 +36,7 @@ import java.net.InetAddress;
 import java.net.SocketAddress;
 import java.util.UUID;
 
-import static gg.essential.network.connectionmanager.ice.IceManager.ICE_CLIENT_EVENT_LOOP_GROUP;
+import static gg.essential.network.connectionmanager.ice.IceEventLoopGroups.ICE_CLIENT_EVENT_LOOP_GROUP;
 import static gg.essential.network.connectionmanager.ice.util.IWishMixinAllowedForPublicStaticFields.connectTarget;
 
 //#if MC>=12001
@@ -88,7 +88,7 @@ public abstract class Mixin_RedirectToLocalConnection {
         UUID user = connectTarget.get();
         if (user != null) {
             // ICE connection
-            IIceManager iceManager = Essential.getInstance().getConnectionManager().getIceManager();
+            IceManager iceManager = Essential.getInstance().getConnectionManager().getIceManager();
             Channel channel = bootstrap.register().syncUninterruptibly().channel();
             ChannelPromise connectPromise = channel.newPromise();
             Dispatchers.getIO().dispatch(EmptyCoroutineContext.INSTANCE, () -> {

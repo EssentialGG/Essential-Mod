@@ -129,9 +129,21 @@ class InvalidSessionRefreshGui(
         }
     }
 
-    fun draw(matrixStack: UMatrixStack) {
+    fun draw(drawContext: UDrawContext) {
         if (!::refreshSessionButton.isInitialized) return
 
+        //#if MC>=12106
+        //$$ // FIXME This is a bit wasteful, but there should only be at most one of these at any one time.
+        //$$ //       But once we have a more general DrawContext in UC/Elementa, we should get rid of this.
+        //$$ gg.essential.util.AdvancedDrawContext.drawImmediate(drawContext.mc) { matrixStack ->
+        //$$     doDraw(matrixStack)
+        //$$ }
+        //#else
+        doDraw(drawContext.matrixStack)
+        //#endif
+    }
+
+    private fun doDraw(matrixStack: UMatrixStack) {
         if (errorMessage.isNotEmpty()) {
             //#if MC>=12000
             //$$ var y = 80f

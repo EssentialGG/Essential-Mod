@@ -27,8 +27,10 @@ import kotlin.math.sqrt
 
 data class Quaternion(val x: Float, val y: Float, val z: Float, val w: Float) {
     fun normalize(): Quaternion {
-        val invNorm = 1 / (x * x + y * y + z * z + w * w)
-        return Quaternion(x * invNorm, y * invNorm, z * invNorm, w * invNorm)
+        val sqr = x * x + y * y + z * z + w * w
+        if (sqr < 1e-8) return Identity // Practically no rotation, avoids divide by 0, and sqrt()
+        val invSqrt = 1 / sqrt(sqr)
+        return Quaternion(x * invSqrt, y * invSqrt, z * invSqrt, w * invSqrt)
     }
 
     fun conjugate(): Quaternion =

@@ -1,0 +1,5 @@
+net.minecraft.resource.metadata.ResourceMetadataSerializer net.minecraft.resource.metadata.ResourceMetadataReader
+net.minecraft.client.gui.widget.EntryListWidget getContentsHeightWithPadding() getMaxPosition()
+net.minecraft.client.gui.widget.EntryListWidget getMaxScrollY() getMaxScroll()
+net.minecraft.client.gui.widget.EntryListWidget getScrollY() getScrollAmount()
+net.minecraft.client.gui.widget.EntryListWidget setScrollY() setScrollAmount()

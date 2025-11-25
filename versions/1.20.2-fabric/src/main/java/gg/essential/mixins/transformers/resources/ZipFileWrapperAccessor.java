@@ -16,7 +16,11 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 
 import java.io.File;
 
+//#if NEOFORGE
+//$$ @Mixin(net.minecraft.server.packs.FilePackResources.SharedZipFileAccess.class)
+//#else
 @Mixin(targets = "net.minecraft.resource.ZipResourcePack$ZipFileWrapper")
+//#endif
 public interface ZipFileWrapperAccessor {
     @Accessor
     File getFile();

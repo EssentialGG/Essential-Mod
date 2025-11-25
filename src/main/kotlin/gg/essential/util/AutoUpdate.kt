@@ -82,11 +82,11 @@ object AutoUpdate {
     fun requiresUpdate() = Essential.getInstance().connectionManager.outdated
 
     fun getNotificationTitle(includeLoaderText: Boolean = true) = if (requiresUpdate()) {
-        "Essential Update Required!"
+        "Update Required"
     } else if (!stage3UpdateAvailable && includeLoaderText) {
-        "Essential Loader Update Available!"
+        "Loader Update Available"
     } else {
-        "Essential Update Available!"
+        "Update Available"
     }
 
     fun createUpdateModal(modalManager: ModalManager) =
@@ -117,7 +117,7 @@ object AutoUpdate {
         } else {
             changelogFuture = CompletableFuture.supplyAsync {
                 val encodedVersion = URLEncoder.encode(version, StandardCharsets.UTF_8.toString()).replace("+", "%20").replace("#", "%23")
-                val versionResponse = WebUtil.fetchString("${MenuData.BASE_URL}/mods/v1/essential:loader-stage2/versions/$encodedVersion/changelog")
+                val versionResponse = httpGetToStringBlocking("${MenuData.BASE_URL}/mods/v1/essential:loader-stage2/versions/$encodedVersion/changelog")
                 val changelog = Gson().fromJson(versionResponse, ChangelogComponent.Changelog::class.java)
                 changelog.summary
             }

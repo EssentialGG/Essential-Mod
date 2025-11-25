@@ -24,6 +24,13 @@ universalLibs()
 dependencies {
     implementation(kotlin("stdlib-jdk8", KotlinVersion.minimal.stdlib))
     implementation(project(":feature-flags"))
+
+    testImplementation(kotlin("test"))
+    testImplementation(libs.elementa)
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 // We need to use the compatibility mode on old versions because we used to use the old Kotlin defaults for those

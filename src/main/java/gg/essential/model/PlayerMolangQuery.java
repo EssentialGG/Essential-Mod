@@ -13,6 +13,7 @@ package gg.essential.model;
 
 import dev.folomeev.kotgl.matrix.matrices.Mat4;
 import dev.folomeev.kotgl.matrix.vectors.Vec3;
+import dev.folomeev.kotgl.matrix.vectors.mutables.MutableVec3;
 import gg.essential.Essential;
 import gg.essential.gui.common.EmulatedUI3DPlayer.EmulatedPlayer;
 import gg.essential.mixins.impl.client.renderer.entity.PlayerEntityRendererExt;
@@ -32,7 +33,7 @@ import java.util.UUID;
 
 import static dev.folomeev.kotgl.matrix.vectors.Vectors.vec3;
 import static dev.folomeev.kotgl.matrix.vectors.Vectors.vecUnitY;
-import static dev.folomeev.kotgl.matrix.vectors.Vectors.vecZero;
+import static dev.folomeev.kotgl.matrix.vectors.mutables.MutableVectors.mutableVec3;
 import static dev.folomeev.kotgl.matrix.vectors.mutables.MutableVectors.plus;
 import static gg.essential.model.util.KotglKt.toMat3;
 import static gg.essential.model.util.KotglKt.transformPosition;
@@ -68,7 +69,11 @@ public class PlayerMolangQuery implements MolangQueryEntity, ParticleSystem.Loca
         if (isValid()) {
             return getLifeTime();
         } else {
+            //#if MC>=12106
+            //$$ World world = player.getWorld();
+            //#else
             World world = player.getEntityWorld();
+            //#endif
             if (world == null) { // shouldn't happen but better be safe than sorry, it is technically possible
                 return getLifeTime();
             }
@@ -185,7 +190,15 @@ public class PlayerMolangQuery implements MolangQueryEntity, ParticleSystem.Loca
         return getPositionAndRotation().getSecond();
     }
 
-    private Vec3 getBasePosition() {
+    public Vec3 getEntityPosition() {
+        return getEntityPositionMut();
+    }
+
+    public Quaternion getEntityRotation() {
+        return getBaseRotation();
+    }
+
+    private MutableVec3 getEntityPositionMut() {
         float partialTicks = getPartialTicks();
         //#if MC>=11600
         //$$ net.minecraft.util.math.vector.Vector3d nextPos = player.getPositionVec();
@@ -200,6 +213,15 @@ public class PlayerMolangQuery implements MolangQueryEntity, ParticleSystem.Loca
         float prevX = (float) player.lastTickPosX;
         float prevY = (float) player.lastTickPosY;
         float prevZ = (float) player.lastTickPosZ;
+        return mutableVec3(
+            prevX + (nextX - prevX) * partialTicks,
+            prevY + (nextY - prevY) * partialTicks,
+            prevZ + (nextZ - prevZ) * partialTicks
+        );
+    }
+
+    private Vec3 getBasePosition() {
+        MutableVec3 pos = getEntityPositionMut();
         //#if MC>=11400
         //$$ if (player.isCrouching()) {
         //#else
@@ -207,20 +229,14 @@ public class PlayerMolangQuery implements MolangQueryEntity, ParticleSystem.Loca
         //#endif
             //#if MC>=11200
             // 0.125f from RenderPlayer.doRender (1.12.2) / PlayerRenderer.getRenderOffset (1.16+)
-            prevY -= 0.125f;
-            nextY -= 0.125f;
+            pos.setY(pos.getY() - 0.125f);
             //#endif
             //#if MC<11400
             // 0.2f from ModelPlayer.render, 0.9375f from RenderPlayer.preRenderCallback
-            prevY -= 0.2 * 0.9375f;
-            nextY -= 0.2 * 0.9375f;
+            pos.setY(pos.getY() - 0.2f * 0.9375f);
             //#endif
         }
-        return vec3(
-            prevX + (nextX - prevX) * partialTicks,
-            prevY + (nextY - prevY) * partialTicks,
-            prevZ + (nextZ - prevZ) * partialTicks
-        );
+        return pos;
     }
 
     private float getRenderYaw() {
@@ -234,9 +250,7 @@ public class PlayerMolangQuery implements MolangQueryEntity, ParticleSystem.Loca
         return Quaternion.Companion.fromAxisAngle(vecUnitY(), (float) (Math.PI - Math.toRadians(getRenderYaw())));
     }
 
-    @NotNull
-    @Override
-    public Pair<Vec3, Quaternion> getPositionAndRotation() {
+    private @NotNull Pair<Vec3, Quaternion> calculatePositionAndRotation() {
         if (!(player instanceof AbstractClientPlayer)) {
             return new Pair<>(getBasePosition(), getBaseRotation());
         }
@@ -247,11 +261,33 @@ public class PlayerMolangQuery implements MolangQueryEntity, ParticleSystem.Loca
         }
         PlayerEntityRendererExt rendererExt = (PlayerEntityRendererExt) renderer;
 
+        // Minecraft renders living entities ever so slightly offset (upwards in local space)
+        // 0.001f from the 1.501 in RenderLivingBase.prepareScale, 0.9375f from RenderPlayer.preRenderCallback
+        Vec3 renderPos = vec3(0f, 0.001f * 0.9375f, 0f);
+
         Mat4 mat = rendererExt.essential$getTransform((AbstractClientPlayer) player, getRenderYaw(), getPartialTicks());
-        Vec3 position = plus(transformPosition(mat, vecZero()), getBasePosition());
+        Vec3 position = plus(transformPosition(mat, renderPos), getBasePosition());
         Quaternion rotation = Quaternion.Companion.fromRotationMatrix(toMat3(mat));
 
         return new Pair<>(position, rotation);
+    }
+
+    private int lastAccessFrame = -1;
+    private Pair<Vec3, Quaternion> cachedPositionAndRotation = null;
+
+    @NotNull
+    @Override
+    public Pair<Vec3, Quaternion> getPositionAndRotation() {
+        if (!isWithinRenderFrame) return calculatePositionAndRotation();
+
+        // calculatePositionAndRotation() is expensive, so we will cache the result during rendering frames
+        if (cachedPositionAndRotation != null && frameCount == lastAccessFrame) {
+            return cachedPositionAndRotation;
+        }
+
+        lastAccessFrame = frameCount;
+        cachedPositionAndRotation = calculatePositionAndRotation();
+        return cachedPositionAndRotation;
     }
 
     @NotNull
@@ -275,14 +311,24 @@ public class PlayerMolangQuery implements MolangQueryEntity, ParticleSystem.Loca
 
     private static float partialTicksMenu;
     private static float partialTicksInGame;
+    private static boolean isWithinRenderFrame = false;
+    private static int frameCount;
     static {
         Essential.EVENT_BUS.register(new Object() {
             @Subscribe(priority = 1)
             private void renderWorld(RenderTickEvent event) {
                 partialTicksMenu = event.getPartialTicksMenu();
                 partialTicksInGame = event.getPartialTicksInGame();
+
+                isWithinRenderFrame = event.isPre();
+                if (isWithinRenderFrame) frameCount++;
             }
         });
+    }
+
+    @Override
+    public boolean isVisible() {
+        return !player.isInvisible();
     }
 
     public interface RealYawAccess {

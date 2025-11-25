@@ -11,29 +11,22 @@
  */
 package gg.essential.handlers;
 
-import com.mojang.authlib.GameProfile;
-import gg.essential.Essential;
 import gg.essential.config.EssentialConfig;
-import gg.essential.connectionmanager.common.enums.ProfileStatus;
 import gg.essential.cosmetics.CosmeticsRenderState;
+import gg.essential.cosmetics.EquippedCosmetic;
+import gg.essential.cosmetics.IconCosmeticRenderer;
 import gg.essential.data.OnboardingData;
-import gg.essential.gui.EssentialPalette;
 import gg.essential.mixins.ext.client.network.NetHandlerPlayClientExt;
-import gg.essential.network.connectionmanager.ConnectionManager;
-import gg.essential.network.connectionmanager.profile.ProfileManager;
-import gg.essential.render.TextRenderTypeVertexConsumer;
-import gg.essential.universal.UGraphics;
 import gg.essential.universal.UMatrixStack;
 import gg.essential.universal.UMinecraft;
-import gg.essential.universal.shader.BlendState;
-import gg.essential.util.Diamond;
-import net.minecraft.client.Minecraft;
+import gg.essential.universal.UResolution;
+import gg.essential.util.UDrawContext;
 import net.minecraft.client.network.NetHandlerPlayClient;
 import net.minecraft.client.network.NetworkPlayerInfo;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.text.ITextComponent;
 
-//#if MC>=11800
+//#if MC>=11800 && MC<12100
 //$$ import gg.essential.compat.ImmediatelyFastCompat;
 //#endif
 
@@ -41,37 +34,39 @@ import net.minecraft.util.text.ITextComponent;
 //$$ import net.minecraft.client.renderer.RenderType;
 //$$ import net.minecraft.util.ResourceLocation;
 //$$ import net.minecraft.client.renderer.IRenderTypeBuffer;
+//#else
+import net.minecraft.util.ResourceLocation;
 //#endif
 
 import java.awt.*;
 import java.util.Map;
 import java.util.UUID;
 
-import static gg.essential.elementa.utils.ExtensionsKt.withAlpha;
+import static gg.essential.util.HelpersKt.identifier;
 
 public class OnlineIndicator {
-    //#if MC!=11202
-    //$$ public static final ThreadLocal<Boolean> currentlyDrawingEntityName = ThreadLocal.withInitial(() -> false);
-    //#else
-    /**
-     * Set while {@link #currentlyDrawingEntityName()}.
-     * Only useful for 1.12.2, all other versions get the entity via regular method arguments.
-     */
-    public static Entity nametagEntity;
+
+    public static final ThreadLocal<Boolean> currentlyDrawingPlayerEntityName = ThreadLocal.withInitial(() -> false);
+    //#if MC>=12109
+    //$$ public static CosmeticsRenderState currentCosmeticsRenderState;
     //#endif
+    //#if MC==11202
+    public static Entity nametagEntity = null;
+    //#endif
+
 
     /**
      * When called from a {@code drawNameplate} mixin, returns whether this nameplate is the primary name nameplate, as
      * opposed to e.g. the scoreboard score line.
      * @return {@code true} if this is the primary name nameplate
      */
-    public static boolean currentlyDrawingEntityName() {
-        //#if MC!=11202
-        //$$ return currentlyDrawingEntityName.get();
-        //#else
-        return nametagEntity != null;
-        //#endif
+    public static boolean currentlyDrawingPlayerEntityName() {
+        return currentlyDrawingPlayerEntityName.get();
     }
+
+    //#if MC<11600
+    private static final ResourceLocation whiteTexture = new ResourceLocation("essential", "textures/white.png");
+    //#endif
 
     public static void drawNametagIndicator(
         UMatrixStack matrixStack,
@@ -82,101 +77,12 @@ public class OnlineIndicator {
         String str,
         int light
     ) {
-
-        if (!cState.onlineIndicator()) {
-            return;
-        }
-
-        boolean alwaysOnTop = !cState.isSneaking();
-
-        int stringWidth = Minecraft.getMinecraft().fontRenderer.getStringWidth(str);
-        //#if MC>=12102
-        //$$ float vanillaX = (float)(-stringWidth) / 2f;
-        //#else
-        float vanillaX = -(float)(stringWidth / 2);
-        //#endif
-        Color color = EssentialPalette.ESSENTIAL_BLUE;
-        //#if MC<11600
-        UGraphics.enableAlpha();
-        UGraphics.disableLighting();
-        UGraphics.depthMask(false);
-        //#endif
-        float x1 = vanillaX - 11;
-        float y1 = -1;
-        float x2 = vanillaX - 1;
-        float y2 = getDiamondBackgroundYMin();
-
-        //#if MC<11600
-        if (alwaysOnTop) {
-            UGraphics.disableDepth();
-        }
-        //#endif
-
-        UGraphics.enableBlend();
-        UGraphics.tryBlendFuncSeparate(770, 771, 1,0);
-
-        int backgroundOpacity = getTextBackgroundOpacity();
-        //#if MC>=12102
-        //$$ double z = -0.01;
-        //#elseif MC>=11600
-        //$$ double z = 0.01;
-        //#else
-        double z = 0;
-        //#endif
-
-        //#if MC>=11600
-        //$$ TextRenderTypeVertexConsumer vertexConsumer = TextRenderTypeVertexConsumer.create(vertexConsumerProvider, alwaysOnTop);
-        //#else
-        UGraphics buffer = UGraphics.getFromTessellator();
-        TextRenderTypeVertexConsumer vertexConsumer = TextRenderTypeVertexConsumer.create(buffer);
-        //#endif
-
-        vertexConsumer.pos(matrixStack, x1, y1, z).color(0, 0, 0, backgroundOpacity).tex(0, 0).light(light).endVertex();
-        vertexConsumer.pos(matrixStack, x1, y2, z).color(0, 0, 0, backgroundOpacity).tex(0, 0).light(light).endVertex();
-        vertexConsumer.pos(matrixStack, x2, y2, z).color(0, 0, 0, backgroundOpacity).tex(0, 0).light(light).endVertex();
-        vertexConsumer.pos(matrixStack, x2, y1, z).color(0, 0, 0, backgroundOpacity).tex(0, 0).light(light).endVertex();
-
-        float diamondCenter = (y1 + y2) / 2 + getDiamondYOffset();
-        Diamond.drawDiamond(matrixStack, vertexConsumer, 6, vanillaX - 6, diamondCenter, withAlpha(color,32).getRGB(), light);
-
-        // On 1.16+, we get a vertex provider from the entity rendering pipeline, so we don't need to draw anything
-        // manually like we do on older versions.
-        //#if MC<11600
-        buffer.drawDirect();
-        //#endif
-
-        //#if MC<11600
-        if (alwaysOnTop) {
-            UGraphics.enableDepth();
-        }
-
-        UGraphics.depthMask(true);
-        //#endif
-
-        if (alwaysOnTop) {
+        IconCosmeticRenderer.INSTANCE.drawNameTagIconAndVersionConsistentPadding(
+            matrixStack,
             //#if MC>=11600
-            //$$ vertexConsumer = TextRenderTypeVertexConsumer.create(vertexConsumerProvider, false);
-            //#else
-            vertexConsumer = TextRenderTypeVertexConsumer.create(buffer);
+            //$$ vertexConsumerProvider,
             //#endif
-            Diamond.drawDiamond(matrixStack, vertexConsumer, 6, vanillaX - 6, diamondCenter, color.getRGB(), light);
-
-            //#if MC<11600
-            buffer.drawDirect();
-            //#endif
-        }
-
-        //#if MC<11600
-        UGraphics.enableLighting();
-        //#endif
-    }
-
-    public static float getDiamondBackgroundYMin() {
-        //#if MC>=11600
-        //$$ return 9;
-        //#else
-        return 8;
-        //#endif
+            cState, str, light);
     }
 
     // Patcher mixins into this at HEAD to cancel it if the background is disabled.
@@ -189,91 +95,46 @@ public class OnlineIndicator {
         //#endif
     }
 
-    private static float getDiamondYOffset() {
-        //#if MC>=11600
-        //$$ return -0.5f;
-        //#else
-        return 0;
-        //#endif
-    }
-
     // Different name to avoid the OldAnimations mixin to `drawTabIndicator`.
     public static void drawTabIndicatorOuter(
-        UMatrixStack matrixStack,
-        //#if MC>=11600
-        //$$ IRenderTypeBuffer.Impl provider,
-        //#endif
+        UDrawContext drawContext,
         NetworkPlayerInfo networkPlayerInfo,
         int x, int y
     ) {
 
-        drawTabIndicator(
-            matrixStack,
-            //#if MC>=11600
-            //$$ provider,
-            //#endif
-            networkPlayerInfo, x, y
-        );
+        // draw the essential user indicator
+        drawTabIndicator(drawContext, networkPlayerInfo, x, y);
     }
+
+    private static final ResourceLocation TAB_LIST_ICON = identifier("essential", "textures/tab_list_icon.png");
 
     // this is modified in OldAnimations, don't remove or rename
     @SuppressWarnings("ConstantConditions")
     private static void drawTabIndicator(
-        UMatrixStack matrixStack,
-        //#if MC>=11600
-        //$$ IRenderTypeBuffer.Impl provider,
-        //#endif
+        UDrawContext drawContext,
         NetworkPlayerInfo networkPlayerInfo,
         int x, int y
     ) {
         if (!OnboardingData.hasAcceptedTos() || !EssentialConfig.INSTANCE.getShowEssentialIndicatorOnTab() || networkPlayerInfo == null)
             return;
 
-        ConnectionManager connectionManager = Essential.getInstance().getConnectionManager();
-        ProfileManager profileManager = connectionManager.getProfileManager();
-        GameProfile gameProfile = networkPlayerInfo.getGameProfile();
-        if (gameProfile == null) return;
-        UUID playerUuid = gameProfile.getId();
-        if (playerUuid == null) return;
+        EquippedCosmetic cosmetic = IconCosmeticRenderer.INSTANCE.getIconCosmetic(networkPlayerInfo);
+        if (cosmetic == null) return;
 
-        if (playerUuid.version() == 2) {
-            // Could be a fake tab entry, try to get their actual uuid
-            UUID actualUuid = OnlineIndicator.findUUIDFromDisplayName(networkPlayerInfo.getDisplayName());
-            if (actualUuid != null) playerUuid = actualUuid;
+        float centreX, centreY, size;
+        if (UResolution.getScaleFactor() < 4) {
+            // use 1:1 scale
+            centreX = x - 7.5F;
+            centreY = y + 1.5F;
+            size = 5;
+        } else {
+            // use 3:4 scale
+            centreX = x - 7.5F - 0.375F; // offset centre pos by 3 eighths of a pixel
+            centreY = y + 1.5F - 0.375F;
+            size = 5 * 0.75F;
         }
-        ProfileStatus status = profileManager.getStatus(playerUuid);
-        if (status == ProfileStatus.OFFLINE) return;
 
-        beforeTabDraw();
-
-        BlendState prevBlendState = BlendState.active();
-        BlendState.NORMAL.activate();
-
-        matrixStack.push();
-
-        //#if MC>=11600
-        //$$ TextRenderTypeVertexConsumer vertexConsumer = TextRenderTypeVertexConsumer.create(provider);
-        //#else
-        UGraphics buffer = UGraphics.getFromTessellator();
-        TextRenderTypeVertexConsumer vertexConsumer = TextRenderTypeVertexConsumer.create(buffer);
-        //#endif
-
-        // Draw indicator
-        matrixStack.translate(0, 0, 5);
-
-        Diamond.drawDiamond(matrixStack, vertexConsumer, 4, x - 9, y + 1.5f, EssentialPalette.ESSENTIAL_BLUE.getRGB());
-
-        //#if MC>=11600
-        //$$ provider.finish();
-        //#else
-        buffer.drawDirect();
-        //#endif
-
-        matrixStack.pop();
-
-        prevBlendState.activate();
-
-        afterTabDraw();
+        IconCosmeticRenderer.INSTANCE.drawTextureInTabList(drawContext, centreX, centreY, TAB_LIST_ICON, size, false);
     }
 
     /**
@@ -316,13 +177,13 @@ public class OnlineIndicator {
     }
 
     public static void beforeTabDraw() {
-        //#if MC>=11800
+        //#if MC>=11800 && MC<12100
         //$$ ImmediatelyFastCompat.beforeHudDraw();
         //#endif
     }
 
     public static void afterTabDraw() {
-        //#if MC>=11800
+        //#if MC>=11800 && MC<12100
         //$$ ImmediatelyFastCompat.afterHudDraw();
         //#endif
     }

@@ -16,7 +16,6 @@ import gg.essential.gradle.util.StripKotlinMetadataTransform.Companion.registerS
 plugins {
     id("kotlin")
     id("org.jetbrains.kotlin.plugin.serialization")
-    id("io.github.goooler.shadow")
     id("gg.essential.defaults")
     id("gg.essential.defaults.repo")
     id("gg.essential.multi-version")
@@ -55,7 +54,7 @@ dependencies {
     })
     implementation(bundle(project(":kdiscordipc"))!!)
 
-    implementation(bundle(project(":cosmetics", configuration = "minecraftRuntimeElements"))!!)
+    implementation(bundle(project(":cosmetics"))!!)
 
     implementation(bundle(project(":lwjgl3"))!!)
     runtimeOnly(bundle(project(":lwjgl3:impl"))!!)
@@ -70,15 +69,6 @@ dependencies {
         }
     }
 
-    implementation(bundle("org.jitsi:ice4j:3.0-52-ga9ba80e") {
-        exclude(module = "kotlin-osgi-bundle")
-        exclude(module = "guava") // we use the one which comes with Minecraft (assuming that it is not too old)
-        exclude(module = "java-sdp-nist-bridge") // sdp is unnecessarily high-level for our use case
-        exclude(module = "jna") // comes with jitsi-utils but is not needed
-    })
-    // upgrade because the old one pulled in by ice4j got compiled by ancient kotlin and fails to remap
-    implementation(bundle("org.jitsi:jitsi-metaconfig:1.0-9-g5e1b624")!!)
-
     // Some of our dependencies rely on slf4j but that's not included in MC prior to 1.17, so we'll manually bundle a
     // log4j adapter for those versions
     // We also bundle it for version 1.17-1.19.2 because those ship slf4j 1.x and only 1.19.3+ starts shipping 2.x
@@ -86,12 +76,22 @@ dependencies {
         implementation(bundle(project(":slf4j-to-log4j"))!!)
     }
     implementation(bundle(project(":quic-connector"))!!)
+    implementation(bundle(project(":pseudotcp"))!!)
 
     implementation(bundle(project(":clipboard"))!!)
     implementation(bundle(project(":utils"))!!)
     implementation(bundle(project(":plasmo"))!!)
+    implementation(bundle(project(":minecraft-auth"))!!)
     if (platform.mcVersion >= 11800) {
         implementation(bundle(project(":immediatelyfast"))!!)
+    }
+    if (platform.mcVersion >= 12105 && (platform.isFabric || platform.isNeoForge)) {
+        repositories.modrinth()
+        if (platform.mcVersion >= 12106) {
+            modCompileOnly("maven.modrinth:iris:1.9.1+1.21.7-${platform.loaderStr}")
+        } else {
+            modCompileOnly("maven.modrinth:iris:1.8.11+1.21.5-${platform.loaderStr}")
+        }
     }
 
     testImplementation(kotlin("test"))
@@ -125,9 +125,13 @@ dependencies {
     if (platform.isFabric && platform.mcVersion >= 12006) {
         val fapiVersion = when (platform.mcVersion) {
             12006 -> "0.97.8+1.20.6"
-            12100 -> "0.99.2+1.21"
-            12102 -> "0.106.0+1.21.2"
+            12101 -> "0.99.2+1.21"
+            12103 -> "0.106.0+1.21.2"
             12104 -> "0.110.0+1.21.4"
+            12105 -> "0.119.0+1.21.5"
+            12106 -> "0.126.0+1.21.6"
+            12107 -> "0.128.1+1.21.7"
+            12109 -> "0.133.13+1.21.9"
             else -> error("No fabric API version configured!")
         }
         include(modImplementation(fabricApi.module("fabric-api-base", fapiVersion))!!)
@@ -205,12 +209,8 @@ tasks.relocatedJar {
     relocate("okhttp3", "gg.essential.lib.okhttp3")
     relocate("okio", "gg.essential.lib.okio")
 
-    // ice4j
+    // pseudotcp
     relocate("org.ice4j", "gg.essential.lib.ice4j")
-    relocate("org.jitsi", "gg.essential.lib.jitsi")
-    relocate("com.typesafe.config", "gg.essential.lib.typesafeconfig")
-    relocate("org.json.simple", "gg.essential.lib.jsonsimple")
-    relocate("org.bitlet.weupnp", "gg.essential.lib.weupnp")
 
     // connection-manager
     relocate("org.java_websocket", "gg.essential.lib.websocket")
@@ -231,6 +231,13 @@ tasks.processResources {
     inputs.property("project_version", project.version)
     filesMatching("assets/essential/version.txt") {
         expand(mapOf("version" to project.version))
+    }
+    if (platform.isNeoForge && platform.mcVersion < 12005) {
+        // NeoForge still uses the old mods.toml name until 1.20.5
+        filesMatching("META-INF/neoforge.mods.toml") {
+            name = "mods.toml"
+        }
+        exclude("META-INF/mods.toml")
     }
 }
 

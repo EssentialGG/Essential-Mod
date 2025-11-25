@@ -14,7 +14,7 @@ package gg.essential.sps
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import gg.essential.Essential
-import gg.essential.mixins.ext.client.resource.FileResourcePackExt
+import gg.essential.mixins.ext.client.resource.ResourcePackWithPath
 import gg.essential.sps.quic.jvm.LOCALHOST
 import gg.essential.universal.UMinecraft
 import gg.essential.util.Multithreading
@@ -150,8 +150,8 @@ object ResourcePackSharingHttpServer {
             return
         }
 
-        if (resourcePack is FileResourcePackExt) {
-            val file = resourcePack.`essential$file`
+        if (resourcePack is ResourcePackWithPath) {
+            val file = resourcePack.`essential$path`
             if (file == null) {
                 this.packInfo = null
                 return

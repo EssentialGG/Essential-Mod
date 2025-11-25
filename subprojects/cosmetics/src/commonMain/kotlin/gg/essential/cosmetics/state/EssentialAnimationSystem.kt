@@ -11,12 +11,16 @@
  */
 package gg.essential.cosmetics.state
 
+import gg.essential.cosmetics.CosmeticId
 import gg.essential.cosmetics.events.AnimationEvent
 import gg.essential.cosmetics.events.AnimationEventType
 import gg.essential.cosmetics.events.AnimationTarget
+import gg.essential.mod.cosmetics.settings.CosmeticSetting
 import gg.essential.model.BedrockModel
 import gg.essential.model.ModelAnimationState
+import gg.essential.model.ModelInstance
 import gg.essential.model.molang.MolangQueryEntity
+import kotlin.collections.HashMap
 import kotlin.random.Random
 
 class EssentialAnimationSystem(
@@ -25,10 +29,22 @@ class EssentialAnimationSystem(
     private val animationState: ModelAnimationState,
     private val textureAnimationSync: TextureAnimationSync,
     private val animationTargets: Set<AnimationTarget>,
+    private val animationVariantSetting: CosmeticSetting.AnimationVariant?,
     private val onAnimation: (String) -> Unit,
 ) {
     private val ongoingAnimations = mutableSetOf<AnimationEvent>()
     private val animationStates = AnimationEffectStates()
+
+    private val pendingAnimationsForOtherModels = mutableSetOf<String>()
+
+    fun triggerPendingAnimationsForOtherModels(models : Collection<ModelInstance>) {
+        if (pendingAnimationsForOtherModels.isEmpty()) return
+
+        pendingAnimationsForOtherModels.forEach { pending ->
+            models.forEach{ it.essentialAnimationSystem.fireTriggerFromAnimation(pending, AnimationEventType.BY_OTHER) }
+        }
+        pendingAnimationsForOtherModels.clear()
+    }
 
     private class AnimationEffectStates {
         var skips = HashMap<AnimationEvent, Int>()
@@ -39,7 +55,7 @@ class EssentialAnimationSystem(
     init {
         processEvent(AnimationEventType.IDLE)
         processEvent(AnimationEventType.EQUIP)
-        processEvent(AnimationEventType.EMOTE)
+        processEmoteEvent()
     }
 
     fun updateAnimationState() {
@@ -66,6 +82,9 @@ class EssentialAnimationSystem(
         if (animationState.active.isEmpty() && highestPriority != null) {
             val animation = bedrockModel.getAnimationByName(highestPriority.name)
             if (animation != null) {
+                if (highestPriority.triggerInOtherCosmetic.isNotEmpty()) {
+                    pendingAnimationsForOtherModels.addAll(highestPriority.triggerInOtherCosmetic)
+                }
                 animationState.startAnimation(animation)
             }
         }
@@ -81,6 +100,28 @@ class EssentialAnimationSystem(
             }
         }
         return null
+    }
+
+    private fun processEmoteEvent(){
+        // Emotes are a special case and should always play one event if present, this requires different probability logic for multiples
+        // Priority is still considered and the final choice will be made only between events with the highest priority
+        // This logic is set explicitly in EmoteWheel for regular players and is saved to the CosmeticSetting ANIMATION_VARIANT
+        // Which is used here to ensure that different users see the same synced emote event variant on their end
+
+        // Get explicit event set by cosmetic settings
+        val event = animationVariantSetting?.data?.animationVariant
+            ?.let { chosenEvent -> bedrockModel.animationEvents.firstOrNull { it.name == chosenEvent } }
+            // Else, for fake UI players, get a random emote event using a local client-side map to prevent animation event repeats
+            ?: getRandomEmoteAnimationEventOrNull(bedrockModel, lastAnimationVariantPlayedByFakeUIPlayers)
+            ?: return
+
+
+        // Process the event
+        if (event.target != AnimationTarget.SELF) {
+            onAnimation(event.name)
+        }
+        ongoingAnimations.add(event)
+        updateAnimationState()
     }
 
     fun processEvent(type: AnimationEventType) {
@@ -101,6 +142,7 @@ class EssentialAnimationSystem(
                 }
             }
             if (!handleProbability(event)) continue
+
             if (event.target != AnimationTarget.SELF) {
                 onAnimation(event.name)
             }
@@ -112,13 +154,13 @@ class EssentialAnimationSystem(
         }
     }
 
-    fun fireTriggerFromAnimation(animationName: String) {
+    fun fireTriggerFromAnimation(animationName: String, requiredType : AnimationEventType? = null) {
         if (animationName == "texture_start") {
             textureAnimationSync.syncTextureStart()
             return
         }
         for (animationEvent in bedrockModel.animationEvents) {
-            if (animationEvent.name == animationName) {
+            if (animationEvent.name == animationName && (requiredType == null || animationEvent.type == requiredType)) {
                 ongoingAnimations.add(animationEvent)
                 updateAnimationState()
                 break
@@ -138,5 +180,54 @@ class EssentialAnimationSystem(
             processEvent(AnimationEventType.TEXTURE_ANIMATION_START)
         }
         lastFrame = (frame % totalFrames).toFloat()
+    }
+
+    companion object {
+        // store the last animation variant played by fake UI players, read later to prevent repeats
+        private val lastAnimationVariantPlayedByFakeUIPlayers: MutableMap<CosmeticId, /* AnimationEvent.name */ String> = mutableMapOf()
+
+        // see processEmoteEvent() for more details
+        fun getRandomEmoteAnimationEventOrNull(emote: BedrockModel, cacheOfLastVariant: MutableMap<CosmeticId, /* AnimationEvent.name */ String>): AnimationEvent? {
+            val emoteEvents = emote.animationEvents.filter { it.type == AnimationEventType.EMOTE }
+
+            if (emoteEvents.size < 2) return emoteEvents.firstOrNull() // only 1 or empty
+
+            val highestPriority = emoteEvents.maxOfOrNull { it.priority }
+            val emoteEventsPriority = emoteEvents.filter { it.priority == highestPriority }
+
+            if (emoteEventsPriority.size < 2) return emoteEventsPriority.firstOrNull() // only 1 with highest priority
+
+            // there are more than 1 event with the highest priority so we need to randomly select one
+
+            // remove the last event variant that was played for this emote, no repeats
+            val lastToSkip = cacheOfLastVariant[emote.cosmetic.id]
+            val eventsMinusLast = emoteEventsPriority.filter { it.name != lastToSkip }
+
+            var randomEvent: AnimationEvent? = null
+            if (eventsMinusLast.size == 1) {
+                // there were only 2 total before removing the last variant used
+                randomEvent = eventsMinusLast.first()
+            } else {
+                // pick random event based on probability as weights
+                var sum = 0f
+                for (element in emoteEventsPriority) {
+                    sum += element.probability
+                }
+
+                var target = Random.nextFloat() * sum
+                for (event in eventsMinusLast) {
+                    target -= event.probability
+                    if (target <= 0) {
+                        randomEvent = event
+                        break
+                    }
+                }
+            }
+
+            // There are more than 1 event with the highest priority, so we need to track this to skip next time
+            if (randomEvent != null) cacheOfLastVariant[emote.cosmetic.id] = randomEvent.name
+
+            return randomEvent
+        }
     }
 }

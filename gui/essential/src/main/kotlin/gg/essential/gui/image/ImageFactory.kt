@@ -12,6 +12,7 @@
 package gg.essential.gui.image
 
 import gg.essential.elementa.components.UIImage
+import gg.essential.elementa.components.inspector.Inspector
 import gg.essential.gui.common.AutoImageSize
 import java.awt.Color
 
@@ -83,6 +84,11 @@ abstract class ImageFactory(
         return DelegatedImageImageFactory(this, settings)
     }
 
+    companion object {
+        init {
+            Inspector.registerComponentFactory(ImageFactory::class.java)
+        }
+    }
 }
 
 /**

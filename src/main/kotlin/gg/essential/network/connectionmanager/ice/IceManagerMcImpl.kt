@@ -17,8 +17,8 @@ import gg.essential.gui.elementa.state.v2.State
 import gg.essential.gui.elementa.state.v2.effect
 import gg.essential.mixins.ext.network.getIceEndpoint
 import gg.essential.network.connectionmanager.ConnectionManager
-import gg.essential.network.connectionmanager.ice.IceManager.ICE_CLIENT_EVENT_LOOP_GROUP
-import gg.essential.network.connectionmanager.ice.IceManager.ICE_SERVER_EVENT_LOOP_GROUP
+import gg.essential.network.connectionmanager.ice.IceEventLoopGroups.ICE_CLIENT_EVENT_LOOP_GROUP
+import gg.essential.network.connectionmanager.ice.IceEventLoopGroups.ICE_SERVER_EVENT_LOOP_GROUP
 import gg.essential.network.connectionmanager.ice.netty.CloseAfterFirstMessage
 import gg.essential.network.connectionmanager.ice.netty.CoroutinesChannelInitializer
 import gg.essential.sps.McIntegratedServerManager
@@ -51,7 +51,7 @@ class IceManagerMcImpl(
     baseDir: Path,
     private val integratedServerManager: State<McIntegratedServerManager?>,
     isInvited: (UUID) -> Boolean,
-) : IceManagerImpl(cmConnection, baseDir.resolve("ice-logs"), isInvited), IIceManager {
+) : IceManagerImpl(cmConnection, baseDir.resolve("ice-logs"), isInvited), IceManager {
     private val refHolder = ReferenceHolderImpl()
 
     override var integratedServerVoicePort: Int = 0
@@ -121,7 +121,9 @@ class IceManagerMcImpl(
         CoroutinesChannelInitializer(coroutineScope, inboundChannel, outboundChannel, onClose)
 
     private inner class TelemetryImpl(private val client: UUID) : Telemetry {
-        private val sessionId = connectionsScope.async(Dispatchers.Client) { cmConnection.spsManager.sessionId }
+        private val sessionId = connectionsScope.async(Dispatchers.Client) {
+            cmConnection.spsManager.sessionId
+        }
         private val receivedPackets = AtomicInteger()
         private val receivedBytes = AtomicLong()
         private val sentPackets = AtomicInteger()

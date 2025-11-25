@@ -16,19 +16,12 @@ package gg.essential.gui.overlay
  */
 interface OverlayManager {
     /**
-     * Creates a new [PersistentLayer] with the given priority (above existing layers with the same priority).
+     * Creates a new [Layer] with the given priority (above existing layers with the same priority).
      */
-    fun createPersistentLayer(priority: LayerPriority): PersistentLayer
+    fun addLayer(priority: LayerPriority): Layer
 
     /**
-     * Creates a new [EphemeralLayer] with the given priority (above existing layers with the same priority).
-     */
-    fun createEphemeralLayer(priority: LayerPriority): EphemeralLayer
-
-    /**
-     * Forcefully removes the given layer.
-     *
-     * This will not call [EphemeralLayer.onClose] or any other cleanup methods.
+     * Removes the given layer.
      */
     fun removeLayer(layer: Layer)
 }

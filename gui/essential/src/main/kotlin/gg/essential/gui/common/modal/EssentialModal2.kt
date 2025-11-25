@@ -12,25 +12,36 @@
 package gg.essential.gui.common.modal
 
 import gg.essential.elementa.UIComponent
+import gg.essential.elementa.components.ScrollComponent
 import gg.essential.elementa.components.Window
 import gg.essential.gui.EssentialPalette
 import gg.essential.gui.common.MenuButton
+import gg.essential.gui.common.OutlineButtonStyle
 import gg.essential.gui.common.StyledButton
-import gg.essential.gui.common.styledButton
+import gg.essential.gui.common.outlineButton
 import gg.essential.gui.common.textStyle
 import gg.essential.gui.elementa.state.v2.State
 import gg.essential.gui.elementa.state.v2.mutableStateOf
 import gg.essential.gui.elementa.state.v2.stateOf
+import gg.essential.gui.layoutdsl.Alignment
 import gg.essential.gui.layoutdsl.Arrangement
 import gg.essential.gui.layoutdsl.LayoutScope
 import gg.essential.gui.layoutdsl.Modifier
 import gg.essential.gui.layoutdsl.WrappedTextBuilder
+import gg.essential.gui.layoutdsl.alignHorizontal
 import gg.essential.gui.layoutdsl.box
-import gg.essential.gui.layoutdsl.childBasedSize
+import gg.essential.gui.layoutdsl.childBasedHeight
+import gg.essential.gui.layoutdsl.childBasedMaxHeight
 import gg.essential.gui.layoutdsl.color
 import gg.essential.gui.layoutdsl.column
+import gg.essential.gui.layoutdsl.fillHeight
+import gg.essential.gui.layoutdsl.fillWidth
+import gg.essential.gui.layoutdsl.height
+import gg.essential.gui.layoutdsl.hoverColor
+import gg.essential.gui.layoutdsl.hoverScope
 import gg.essential.gui.layoutdsl.onLeftClick
 import gg.essential.gui.layoutdsl.outline
+import gg.essential.gui.layoutdsl.row
 import gg.essential.gui.layoutdsl.shadow
 import gg.essential.gui.layoutdsl.spacer
 import gg.essential.gui.layoutdsl.tag
@@ -79,7 +90,7 @@ abstract class EssentialModal2(
                 nextComponent?.grabWindowFocus()
             }
 
-            UKeyboard.KEY_ENTER -> {
+            UKeyboard.KEY_ENTER, UKeyboard.KEY_NUMPADENTER -> {
                 val primaryAction = window.findChildrenByTag<PrimaryAction>(recursive = true).singleOrNull()
 
                 // The simulated left-click event may cause the component's hierarchy to change.
@@ -114,7 +125,7 @@ abstract class EssentialModal2(
     override fun LayoutScope.layoutModal() {
         box(
             Modifier
-                .childBasedSize(16f)
+                .childBasedHeight(16f)
                 .color(EssentialPalette.MODAL_BACKGROUND)
                 .outline(EssentialPalette.BUTTON_HIGHLIGHT, 1f)
         ) {
@@ -138,11 +149,46 @@ abstract class EssentialModal2(
      * call a superclass' implementation of an extension function. ([KT-11488](https://youtrack.jetbrains.com/issue/KT-11488/When-overriding-a-member-extension-function-cannot-call-superclass-implementation))
      */
     fun LayoutScope.layoutContentImpl(modifier: Modifier = Modifier) {
-        column(Modifier.width(190f).then(modifier), Arrangement.spacedBy(17f)) {
-            layoutTitle()
-            layoutBody()
-            layoutButtons()
+        lateinit var titleContainer: UIComponent
+        lateinit var bodyContainer: UIComponent
+        lateinit var buttonsContainer: UIComponent
+        val hasTitle = mutableStateOf(true)
+        val hasBody = mutableStateOf(true)
+        val hasButtons = mutableStateOf(true)
+
+        // Width = 190 (Main) + 16 * 2 (Padding)
+        column(Modifier.width(222f).then(modifier), Arrangement.spacedBy(17f)) {
+            if_(hasTitle) {
+                box(Modifier.fillWidth(padding = 16f)) {
+                    titleContainer = containerDontUseThisUnlessYouReallyHaveTo
+                    layoutTitle()
+                }
+            }
+            if_(hasBody) {
+                box(Modifier.fillWidth().childBasedMaxHeight()) {
+                    box(Modifier.fillWidth(padding = 16f)) {
+                        bodyContainer = containerDontUseThisUnlessYouReallyHaveTo
+                        layoutBody()
+                    }
+                    box(Modifier.width(16f).alignHorizontal(Alignment.End)) {
+                        layoutBodyScrollBar()
+                    }
+                }
+            }
+            if_(hasButtons) {
+                box(Modifier.fillWidth(padding = 16f)) {
+                    buttonsContainer = containerDontUseThisUnlessYouReallyHaveTo
+                    layoutButtons()
+                }
+            }
         }
+
+        titleContainer.children.addObserver { _, _ -> hasTitle.set(titleContainer.children.isNotEmpty()) }
+        bodyContainer.children.addObserver { _, _ -> hasBody.set(bodyContainer.children.isNotEmpty()) }
+        buttonsContainer.children.addObserver { _, _ -> hasButtons.set(buttonsContainer.children.isNotEmpty()) }
+        hasTitle.set(titleContainer.children.isNotEmpty())
+        hasBody.set(bodyContainer.children.isNotEmpty())
+        hasButtons.set(buttonsContainer.children.isNotEmpty())
     }
 
     /** Mainly intended for the [title] of your modal. */
@@ -150,6 +196,28 @@ abstract class EssentialModal2(
 
     /** For the actual content of your modal, e.g. the [description] text. */
     open fun LayoutScope.layoutBody() {}
+
+    /** For the scrollbar of your modal */
+    open fun LayoutScope.layoutBodyScrollBar() {}
+
+    /**
+     * Implements a scrollbar for the layoutBody
+     *
+     * Use the example below to implement the scrollbar
+     * ```kt
+     * override fun LayoutScope.layoutBodyScrollBar() = layoutBodyScrollBarImpl(scroller)
+     * ```
+     */
+    fun LayoutScope.layoutBodyScrollBarImpl(scroller: ScrollComponent) {
+        val scrollbar: UIComponent
+        box(Modifier.height(scroller).width(6f).alignHorizontal(Alignment.Start(1f)).hoverScope()) {
+            scrollbar = box(
+                Modifier.width(2f).fillHeight().color(EssentialPalette.LIGHTEST_BACKGROUND)
+                    .hoverColor(EssentialPalette.SCROLLBAR)
+            )
+        }
+        scroller.setVerticalScrollBarComponent(scrollbar)
+    }
 
     /** For the action buttons of your modal. See [primaryButton], [cancelButton] & [primaryAndCancelButtons]. */
     abstract fun LayoutScope.layoutButtons()
@@ -185,6 +253,20 @@ abstract class EssentialModal2(
         )
     }
 
+    /** See [primaryButton], [cancelButton]. */
+    fun LayoutScope.primaryAndCancelButtons(
+        primaryText: String,
+        cancelText: String,
+        primaryAction: suspend () -> Unit,
+        cancelAction: () -> Unit = ::close,
+        primaryStyle: StyledButton.Style = OutlineButtonStyle.BLUE,
+    ) {
+        row(Arrangement.spacedBy(8f)) {
+            cancelButton(cancelText, action = cancelAction)
+            primaryButton(primaryText, style = primaryStyle, action = primaryAction)
+        }
+    }
+
     /**
      * [action] is a suspend function which is called on left-click. While the [action] is executing,
      * the button will be in a "disabled" state, where no click events will propagate.
@@ -196,15 +278,18 @@ abstract class EssentialModal2(
     fun LayoutScope.primaryButton(
         text: String,
         modifier: Modifier = Modifier,
-        style: StyledButton.Style = StyledButton.Style.BLUE,
+        style: StyledButton.Style = OutlineButtonStyle.BLUE,
+        disabled: State<Boolean> = stateOf(false),
         action: suspend () -> Unit,
     ) {
-        styledButton(
+        outlineButton(
             Modifier
                 .width(91f)
+                .shadow()
                 .tag(PrimaryAction)
                 .then(modifier),
-            style = style,
+            style = { style },
+            disabled = disabled,
             action = action,
         ) { currentStyle ->
             text(text, Modifier.textStyle(currentStyle))
@@ -216,9 +301,10 @@ abstract class EssentialModal2(
         modifier: Modifier = Modifier,
         action: () -> Unit = ::close,
     ) {
-        styledButton(
+        outlineButton(
             Modifier
                 .width(91f)
+                .shadow()
                 .onLeftClick {
                     USound.playButtonPress()
                     action()
@@ -231,17 +317,16 @@ abstract class EssentialModal2(
     }
 
     /**
-     * An overload of [gg.essential.gui.common.styledButton].
+     * An overload of [gg.essential.gui.common.outlineButton].
      *
      * [action] is a suspend function which is called on left-click. While the [action] is executing,
      * the button will be in a "disabled" state, where no click events will propagate.
      *
      * The [StyledButton.Style.disabledStyle] will be used while the [action] is being executed.
      */
-    fun LayoutScope.styledButton(
+    fun LayoutScope.outlineButton(
         modifier: Modifier = Modifier,
-        style: State<StyledButton.Style> = stateOf(StyledButton.Style.GRAY),
-        enableRetexturing: State<Boolean> = stateOf(false),
+        style: State<StyledButton.Style> = stateOf(OutlineButtonStyle.GRAY),
         disabled: State<Boolean> = stateOf(false),
         action: suspend () -> Unit,
         content: LayoutScope.(style: State<MenuButton.Style>) -> Unit,
@@ -249,39 +334,39 @@ abstract class EssentialModal2(
         val actionRunning = mutableStateOf(false)
         val effectiveDisabled = State { disabled() || actionRunning() }
 
-        styledButton(
+        outlineButton(
             Modifier
                 .onLeftClick {
                     USound.playButtonPress()
 
                     coroutineScope.launch {
                         actionRunning.set(true)
-                        action()
-                        actionRunning.set(false)
+                        try {
+                            action()
+                        } finally {
+                            actionRunning.set(false)
+                        }
                     }
                 }
                 .focusable(effectiveDisabled)
                 .then(modifier),
             style,
-            enableRetexturing,
             effectiveDisabled,
             content
         )
     }
 
-    /** See [styledButton], just an overload without any state to make it easier to call. */
-    fun LayoutScope.styledButton(
+    /** See [outlineButton], just an overload without any state to make it easier to call. */
+    fun LayoutScope.outlineButton(
         modifier: Modifier = Modifier,
         style: StyledButton.Style,
-        enableRetexturing: Boolean = false,
         disabled: Boolean = false,
         action: suspend () -> Unit,
         content: LayoutScope.(style: State<MenuButton.Style>) -> Unit,
     ) {
-        styledButton(
+        outlineButton(
             modifier,
             stateOf(style),
-            stateOf(enableRetexturing),
             stateOf(disabled),
             action,
             content,

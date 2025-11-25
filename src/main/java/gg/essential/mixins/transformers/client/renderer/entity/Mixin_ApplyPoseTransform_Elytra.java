@@ -17,6 +17,7 @@ import gg.essential.mixins.impl.client.model.ElytraPoseSupplier;
 import gg.essential.model.backend.PlayerPose;
 import gg.essential.model.backend.minecraft.PlayerPoseKt;
 import gg.essential.model.util.PlayerPoseManager;
+import kotlin.Pair;
 import net.minecraft.client.entity.AbstractClientPlayer;
 import net.minecraft.client.model.ModelElytra;
 import net.minecraft.client.model.ModelRenderer;
@@ -100,7 +101,7 @@ public abstract class Mixin_ApplyPoseTransform_Elytra implements ElytraPoseSuppl
         CosmeticsRenderState cState = new CosmeticsRenderState.Live((AbstractClientPlayer) entity);
         //#endif
         PlayerPoseManager poseManager = cState.poseManager();
-        if (poseManager != null) {
+        if (poseManager == null) {
             return;
         }
 
@@ -115,12 +116,7 @@ public abstract class Mixin_ApplyPoseTransform_Elytra implements ElytraPoseSuppl
     }
 
     @Override
-    public @Nullable PlayerPose.Part getLeftWingPose() {
-        return toPose(this.leftWing);
-    }
-
-    @Override
-    public @Nullable PlayerPose.Part getRightWingPose() {
-        return toPose(this.rightWing);
+    public @Nullable Pair<PlayerPose.Part, PlayerPose.Part> getWingsPose() {
+        return new Pair<>(toPose(this.leftWing), toPose(this.rightWing));
     }
 }

@@ -11,16 +11,13 @@
  */
 package gg.essential.mixins.transformers.feature.ice.client;
 
-import gg.essential.Essential;
-import gg.essential.network.connectionmanager.sps.SPSManager;
+import gg.essential.sps.SpsAddress;
 import net.minecraft.client.network.ServerPinger;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-
-import java.util.UUID;
 
 import static gg.essential.network.connectionmanager.ice.util.IWishMixinAllowedForPublicStaticFields.connectTarget;
 
@@ -44,10 +41,9 @@ public abstract class Mixin_IceAddressResolving_Ping {
     @ModifyArg(method = "ping", at = @At(value = "INVOKE", target = "Ljava/net/InetAddress;getByName(Ljava/lang/String;)Ljava/net/InetAddress;"))
     //#endif
     private String setIceTarget(String address) {
-        SPSManager spsManager = Essential.getInstance().getConnectionManager().getSpsManager();
-        UUID user = spsManager.getHostFromSpsAddress(address);
-        if (user != null) {
-            connectTarget.set(user);
+        SpsAddress spsAddress = SpsAddress.parse(address);
+        if (spsAddress != null) {
+            connectTarget.set(spsAddress.getHost());
             address = "127.0.0.1"; // just needs to resolve
         }
         return address;

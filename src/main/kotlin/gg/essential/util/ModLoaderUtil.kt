@@ -14,16 +14,13 @@ package gg.essential.util
 import gg.essential.Essential
 import gg.essential.connectionmanager.common.packet.mod.ClientModsAnnouncePacket
 import gg.essential.connectionmanager.common.packet.partner.PartneredMod
+import gg.essential.data.VersionData
 import gg.essential.gui.elementa.state.v2.State
 import gg.essential.gui.elementa.state.v2.memo
 import gg.essential.gui.elementa.state.v2.mutableStateOf
 import gg.essential.universal.UMinecraft
 import kotlin.io.path.*
 import org.apache.commons.codec.digest.DigestUtils
-
-//#if MC>=11400
-//$$ import net.minecraft.util.SharedConstants
-//#endif
 
 //#if FABRIC
 //$$ import gg.essential.lib.gson.JsonObject
@@ -42,6 +39,11 @@ import net.minecraftforge.common.ForgeVersion
 import gg.essential.mixincompat.util.MixinCompatUtils
 import net.minecraftforge.fml.common.Loader
 //#endif
+//#endif
+
+//#if NEOFORGE
+//$$ import net.neoforged.fml.loading.LoadingModList
+//$$ import net.neoforged.neoforge.internal.versions.neoforge.NeoForgeVersion
 //#endif
 
 import java.io.IOException
@@ -97,9 +99,21 @@ object ModLoaderUtil {
             "ChromaHUD"
         )
 
-    private val mutablePartnerMods = mutableStateOf<List<PartneredMod>>(listOf())
-    val partnerMods: State<List<PartneredMod>> = mutablePartnerMods
-    val partnerModIds = memo { partnerMods().map { it.id } }
+    private val mutablePartnerMods = mutableStateOf<List<PartneredMod>?>(null)
+    val partnerMods: State<List<PartneredMod>?> = mutablePartnerMods
+    val partnerModIds = memo { partnerMods()?.map { it.id } }
+
+    private val mutableAreModsLoaded = mutableStateOf(false)
+    @JvmField
+    val areModsLoaded: State<Boolean> = mutableAreModsLoaded
+
+    val loadedPartnerMods = memo {
+        if (!areModsLoaded()) return@memo null
+        val mods = getMods()
+        partnerMods()?.filter { partnerMod -> mods.any { it.id == partnerMod.id } }?.toSet()
+    }
+    @JvmField
+    val loadedPartnerModIds = memo { loadedPartnerMods()?.map { it.id } }
 
     private val modpackId by lazy {
         val modpackProps = UMinecraft.getMinecraft().mcDataDir.toPath() / "config" / "essential-modpack.properties"
@@ -111,12 +125,14 @@ object ModLoaderUtil {
 
     @JvmStatic
     fun createModsAnnouncePacket() = ClientModsAnnouncePacket(
-        getMinecraftVersion(), getModChecksums().values.toTypedArray(),
+        VersionData.getMinecraftVersion(), getModChecksums().values.toTypedArray(),
         getPlatform(), getPlatformVersion(), modpackId
     )
 
     private fun getPlatform(): ClientModsAnnouncePacket.Platform {
-        //#if FORGE
+        //#if NEOFORGE
+        //$$ return ClientModsAnnouncePacket.Platform.NEOFORGE
+        //#elseif FORGE
         return ClientModsAnnouncePacket.Platform.FORGE
         //#elseif FABRIC
         //$$ return ClientModsAnnouncePacket.Platform.FABRIC
@@ -128,9 +144,9 @@ object ModLoaderUtil {
         mutablePartnerMods.set(list)
     }
 
-    fun getLoadedPartnerModIds(): Set<String> {
-        val mods = getMods()
-        return partnerModIds.getUntracked().filter { partnerId -> mods.any { it.id == partnerId } }.toSet()
+    @JvmStatic
+    fun setModsLoaded() {
+        mutableAreModsLoaded.set(true)
     }
 
     /**
@@ -310,14 +326,6 @@ object ModLoaderUtil {
         }.toMap()
     }
 
-    private fun getMinecraftVersion(): String {
-        //#if MC>=11400
-        //$$ return SharedConstants.getVersion().id
-        //#else
-        return ForgeVersion::mcVersion.get()
-        //#endif
-    }
-
     private fun getPlatformVersion(): String {
         //#if FABRIC
         //$$ val loader = FabricLoader.getInstance()
@@ -343,7 +351,11 @@ object ModLoaderUtil {
         //$$     return "error:${loader.javaClass.name}-${e.message}"
         //$$ }
         //#elseif MC>=11400
+        //#if NEOFORGE
+        //$$ return NeoForgeVersion.getVersion()
+        //#else
         //$$ return ForgeVersion.getVersion()
+        //#endif
         //#else
         return ForgeVersion.getBuildVersion().toString()
         //#endif
@@ -360,6 +372,20 @@ object ModLoaderUtil {
         //$$ return LoadingModList.get().getModFileById(modId) != null
         //#else
         return modId in Loader.instance().indexedModList
+        //#endif
+    }
+
+    /**
+     * This method is not safe to call in early init on legacy forge.
+     * Test usage thoroughly.
+     */
+    fun getModVersion(modId: String): String? {
+        //#if FABRIC
+        //$$ return FabricLoader.getInstance().getModContainer(modId).orElse(null)?.metadata?.version?.toString()
+        //#elseif MC>=11400
+        //$$ return LoadingModList.get().mods.find { it.modId == modId }?.version?.toString()
+        //#else
+        return Loader.instance().indexedModList[modId]?.version
         //#endif
     }
 

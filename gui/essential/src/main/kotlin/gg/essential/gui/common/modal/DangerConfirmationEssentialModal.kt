@@ -11,7 +11,6 @@
  */
 package gg.essential.gui.common.modal
 
-import gg.essential.elementa.state.BasicState
 import gg.essential.gui.EssentialPalette
 import gg.essential.gui.common.*
 import gg.essential.gui.overlay.ModalManager
@@ -28,6 +27,9 @@ open class DangerConfirmationEssentialModal(
     init {
         primaryButtonText = confirmText
         contentTextColor = EssentialPalette.TEXT_HIGHLIGHT
-        primaryActionButton.rebindStyle(BasicState(MenuButton.RED), BasicState(MenuButton.LIGHT_RED))
+        configure {
+            primaryButtonStyle = OutlineButtonStyle.RED.defaultStyle
+            primaryButtonHoverStyle = OutlineButtonStyle.RED.hoveredStyle
+        }
     }
 }

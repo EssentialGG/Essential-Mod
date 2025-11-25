@@ -32,18 +32,18 @@ import java.awt.Color
 /**
  * A [ModalManager] which is backed by a [UIContainer].
  */
-class UIContainerModalManagerImpl(
+open class UIContainerModalManagerImpl(
     backgroundColor: Color = Color.BLACK.withAlpha(150)
 ) : UIContainer(), ModalManager {
     override val coroutineScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Client)
 
     private val modalQueue = mutableListOf<Modal>()
     override var isCurrentlyFadingIn: Boolean = false
-        private set
+        protected set
 
     private var didFade: Boolean = false
 
-    private val background by UIBlock(backgroundColor).constrain {
+    protected val background by UIBlock(backgroundColor).constrain {
         x = 0.pixels
         y = 0.pixels
         width = 100.percentOfWindow()
@@ -87,9 +87,12 @@ class UIContainerModalManagerImpl(
         }
     }
 
-    private fun pushModalFromQueue(): Modal? {
+    protected open fun setupModal(modal: Modal) {}
+
+    protected fun pushModalFromQueue(): Modal? {
         val modal = modalQueue.removeFirstOrNull() ?: return null
         modal childOf background
+        setupModal(modal)
         modal.onOpen()
 
         if (!didFade) {

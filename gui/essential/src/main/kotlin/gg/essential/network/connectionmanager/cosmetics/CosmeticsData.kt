@@ -16,6 +16,8 @@ import gg.essential.cosmetics.CosmeticCategoryId
 import gg.essential.cosmetics.CosmeticId
 import gg.essential.cosmetics.CosmeticTypeId
 import gg.essential.cosmetics.FeaturedPageCollectionId
+import gg.essential.cosmetics.ImplicitOwnership
+import gg.essential.cosmetics.ImplicitOwnershipId
 import gg.essential.gui.elementa.state.v2.ListState
 import gg.essential.mod.cosmetics.CosmeticBundle
 import gg.essential.mod.cosmetics.CosmeticCategory
@@ -28,11 +30,13 @@ interface CosmeticsData {
     val types: ListState<CosmeticType>
     val bundles: ListState<CosmeticBundle>
     val featuredPageCollections: ListState<FeaturedPageCollection>
+    val implicitOwnerships: ListState<ImplicitOwnership>
     val cosmetics: ListState<Cosmetic>
 
     fun getCategory(id: CosmeticCategoryId): CosmeticCategory?
     fun getType(id: CosmeticTypeId): CosmeticType?
     fun getCosmeticBundle(id: CosmeticBundleId): CosmeticBundle? // rename to getBundle() when removing feature flag
     fun getFeaturedPageCollection(id: FeaturedPageCollectionId): FeaturedPageCollection?
+    fun getImplicitOwnership(id: ImplicitOwnershipId): ImplicitOwnership?
     fun getCosmetic(id: CosmeticId): Cosmetic?
 }

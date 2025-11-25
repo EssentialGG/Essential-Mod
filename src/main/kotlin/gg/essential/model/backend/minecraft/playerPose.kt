@@ -29,6 +29,10 @@ import net.minecraft.client.model.ModelBiped
 import net.minecraft.client.model.ModelRenderer
 import net.minecraft.client.renderer.entity.RenderPlayer
 
+//#if MC>=12109
+//$$ import dev.folomeev.kotgl.matrix.vectors.vecZero
+//#endif
+
 //#if MC>=12102
 //$$ import dev.folomeev.kotgl.matrix.vectors.mutables.minus
 //$$ import dev.folomeev.kotgl.matrix.vectors.mutables.plus
@@ -38,13 +42,22 @@ import net.minecraft.client.renderer.entity.RenderPlayer
 //$$ import gg.essential.model.util.toMat4
 //#endif
 
-fun RenderPlayer.toPose(): PlayerPose {
+//#if MC>=12109
+//$$ fun PlayerEntityRenderer<*>.toPose(
+//#else
+fun RenderPlayer.toPose(
+//#endif
+    withCape: Boolean,
+    withElytra: Boolean,
+): PlayerPose {
     val basePose = mainModel.toPose()
     val features = (this as PlayerEntityRendererExt).`essential$getFeatures`()
+    val capePose = if (withCape) features.firstNotNullOfOrNull { (it as? CapePoseSupplier)?.capePose } else null
+    val wingsPose = if (withElytra) features.firstNotNullOfOrNull { (it as? ElytraPoseSupplier)?.wingsPose } else null
     return basePose.copy(
-        cape = features.firstNotNullOfOrNull { (it as? CapePoseSupplier)?.capePose } ?: PlayerPose.Part.MISSING,
-        leftWing = features.firstNotNullOfOrNull { (it as? ElytraPoseSupplier)?.leftWingPose } ?: PlayerPose.Part.MISSING,
-        rightWing = features.firstNotNullOfOrNull { (it as? ElytraPoseSupplier)?.rightWingPose } ?: PlayerPose.Part.MISSING,
+        cape = capePose ?: PlayerPose.Part.MISSING,
+        leftWing = wingsPose?.first ?: PlayerPose.Part.MISSING,
+        rightWing = wingsPose?.second ?: PlayerPose.Part.MISSING,
     )
 }
 
@@ -89,7 +102,22 @@ fun ModelBiped.toPose(): PlayerPose = PlayerPose(
     //#else
     isChild,
     //#endif
-)
+).let { pose ->
+    //#if MC>=12109
+    //$$ if (body.hasChild("cape"))  {
+    //$$     // FIXME Ideally we'd pass the true `extraOffset` here, but we can't easily get it at this point.
+    //$$     //       It doesn't matter particularly much since `Mixin_CapePoseSupplier` does consider it (so cosmetics
+    //$$     //       and particles will be correct), and we don't have any emotes which have complex animations for the
+    //$$     //       cape specifically.
+    //$$     //       I'm also kind of hoping MC will get rid of it in the future anyway.
+    //$$     pose.withCapePose(vecZero(), body, body.getChild("cape"))
+    //$$ } else {
+    //$$     pose
+    //$$ }
+    //#else
+    pose
+    //#endif
+}
 
 fun ModelRenderer.toPose() = PlayerPose.Part(
     rotationPointX,
@@ -100,8 +128,6 @@ fun ModelRenderer.toPose() = PlayerPose.Part(
     rotateAngleZ,
     (this as ExtraTransformHolder).extra,
 )
-
-fun PlayerPose.applyTo(renderer: RenderPlayer) = applyTo(renderer.mainModel)
 
 //#if MC>=11600
 //$$ fun PlayerPose.applyTo(model: BipedModel<*>) {
@@ -135,6 +161,9 @@ fun PlayerPose.applyTo(model: ModelBiped) {
     leftArm.applyTo(model.bipedLeftArm)
     rightLeg.applyTo(model.bipedRightLeg)
     leftLeg.applyTo(model.bipedLeftLeg)
+    //#endif
+    //#if MC>=12109
+    //$$ if (model.body.hasChild("cape")) applyCapePose(vecZero(), model.body, model.body.getChild("cape"))
     //#endif
     //#if MC<12102
     if (model is ModelPlayerAccessor) {

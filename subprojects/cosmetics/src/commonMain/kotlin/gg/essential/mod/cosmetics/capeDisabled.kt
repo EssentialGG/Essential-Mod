@@ -31,6 +31,7 @@ val CAPE_DISABLED_COSMETIC = Cosmetic(
     now(),
     null,
     null,
+    null,
     emptyMap(),
     emptyMap(),
     0,

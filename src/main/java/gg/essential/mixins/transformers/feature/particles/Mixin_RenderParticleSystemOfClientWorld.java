@@ -11,6 +11,7 @@
  */
 package gg.essential.mixins.transformers.feature.particles;
 
+import gg.essential.config.EssentialConfig;
 import gg.essential.mixins.ext.client.ParticleSystemHolder;
 import gg.essential.model.ParticleSystem;
 import gg.essential.model.backend.minecraft.MinecraftRenderBackend;
@@ -35,6 +36,11 @@ import static dev.folomeev.kotgl.matrix.vectors.Vectors.vecUnitY;
 import static dev.folomeev.kotgl.matrix.vectors.mutables.MutableVectors.times;
 import static gg.essential.util.HelpersKt.getPerspective;
 
+//#if MC>=12109
+//$$ import net.minecraft.client.render.Frustum;
+//$$ import net.minecraft.client.render.SubmittableBatch;
+//#endif
+
 //#if MC>=12104
 //$$ import com.mojang.blaze3d.systems.RenderSystem;
 //#endif
@@ -52,15 +58,35 @@ import net.minecraft.world.World;
 
 @Mixin(ParticleManager.class)
 public abstract class Mixin_RenderParticleSystemOfClientWorld {
+    //#if MC>=12109
+    //$$ private static final String RENDER_PARTICLES = "addToBatch";
+    //#else
     // Forge overloads this method with an additional argument in 1.16+
-    //#if FORGE && MC>=11600
-    //#if MC>=11700
+    // NeoForge adds another one in 1.21+
+    //#if NEOFORGE && MC>=12100
+    //#if MC>=12104
+    //$$ private static final String RENDER_PARTICLES = "render(Lnet/minecraft/client/Camera;FLnet/minecraft/client/renderer/MultiBufferSource$BufferSource;Lnet/minecraft/client/renderer/culling/Frustum;Ljava/util/function/Predicate;)V";
+    //#else
+    //$$ private static final String RENDER_PARTICLES = "render(Lnet/minecraft/client/renderer/LightTexture;Lnet/minecraft/client/Camera;FLnet/minecraft/client/renderer/culling/Frustum;Ljava/util/function/Predicate;)V";
+    //#endif
+    //#elseif FORGELIKE && MC>=11600
+    //#if MC>=12104
+    //$$ private static final String RENDER_PARTICLES = "render(Lnet/minecraft/client/Camera;FLnet/minecraft/client/renderer/MultiBufferSource$BufferSource;Lnet/minecraft/client/renderer/culling/Frustum;)V";
+    //#elseif MC>=12006
+    //$$ private static final String RENDER_PARTICLES = "render(Lnet/minecraft/client/renderer/LightTexture;Lnet/minecraft/client/Camera;FLnet/minecraft/client/renderer/culling/Frustum;)V";
+    //#elseif MC>=11700
     //$$ private static final String RENDER_PARTICLES = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource$BufferSource;Lnet/minecraft/client/renderer/LightTexture;Lnet/minecraft/client/Camera;FLnet/minecraft/client/renderer/culling/Frustum;)V";
     //#else
     //$$ private static final String RENDER_PARTICLES = "renderParticles(Lcom/mojang/blaze3d/matrix/MatrixStack;Lnet/minecraft/client/renderer/IRenderTypeBuffer$Impl;Lnet/minecraft/client/renderer/LightTexture;Lnet/minecraft/client/renderer/ActiveRenderInfo;FLnet/minecraft/client/renderer/culling/ClippingHelper;)V";
     //#endif
     //#else
+    // TODO remap bug: it thinks the method reference is ambiguous because it doesn't consider the arguments our injector takes
+    //#if MC>=12105
+    //$$ private static final String RENDER_PARTICLES = "renderParticles(Lnet/minecraft/client/render/Camera;FLnet/minecraft/client/render/VertexConsumerProvider$Immediate;)V";
+    //#else
     private static final String RENDER_PARTICLES = "renderParticles";
+    //#endif
+    //#endif
     //#endif
 
     @Shadow
@@ -92,6 +118,10 @@ public abstract class Mixin_RenderParticleSystemOfClientWorld {
         //#endif
     )
     private void essential$renderParticles(
+        //#if MC>=12109
+        //$$ SubmittableBatch batch,
+        //$$ Frustum frustum,
+        //#endif
         //#if MC>=11600
         //#if MC<12005
         //$$ MatrixStack matrixStackIn,
@@ -102,14 +132,17 @@ public abstract class Mixin_RenderParticleSystemOfClientWorld {
         //#endif
         //$$ ActiveRenderInfo activeRenderInfoIn,
         //$$ float partialTicks,
-        //#if MC>=12104
+        //#if MC>=12104 && MC<12109
         //$$ VertexConsumerProvider.Immediate bufferIn,
         //#endif
-        //#if FORGE
+        //#if FORGELIKE
         //#if MC>=11700
         //$$ net.minecraft.client.renderer.culling.Frustum frustum,
         //#else
         //$$ net.minecraft.client.renderer.culling.ClippingHelper clippingHelper,
+        //#endif
+        //#if NEOFORGE && MC>=12100
+        //$$ java.util.function.Predicate renderTypePredicate,
         //#endif
         //#endif
         //#else
@@ -191,18 +224,52 @@ public abstract class Mixin_RenderParticleSystemOfClientWorld {
         UUID cameraUuid = cameraEntity.getUniqueID();
         //#endif
 
+        boolean isFirstPerson = getPerspective() == 0;
+        boolean hideCosmeticParticlesInFirstPerson = EssentialConfig.INSTANCE.getHideCosmeticParticlesInFirstPerson().getUntracked();
+
+        //#if MC>=12109
+        //$$ batch.add((queue, camera) -> {
+        //$$     ParticleSystem.VertexConsumerProvider particleVertexConsumer = (renderPass, block) -> {
+        //$$         queue.getBatchingQueue(renderPass.getMaterial().getNeedsSorting() ? 0 : 1)
+        //$$             .submitCustom(new MatrixStack(), MinecraftRenderBackend.INSTANCE.getParticleLayer(renderPass), (_matrixEntry, vertexConsumer) ->
+        //$$                 new MinecraftRenderBackend.ParticleVertexConsumerProvider(_layer -> vertexConsumer)
+        //$$                     .provide(renderPass, block));
+        //$$     };
+        //$$
+        //$$     particleSystem.render(
+        //$$         stack,
+        //$$         cameraPos,
+        //$$         cameraRot,
+        //$$         particleVertexConsumer,
+        //$$         cameraUuid,
+        //$$         isFirstPerson,
+        //$$         hideCosmeticParticlesInFirstPerson,
+        //$$         null
+        //$$     );
+        //$$ });
+        //#else
         ParticleSystem.VertexConsumerProvider particleVertexConsumer = new MinecraftRenderBackend.ParticleVertexConsumerProvider(
             //#if MC>=12104
             //$$ bufferIn
             //#endif
         );
 
-        boolean isFirstPerson = getPerspective() == 0;
-        particleSystem.render(stack, cameraPos, cameraRot, particleVertexConsumer, cameraUuid, isFirstPerson);
+        particleSystem.render(
+                stack,
+                cameraPos,
+                cameraRot,
+                particleVertexConsumer,
+                cameraUuid,
+                isFirstPerson,
+                hideCosmeticParticlesInFirstPerson,
+                null
+        );
+        //#endif
 
         profiler.endSection();
     }
 
+    //#if MC<12109
     // Forge's overload has been mirrored in OptiFine (which can be used on Fabric through OptiFabric)
     //#if MC>=11600 && FABRIC
     //$$ @Group(name = "render_particles", min = 1, max = 1)
@@ -248,5 +315,19 @@ public abstract class Mixin_RenderParticleSystemOfClientWorld {
     //$$         ci
     //$$     );
     //$$ }
+    //#endif
+
+    // NeoForge's additional argument on 1.21+ also exists on later versions of 1.20.6, so we need to support both there
+    //#if MC==12006 && NEOFORGE
+    //$$ @Group(name = "render_particles", min = 1, max = 1)
+    //$$ @org.spongepowered.asm.mixin.Dynamic("Extra argument added by in NeoForge 20.6.75 (#977) (7c6475b28)")
+    //$$ @Inject(
+    //$$     method = "render(Lnet/minecraft/client/renderer/LightTexture;Lnet/minecraft/client/Camera;FLnet/minecraft/client/renderer/culling/Frustum;Ljava/util/function/Predicate;)V",
+    //$$    at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/RenderSystem;depthMask(Z)V")
+    //$$ )
+    //$$ private void essential$renderParticles(LightTexture lightTexture, Camera camera, float partialTicks, net.minecraft.client.renderer.culling.Frustum frustum, java.util.function.Predicate renderTypePredicate, CallbackInfo ci) {
+    //$$     essential$renderParticles(lightTexture, camera, partialTicks, frustum, ci);
+    //$$ }
+    //#endif
     //#endif
 }

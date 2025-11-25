@@ -13,6 +13,7 @@ package gg.essential.mixins.transformers.feature.cosmetics;
 
 import gg.essential.cosmetics.WearablesManager;
 import gg.essential.mixins.impl.client.entity.AbstractClientPlayerExt;
+import gg.essential.model.backend.PlayerPose;
 import net.minecraft.client.entity.AbstractClientPlayer;
 import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.client.renderer.RenderGlobal;
@@ -27,11 +28,29 @@ import static gg.essential.cosmetics.events.CosmeticEventDispatcher.dispatchEven
 
 @Mixin(RenderGlobal.class)
 public abstract class Mixin_UpdateCosmetics {
+    //#if NEOFORGE
+    //#if MC>=12106
+    //$$ private static final String MAIN_PASS_LAMBDA = "lambda$addMainPass$3";
+    //#else
+    //$$ private static final String MAIN_PASS_LAMBDA = "lambda$addMainPass$2";
+    //#endif
+    //#elseif FORGE
+    //#if MC>=12106
+    //$$ private static final String MAIN_PASS_LAMBDA = "lambda$addMainPass$2";
+    //#else
+    //$$ private static final String MAIN_PASS_LAMBDA = "lambda$addMainPass$1";
+    //#endif
+    //#else
+    private static final String MAIN_PASS_LAMBDA = "method_62214";
+    //#endif
+
     @Shadow
     private WorldClient world;
 
-    //#if MC>=12102
-    //$$ @Inject(method = "method_62214", at = @At(value = "CONSTANT", args = "stringValue=entities"))
+    //#if MC>=12109
+    //$$ @Inject(method = "render", at = @At(value = "CONSTANT", args = "stringValue=entities"))
+    //#elseif MC>=12102
+    //$$ @Inject(method = MAIN_PASS_LAMBDA, at = @At(value = "CONSTANT", args = "stringValue=entities"))
     //#elseif MC>=11400
     //$$ @Inject(method = "updateCameraAndRender", at = @At(value = "CONSTANT", args = "stringValue=entities"))
     //#else
@@ -48,14 +67,20 @@ public abstract class Mixin_UpdateCosmetics {
             }
             AbstractClientPlayerExt playerExt = (AbstractClientPlayerExt) player;
 
+            // Set null so Mixin_RenderExtraClientCosmeticGeometryInFirstPerson can detect if the player was rendered already
+            // during this pass by some other mod. E.G. a first person body mod
+            playerExt.setRenderedPose(null);
+
             WearablesManager wearablesManager = playerExt.getWearablesManager();
             wearablesManager.update();
             playerExt.getPoseManager().update(wearablesManager);
         }
     }
 
-    //#if MC>=12102
-    //$$ @Inject(method = "method_62214", at = @At(value = "CONSTANT", args = "stringValue=blockentities"))
+    //#if MC>=12109
+    //$$ @Inject(method = MAIN_PASS_LAMBDA, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/command/RenderDispatcher;render()V", shift = At.Shift.AFTER))
+    //#elseif MC>=12102
+    //$$ @Inject(method = MAIN_PASS_LAMBDA, at = @At(value = "CONSTANT", args = "stringValue=blockentities"))
     //#elseif MC>=11400
     //$$ @Inject(method = "updateCameraAndRender", at = @At(value = "CONSTANT", args = "stringValue=blockentities"))
     //#else
@@ -73,7 +98,18 @@ public abstract class Mixin_UpdateCosmetics {
             AbstractClientPlayerExt playerExt = (AbstractClientPlayerExt) player;
 
             WearablesManager wearablesManager = playerExt.getWearablesManager();
-            wearablesManager.updateLocators(playerExt.getRenderedPose());
+            PlayerPose renderedPose = playerExt.getRenderedPose();
+            if (renderedPose == null) {
+                // No way for us to get the real pose if we didn't actually render, let's just use the neutral pose.
+                renderedPose = PlayerPose.Companion.neutral();
+                // Also no way to know if cape/elytra/etc. are visible (not if you consider modded items anyway),
+                // so we'll place those far away as if they weren't visible so any events they spawn won't be visible.
+                renderedPose = renderedPose.withoutAttachments();
+                // Also apply any emotes to it, so that any particles that shoot where the emote points actually shoot
+                // in that direction instead of just straight down.
+                renderedPose = playerExt.getPoseManager().computePose(wearablesManager, renderedPose);
+            }
+            wearablesManager.updateLocators(renderedPose);
             dispatchEvents((AbstractClientPlayer) player, wearablesManager);
         }
     }

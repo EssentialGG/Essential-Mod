@@ -27,35 +27,39 @@ import gg.essential.universal.shader.BlendState
 import gg.essential.universal.utils.ReleasedDynamicTexture
 import gg.essential.universal.vertex.UVertexConsumer
 import gg.essential.util.OptiFineAccessor
+import gg.essential.util.UnownedGlGpuTexture
 import gg.essential.util.identifier
+import gg.essential.util.image.GpuTexture
 import net.minecraft.client.renderer.GlStateManager
 import net.minecraft.client.renderer.vertex.DefaultVertexFormats
 import net.minecraft.util.ResourceLocation
 import org.lwjgl.opengl.GL11
-import org.lwjgl.opengl.GL30
 import java.io.ByteArrayInputStream
 import gg.essential.model.util.UMatrixStack as CMatrixStack
 import gg.essential.model.util.UVertexConsumer as CVertexConsumer
 
-//#if MC>=12102
-//$$ import net.minecraft.client.render.VertexConsumer
+//#if MC>=12109
+//$$ import net.minecraft.client.render.command.OrderedRenderCommandQueue
 //#endif
 
-//#if MC>=11700
-//$$ import org.lwjgl.opengl.GL30.glBindFramebuffer
-//$$ import org.lwjgl.opengl.GL30.glDeleteFramebuffers
-//$$ import org.lwjgl.opengl.GL30.glFramebufferTexture2D
-//$$ import org.lwjgl.opengl.GL30.glGenFramebuffers
-//#elseif MC>=11400
-//$$ import com.mojang.blaze3d.platform.GlStateManager.bindFramebuffer as glBindFramebuffer
-//$$ import com.mojang.blaze3d.platform.GlStateManager.deleteFramebuffers as glDeleteFramebuffers
-//$$ import com.mojang.blaze3d.platform.GlStateManager.framebufferTexture2D as glFramebufferTexture2D
-//$$ import com.mojang.blaze3d.platform.GlStateManager.genFramebuffers as glGenFramebuffers
-//#else
-import net.minecraft.client.renderer.OpenGlHelper.glBindFramebuffer
-import net.minecraft.client.renderer.OpenGlHelper.glDeleteFramebuffers
-import net.minecraft.client.renderer.OpenGlHelper.glFramebufferTexture2D
-import net.minecraft.client.renderer.OpenGlHelper.glGenFramebuffers
+//#if MC>=12105
+//$$ import com.mojang.blaze3d.pipeline.BlendFunction
+//$$ import com.mojang.blaze3d.pipeline.RenderPipeline
+//$$ import com.mojang.blaze3d.vertex.VertexFormat
+//$$ import gg.essential.util.ModLoaderUtil
+//#if FORGE==0
+//$$ import net.irisshaders.iris.api.v0.IrisApi
+//$$ import net.irisshaders.iris.api.v0.IrisProgram
+//#endif
+//$$ import net.minecraft.client.MinecraftClient
+//$$ import net.minecraft.client.gl.Framebuffer
+//$$ import net.minecraft.client.gl.RenderPipelines
+//$$ import net.minecraft.client.render.BuiltBuffer
+//$$ import net.minecraft.client.texture.GlTexture
+//#endif
+
+//#if MC>=12102
+//$$ import net.minecraft.client.render.VertexConsumer
 //#endif
 
 //#if MC>=11600
@@ -77,7 +81,11 @@ object MinecraftRenderBackend : RenderBackend {
     override fun deleteTexture(texture: RenderBackend.Texture) {
         val identifier = (texture as DynamicTexture).identifier
 
+        //#if MC>=12105
+        //$$ texture.texture.close()
+        //#else
         texture.texture.deleteGlTexture()
+        //#endif
 
         if (registeredTextures.remove(identifier, texture)) {
             getMinecraft().textureManager.deleteTexture(identifier)
@@ -87,44 +95,90 @@ object MinecraftRenderBackend : RenderBackend {
     override fun blitTexture(dst: RenderBackend.Texture, ops: Iterable<RenderBackend.BlitOp>) {
         val textureManager = getMinecraft().textureManager
         fun RenderBackend.Texture.glId() =
+            //#if MC>=12105
+            //$$ (textureManager.getTexture((this as MinecraftTexture).identifier).glTexture as GlTexture).glId
+            //#else
             textureManager.getTexture((this as MinecraftTexture).identifier)!!.glTextureId
+            //#endif
+        fun RenderBackend.Texture.gpuTexture() =
+            UnownedGlGpuTexture(GpuTexture.Format.RGBA8, glId(), width, height)
 
-        val prevScissor = GL11.glGetBoolean(GL11.GL_SCISSOR_TEST)
-        if (prevScissor) GL11.glDisable(GL11.GL_SCISSOR_TEST)
-
-        val prevDrawFrameBufferBinding = GL11.glGetInteger(GL30.GL_DRAW_FRAMEBUFFER_BINDING)
-        val prevReadFrameBufferBinding = GL11.glGetInteger(GL30.GL_READ_FRAMEBUFFER_BINDING)
-
-        val dstBuffer = glGenFramebuffers()
-        val srcBuffer = glGenFramebuffers()
-
-        glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, dstBuffer)
-        glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, srcBuffer)
-        glFramebufferTexture2D(GL30.GL_DRAW_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT0, GL11.GL_TEXTURE_2D, dst.glId(), 0)
-
-        for ((src, srcX, srcY, destX, destY, width, height) in ops) {
-            glFramebufferTexture2D(GL30.GL_READ_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT0, GL11.GL_TEXTURE_2D, src.glId(), 0)
-            GL30.glBlitFramebuffer(
-                srcX, srcY, srcX + width, srcY + height,
-                destX, destY, destX + width, destY + height,
-                GL11.GL_COLOR_BUFFER_BIT, GL11.GL_NEAREST
-            )
-        }
-
-        glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, prevDrawFrameBufferBinding)
-        glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, prevReadFrameBufferBinding)
-
-        glDeleteFramebuffers(dstBuffer)
-        glDeleteFramebuffers(srcBuffer)
-
-        if (prevScissor) GL11.glEnable(GL11.GL_SCISSOR_TEST)
+        dst.gpuTexture().copyFrom(ops.map { GpuTexture.CopyOp(it.src.gpuTexture(), it.srcX, it.srcY, it.destX, it.destY, it.width, it.height) })
     }
+
+    //#if MC>=12105
+    //$$ private fun RenderLayer.drawImpl(pipeline: RenderPipeline, buffer: BuiltBuffer) {
+    //$$     startDrawing()
+    //$$     buffer.use {
+            //#if MC>=12106
+            //$$ val dynamicTransforms = RenderSystem.getDynamicUniforms().write(
+            //$$     RenderSystem.getModelViewMatrix(),
+            //$$     org.joml.Vector4f(1.0F, 1.0F, 1.0F, 1.0F),
+            //#if MC>=12109
+            //$$     org.joml.Vector3f(),
+            //#else
+            //$$     RenderSystem.getModelOffset(),
+            //#endif
+            //$$     RenderSystem.getTextureMatrix(),
+            //$$     RenderSystem.getShaderLineWidth(),
+            //$$ )
+            //#endif
+    //$$         val vertexBuffer = pipeline.vertexFormat.uploadImmediateVertexBuffer(buffer.buffer)
+    //$$         val sortedBuffer = buffer.sortedBuffer
+    //$$         val (indexBuffer, indexType) = if (sortedBuffer != null) {
+    //$$             pipeline.vertexFormat.uploadImmediateIndexBuffer(sortedBuffer) to buffer.drawParameters.indexType()
+    //$$         } else {
+    //$$             val shapeIndexBuffer = RenderSystem.getSequentialBuffer(buffer.drawParameters.mode())
+    //$$             shapeIndexBuffer.getIndexBuffer(buffer.drawParameters.indexCount()) to shapeIndexBuffer.indexType
+    //$$         }
+    //$$         val target = MinecraftClient.getInstance().framebuffer
+    //$$         RenderSystem.getDevice().createCommandEncoder().createRenderPass(
+                //#if MC>=12106
+                //$$ { "Immediate draw for $name" },
+                //$$ RenderSystem.outputColorTextureOverride ?: target.colorAttachmentView!!,
+                //$$ java.util.OptionalInt.empty(),
+                //$$ if (target.useDepthAttachment) RenderSystem.outputDepthTextureOverride ?: target.depthAttachmentView else null,
+                //$$ java.util.OptionalDouble.empty()
+                //#else
+                //$$ target.colorAttachment!!,
+                //$$ java.util.OptionalInt.empty(),
+                //$$ if (target.useDepthAttachment) target.depthAttachment else null,
+                //$$ java.util.OptionalDouble.empty()
+                //#endif
+    //$$         ).use { renderPass ->
+    //$$             renderPass.setPipeline(pipeline)
+                //#if MC>=12106
+                //$$ RenderSystem.bindDefaultUniforms(renderPass)
+                //$$ renderPass.setUniform("DynamicTransforms", dynamicTransforms)
+                //#else
+                //$$ if (RenderSystem.SCISSOR_STATE.isEnabled) {
+                //$$     renderPass.enableScissor(RenderSystem.SCISSOR_STATE)
+                //$$ }
+                //#endif
+    //$$             for (i in 0 until 12) {
+    //$$                 RenderSystem.getShaderTexture(i)?.let { renderPass.bindSampler("Sampler$i", it) }
+    //$$             }
+    //$$             renderPass.setVertexBuffer(0, vertexBuffer)
+    //$$             renderPass.setIndexBuffer(indexBuffer, indexType)
+                //#if MC>=12106
+                //$$ renderPass.drawIndexed(0, 0, buffer.drawParameters.indexCount(), 1)
+                //#else
+                //$$ renderPass.drawIndexed(0, buffer.drawParameters.indexCount())
+                //#endif
+    //$$         }
+    //$$     }
+    //$$     endDrawing()
+    //$$ }
+    //#endif
 
     //#if MC>=12104
     //$$ // As of 1.21.4, MC itself now finally uses the RenderLayer system for its particles, so we'll do the same.
     //$$ // Our particles have more blending modes though, so we need some custom layers.
     //$$ private val particleLayers = mutableMapOf<ParticleEffect.RenderPass, RenderLayer>()
-    //$$ private fun getParticleLayer(renderPass: ParticleEffect.RenderPass) = particleLayers.getOrPut(renderPass) {
+    //$$ fun getParticleLayer(renderPass: ParticleEffect.RenderPass) = particleLayers.getOrPut(renderPass) {
+    //#if MC>=12105
+    //$$     RenderLayerFactory.createParticleLayer(renderPass)
+    //#else
     //$$     val texture = (renderPass.texture as MinecraftTexture).identifier
     //$$     val inner =
     //$$         if (renderPass.material == Cutout) RenderLayer.getOpaqueParticle(texture)
@@ -143,7 +197,7 @@ object MinecraftRenderBackend : RenderBackend {
     //$$             when (renderPass.material) {
     //$$                 Cutout -> {} // blending is disabled by default
     //$$                 Add -> BlendState(BlendState.Equation.ADD, BlendState.Param.SRC_ALPHA, BlendState.Param.ONE).activate()
-    //$$                 Blend -> BlendState.NORMAL.activate()
+    //$$                 Blend -> BlendState.ALPHA.activate()
     //$$             }
     //$$         },
     //$$         {
@@ -153,6 +207,7 @@ object MinecraftRenderBackend : RenderBackend {
     //$$         },
     //$$     )
     //$$     ParticleLayer()
+    //#endif
     //$$ }
     //#endif
 
@@ -161,6 +216,9 @@ object MinecraftRenderBackend : RenderBackend {
     //$$ // have to build it ourselves.
     //$$ private val entityTranslucentCullLayers = mutableMapOf<Identifier, RenderLayer>()
     //$$ fun getEntityTranslucentCullLayer(texture: Identifier) = entityTranslucentCullLayers.getOrPut(texture) {
+    //#if MC>=12105
+    //$$     RenderLayerFactory.createEntityTranslucentCullLayer(texture)
+    //#else
     //$$     val inner = RenderLayer.getEntityTranslucent(texture)
     //$$     // Note: If this is turned into an anonymous class, Kotlin will generate the bridge for the protected
     //$$     // field in the wrong class (MinecraftRenderBackend), which will then throw an IllegalAccessError.
@@ -183,6 +241,7 @@ object MinecraftRenderBackend : RenderBackend {
     //$$         },
     //$$     )
     //$$     EntityTranslucentCullLayer()
+    //#endif
     //$$ }
     //#elseif MC>=11400
     //$$ fun getEntityTranslucentCullLayer(texture: ResourceLocation) = RenderType.getEntityTranslucentCull(texture)
@@ -205,6 +264,10 @@ object MinecraftRenderBackend : RenderBackend {
     //$$ // 3. Alpha values: so we can do the aforementioned blending.
     //$$ //    Both layers support these, however the `entity_translucent_emissive` layer discards any pixel with
     //$$ //    `alpha < 0.1`, luckily the `eyes` one doesn't, so that's what we'll use.
+    //#if MC>=12105
+    //$$ // The `eyes` layer now uses regular blending, so we can use it directly
+    //$$ fun getEmissiveLayer(texture: Identifier) = RenderLayer.getEyes(texture)
+    //#else
     //$$ private val emissiveLayers = mutableMapOf<ResourceLocation, RenderType>()
     //$$ fun getEmissiveLayer(texture: ResourceLocation) = emissiveLayers.getOrPut(texture) {
     //$$     val inner = RenderType.getEyes(texture)
@@ -239,11 +302,15 @@ object MinecraftRenderBackend : RenderBackend {
     //$$     )
     //$$     EmissiveLayer()
     //$$ }
+    //#endif
     //$$ // For the elytra we need need a special layer because the armor layer used to render it adds a tiny extra scale
     //$$ // offset (VIEW_OFFSET_Z_LAYERING) to the model-view matrix, meaning it'll be slightly closer to the camera than
     //$$ // our emissive layer if we don't do the same.
     //$$ private val armorLayers = mutableMapOf<ResourceLocation, RenderType>()
     //$$ fun getEmissiveArmorLayer(texture: ResourceLocation) = armorLayers.getOrPut(texture) {
+    //#if MC>=12105
+    //$$     RenderLayerFactory.createEmissiveArmorLayer(texture)
+    //#else
     //$$     val inner = getEmissiveLayer(texture)
     //$$     // Note: If this is turned into an anonymous class, Kotlin will generate the bridge for the protected
     //$$     // field in the wrong class (MinecraftRenderBackend), which will then throw an IllegalAccessError.
@@ -258,6 +325,7 @@ object MinecraftRenderBackend : RenderBackend {
     //$$         { field_239235_M_.clearRenderState(); inner.clearRenderState() },
     //$$     )
     //$$     EmissiveArmorLayer()
+    //#endif
     //$$ }
     //#if MC>=12102
     //$$ object NullMcVertexConsumer : VertexConsumer {
@@ -362,6 +430,83 @@ object MinecraftRenderBackend : RenderBackend {
         texture: ReleasedDynamicTexture,
     ) : DynamicTexture(identifier("essential", "textures/cosmetics/${name.lowercase()}"), texture)
 
+    class CommandQueue : RenderBackend.CommandQueue {
+        private class Key(
+            val texture: MinecraftTexture,
+            val translucent: Boolean,
+            val emissive: Boolean,
+        ) : Comparable<Key> {
+            override fun compareTo(other: Key): Int = KEY_COMPARATOR.compare(this, other)
+            companion object {
+                val KEY_COMPARATOR =
+                    // Translucent geometry must be last
+                    compareBy<Key> { it.translucent }
+                        // emissive pass must be after the corresponding opaque geometry
+                        .thenBy { it.emissive }
+                        // finally sort by identifier so passes with identical texture can be rendered in one pass
+                        //#if MC>=11200
+                        .thenBy { it.texture.identifier }
+                        //#else
+                        //$$ .thenBy { it.texture.identifier.resourceDomain }
+                        //$$ .thenBy { it.texture.identifier.resourcePath }
+                        //#endif
+            }
+        }
+
+        private val queue = mutableMapOf<Key, MutableList<(CVertexConsumer) -> Unit>>()
+
+        override fun submit(
+            texture: RenderBackend.Texture,
+            translucent: Boolean,
+            emissive: Boolean,
+            render: (CVertexConsumer) -> Unit,
+        ) {
+            require(texture is MinecraftTexture)
+            queue.getOrPut(Key(texture, translucent, emissive), ::mutableListOf)
+                .add(render)
+        }
+
+        fun render(vertexConsumerProvider: RenderBackend.VertexConsumerProvider) {
+            if (queue.isEmpty()) return
+
+            for ((key, commands) in queue.entries.sortedBy { it.key }) {
+                vertexConsumerProvider.provide(key.texture, key.emissive) { vertexConsumer ->
+                    for (command in commands) {
+                        command(vertexConsumer)
+                    }
+                }
+            }
+        }
+    }
+
+    //#if MC>=12109
+    //$$ class MinecraftCommandQueue(
+    //$$     private val mcQueue: OrderedRenderCommandQueue,
+    //$$     private val light: Int,
+    //$$ ) : RenderBackend.CommandQueue {
+    //$$     override fun submit(
+    //$$         texture: RenderBackend.Texture,
+    //$$         translucent: Boolean,
+    //$$         emissive: Boolean,
+    //$$         render: (CVertexConsumer) -> Unit,
+    //$$     ) {
+    //$$         require(texture is MinecraftTexture)
+    //$$         val layer =
+    //$$             if (emissive) getEmissiveLayer(texture.identifier)
+    //$$             else getEntityTranslucentCullLayer(texture.identifier)
+    //$$         val order = when {
+    //$$             translucent -> 2
+    //$$             emissive -> 1
+    //$$             else -> 0
+    //$$         }
+    //$$         mcQueue.getBatchingQueue(order).submitCustom(net.minecraft.client.util.math.MatrixStack(), layer) { _, vertexConsumer ->
+    //$$             VertexConsumerProvider({ vertexConsumer }, light)
+    //$$                 .provide(texture, emissive, render)
+    //$$         }
+    //$$     }
+    //$$ }
+    //#endif
+
     //#if MC>=11600
     //$$ class VertexConsumerProvider(val provider: net.minecraft.client.renderer.IRenderTypeBuffer, val light: Int) : RenderBackend.VertexConsumerProvider {
     //#else
@@ -406,16 +551,21 @@ object MinecraftRenderBackend : RenderBackend {
             //$$ )
             //$$ block(VertexConsumerAdapter(UVertexConsumer.of(buffer)))
             //#else
-            val renderer = UGraphics.getFromTessellator()
-            GlStateManager.enableCull()
-            UGraphics.enableAlpha()
-            UGraphics.enableBlend()
-            UGraphics.tryBlendFuncSeparate(770, 771, 1, 0)
+            val prevCull = GL11.glGetBoolean(GL11.GL_CULL_FACE)
+            val prevAlphaTest = GL11.glGetBoolean(GL11.GL_ALPHA_TEST)
+            val prevBlend = BlendState.active()
+
+            if (!prevCull) GlStateManager.enableCull()
+            if (!prevAlphaTest) UGraphics.enableAlpha()
+            if (prevBlend != BlendState.ALPHA) UGraphics.Globals.blendState(BlendState.ALPHA)
+
             UGraphics.color4f(1f, 1f, 1f, 1f)
             val prevTextureId = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D)
             UGraphics.bindTexture(0, texture.identifier)
             val cleanupEmissive = if (emissive) setupEmissiveRendering() else ({})
 
+            val renderer = UGraphics.getFromTessellator()
+            @Suppress("DEPRECATION")
             renderer.beginWithDefaultShader(UGraphics.DrawMode.QUADS, VERTEX_FORMAT)
 
             block(VertexConsumerAdapter(renderer.asUVertexConsumer()))
@@ -423,8 +573,10 @@ object MinecraftRenderBackend : RenderBackend {
             renderer.drawSorted(0, 0, 0)
 
             cleanupEmissive()
-            GlStateManager.disableCull()
             UGraphics.bindTexture(0, prevTextureId)
+            if (prevBlend != BlendState.ALPHA) UGraphics.Globals.blendState(prevBlend)
+            if (!prevAlphaTest) UGraphics.disableAlpha()
+            if (!prevCull) GlStateManager.disableCull()
             //#endif
         }
 
@@ -484,33 +636,32 @@ object MinecraftRenderBackend : RenderBackend {
             val prevTextureId = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D)
             val prevCull = GL11.glIsEnabled(GL11.GL_CULL_FACE)
 
+            @Suppress("DEPRECATION")
             when (renderPass.material) {
                 Add -> BlendState(BlendState.Equation.ADD, BlendState.Param.SRC_ALPHA, BlendState.Param.ONE)
                 Cutout -> BlendState.DISABLED
-                Blend -> BlendState.NORMAL
+                Blend -> BlendState.ALPHA
             }.activate()
             //#if MC<11700
-            if (renderPass.material == Cutout) {
-                GlStateManager.enableAlpha()
-                GlStateManager.alphaFunc(GL11.GL_GREATER, 0.5f)
-            }
+            GlStateManager.enableAlpha()
+            GlStateManager.alphaFunc(GL11.GL_GREATER, if (renderPass.material == Cutout) 0.5f else 0.0f)
             //#endif
             UGraphics.bindTexture(0, texture.identifier)
             if (!prevCull) GlStateManager.enableCull()
 
             val renderer = UGraphics.getFromTessellator()
+            @Suppress("DEPRECATION")
             renderer.beginWithDefaultShader(UGraphics.DrawMode.QUADS, DefaultVertexFormats.PARTICLE_POSITION_TEX_COLOR_LMAP)
             block(VertexConsumerAdapter(renderer.asUVertexConsumer()))
             renderer.drawDirect()
 
             if (!prevCull) GlStateManager.disableCull()
             UGraphics.bindTexture(0, prevTextureId)
+            @Suppress("DEPRECATION")
             prevBlend.activate()
             //#if MC<11700
-            if (renderPass.material == Cutout) {
-                if (!prevAlphaTest) GlStateManager.disableAlpha()
-                GlStateManager.alphaFunc(prevAlphaTestFunc, prevAlphaTestRef)
-            }
+            if (!prevAlphaTest) GlStateManager.disableAlpha()
+            GlStateManager.alphaFunc(prevAlphaTestFunc, prevAlphaTestRef)
             //#endif
             //#endif
         }

@@ -12,11 +12,9 @@
 package gg.essential.util
 
 import gg.essential.universal.UMinecraft
-import net.minecraft.client.Minecraft
 import net.minecraft.client.resources.IResource
 import net.minecraft.client.resources.IResourceManager
 import net.minecraft.client.resources.IResourceManagerReloadListener
-import net.minecraft.client.resources.SimpleReloadableResourceManager
 import net.minecraft.util.ResourceLocation
 import java.io.FileNotFoundException
 import java.util.concurrent.CopyOnWriteArrayList
@@ -32,13 +30,6 @@ typealias Listener = () -> Unit
 
 object ResourceManagerUtil : IResourceManagerReloadListener {
     private val listeners = CopyOnWriteArrayList<Listener>()
-
-    init {
-        UMinecraft.getMinecraft().executor.execute {
-            (Minecraft.getMinecraft().resourceManager as SimpleReloadableResourceManager)
-                .registerReloadListener(this)
-        }
-    }
 
     fun onResourceManagerReload(listener: Listener) {
         listeners.add(listener)
@@ -59,6 +50,14 @@ object ResourceManagerUtil : IResourceManagerReloadListener {
      * We want to clear our caches when the resource manager is reloaded in-case a resource pack is controlling
      * the texture.
      */
+    //#if MC>=12109
+    //$$ override fun reload(
+    //$$     store: ResourceReloader.Store,
+    //$$     backgroundExecutor: Executor,
+    //$$     stage: Synchronizer,
+    //$$     gameExecutor: Executor,
+    //$$ ): CompletableFuture<Void> {
+    //#else
     //#if MC<=11202
     override fun onResourceManagerReload(ignored: IResourceManager) {
         //#else
@@ -73,6 +72,7 @@ object ResourceManagerUtil : IResourceManagerReloadListener {
         //$$      gameExecutor: Executor?,
         //$$  ): CompletableFuture<Void?> {
         //#endif
+    //#endif
         listeners.forEach(Listener::invoke)
         //#if MC>11202
         //$$ return stage.markCompleteAwaitingOthers(null)

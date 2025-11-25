@@ -1,0 +1,8 @@
+net.minecraft.entity.Entity getEntityWorld() getWorld()
+net.minecraft.entity.Entity getEntityPos() getPos()
+net.minecraft.client.network.ClientPlayerLikeEntity getSkin() net.minecraft.client.network.AbstractClientPlayerEntity getSkinTextures()
+
+com.mojang.authlib.GameProfile com.mojang.authlib.GameProfile
+com.mojang.authlib.GameProfile id() getId()Ljava/util/UUID;
+com.mojang.authlib.GameProfile name() getName()Ljava/lang/String;
+com.mojang.authlib.GameProfile properties() getProperties()Lcom/mojang/authlib/properties/PropertyMap;

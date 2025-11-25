@@ -11,13 +11,17 @@
  */
 package gg.essential.model
 
+import gg.essential.cosmetics.CosmeticId
+import gg.essential.cosmetics.CosmeticsState
 import gg.essential.cosmetics.events.AnimationTarget
 import gg.essential.cosmetics.state.EssentialAnimationSystem
 import gg.essential.cosmetics.state.TextureAnimationSync
 import gg.essential.cosmetics.state.WearableLocator
-import gg.essential.model.EnumPart.Companion.fromBoneName
+import gg.essential.mod.cosmetics.settings.CosmeticSetting
+import gg.essential.mod.cosmetics.settings.setting
 import gg.essential.model.backend.PlayerPose
 import gg.essential.model.backend.RenderBackend
+import gg.essential.model.bones.BedrockModelState
 import gg.essential.model.molang.MolangQueryEntity
 import gg.essential.model.util.UMatrixStack
 import gg.essential.network.cosmetics.Cosmetic
@@ -26,16 +30,30 @@ class ModelInstance(
     var model: BedrockModel,
     val entity: MolangQueryEntity,
     val animationTargets: Set<AnimationTarget>,
+    state: CosmeticsState,
     val onAnimation: (String) -> Unit,
 ) {
-    var locator = WearableLocator(entity.locator)
-    var animationState = ModelAnimationState(entity, locator)
+    var locator = WearableLocator(entity.locator, wearableVisible = !state.propertyHidesEntireCosmetic(model.cosmetic.id))
+    // allows new particles to reflect modelInstance texture changes even when the animationState doesn't update
+    private val textureSource = { this.model.texture }
+    var animationState = ModelAnimationState(entity, locator, textureSource)
     var textureAnimationSync = TextureAnimationSync(model.textureFrameCount)
-    var essentialAnimationSystem = EssentialAnimationSystem(model, entity, animationState, textureAnimationSync, animationTargets, onAnimation)
+    private var animationVariantSetting: CosmeticSetting.AnimationVariant? = state.getAnimationVariantSettingOf(model.cosmetic.id)
+    var essentialAnimationSystem = EssentialAnimationSystem(model, entity, animationState, textureAnimationSync, animationTargets, animationVariantSetting, onAnimation)
 
-    fun switchModel(newModel: BedrockModel) {
+
+    private fun CosmeticsState.getAnimationVariantSettingOf(cosmeticId: CosmeticId): CosmeticSetting.AnimationVariant? {
+        return cosmetics.values.firstOrNull { it.id == cosmeticId }?.settings?.setting<CosmeticSetting.AnimationVariant>()
+    }
+
+    fun switchModel(newModel: BedrockModel, newState: CosmeticsState) {
+        locator.wearableVisible = !newState.propertyHidesEntireCosmetic(newModel.cosmetic.id)
+
         val newTextureAnimation = model.textureFrameCount != newModel.textureFrameCount
         val newAnimations = model.animations != newModel.animations || model.animationEvents != newModel.animationEvents
+
+        val newAnimationVariantSetting = newState.getAnimationVariantSettingOf(newModel.cosmetic.id)
+        val newAnimationVariant = animationVariantSetting != newAnimationVariantSetting
 
         model = newModel
 
@@ -44,11 +62,15 @@ class ModelInstance(
         }
         if (newAnimations) {
             locator.isValid = false
-            locator = WearableLocator(entity.locator)
-            animationState = ModelAnimationState(entity, locator)
+            locator = WearableLocator(entity.locator, locator.wearableVisible)
+            animationState = ModelAnimationState(entity, locator, textureSource)
         }
-        if (newAnimations || newTextureAnimation) {
-            essentialAnimationSystem = EssentialAnimationSystem(model, entity, animationState, textureAnimationSync, animationTargets, onAnimation)
+        if (newAnimationVariant) {
+            animationVariantSetting = newAnimationVariantSetting
+        }
+
+        if (newAnimations || newTextureAnimation || newAnimationVariant) {
+            essentialAnimationSystem = EssentialAnimationSystem(model, entity, animationState, textureAnimationSync, animationTargets, animationVariantSetting, onAnimation)
         }
     }
 
@@ -56,32 +78,7 @@ class ModelInstance(
         get() = model.cosmetic
 
     fun computePose(basePose: PlayerPose): PlayerPose {
-        return model.computePose(basePose, animationState, entity)
-    }
-
-    private var lastUpdateTime = Float.NEGATIVE_INFINITY
-
-    /**
-     * Updates the state of this model for the current frame prior to rendering.
-     *
-     * Note that new animation events are emitted into [ModelAnimationState.pendingEvents] and the caller needs to
-     * collect them from there and forward them to the actual particle/sound/etc system at the appropriate time.
-     *
-     * Also note that this does **not** yet update the locators bound to this model instance. For that one must call
-     * [updateLocators] after rendering.
-     * This is because the position and rotation of locators depends on the final rendered player pose, which is only
-     * available after rendering.
-     * Because particle events may depend on the position of locators, they should however ideally be updated before
-     * particles are updated, rendered, and/or spawned.
-     */
-    fun update() {
-        val now = entity.lifeTime
-        if (lastUpdateTime == now) return // was already updated this frame
-        lastUpdateTime = now
-
-        essentialAnimationSystem.maybeFireTextureAnimationStartEvent()
-        essentialAnimationSystem.updateAnimationState()
-        animationState.updateEffects()
+        return model.computePose(basePose, animationState)
     }
 
     /**
@@ -90,50 +87,39 @@ class ModelInstance(
      * Note that this method must called for all models, even those that were not actually rendered (e.g. because
      * the corresponding player was frustum culled), so that particles bound to locators (which may be visible even
      * when the player entity that spawned them is not) are update correctly.
-     * In such cases where no reliable pose information is available, pass `null`.
      */
-    fun updateLocators(renderedPose: PlayerPose?) {
+    fun updateLocators(renderedPose: PlayerPose, state: CosmeticsState) {
         // Locators are fairly expensive to update, so only do it if we need to
         if (animationState.locatorsNeedUpdating()) {
-            val pose = renderedPose
-                // No way for us to get the real pose if we didn't actually render, let's just use the neutral pose
-                ?: PlayerPose.neutral().copy(
-                    // Also no way to know if cape/elytra/etc. are visible (not if you consider modded items anyway),
-                    // so we'll move those far away so any events they spawn won't be visible.
-                    rightShoulderEntity = PlayerPose.Part.MISSING,
-                    leftShoulderEntity = PlayerPose.Part.MISSING,
-                    rightWing = PlayerPose.Part.MISSING,
-                    leftWing = PlayerPose.Part.MISSING,
-                    cape = PlayerPose.Part.MISSING,
-                )
-            val rootBone = model.rootBone
-            animationState.apply(rootBone, false)
-            model.applyPose(rootBone, pose, entity)
-            animationState.updateLocators(rootBone, 1 / 16f)
+            val modelState = BedrockModelState(
+                renderedPose,
+                animationState.bake(model.bones),
+                state.getPositionAdjustment(cosmetic),
+                state.sides[cosmetic.id],
+                state.hiddenBones[cosmetic.id] ?: emptySet(),
+                EnumPart.values().toSet() - state.hiddenParts.getOrDefault(cosmetic.id, emptySet()),
+            )
+            modelState.apply(model.bones)
+
+            animationState.updateLocators(model.bones, 1 / 16f)
+
+            modelState.reset(model.bones)
         }
     }
 
     fun render(
         matrixStack: UMatrixStack,
-        vertexConsumerProvider: RenderBackend.VertexConsumerProvider,
-        rootBone: Bone,
+        queue: RenderBackend.CommandQueue,
+        geometry: RenderGeometry,
         renderMetadata: RenderMetadata,
     ) {
-        animationState.apply(rootBone, false)
-
-        for (bone in model.getBones(rootBone)) {
-            if (fromBoneName(bone.boxName) != null) {
-                bone.userOffsetX = renderMetadata.positionAdjustment.x
-                bone.userOffsetY = renderMetadata.positionAdjustment.y
-                bone.userOffsetZ = renderMetadata.positionAdjustment.z
-            }
-        }
+        val bakedAnimations = animationState.bake(model.bones)
 
         model.render(
             matrixStack,
-            vertexConsumerProvider,
-            rootBone,
-            entity,
+            queue,
+            geometry,
+            bakedAnimations,
             renderMetadata,
             textureAnimationSync.getAdjustedLifetime(entity.lifeTime),
         )

@@ -15,13 +15,16 @@ import gg.essential.Essential
 import gg.essential.connectionmanager.common.packet.Packet
 import gg.essential.connectionmanager.common.packet.cosmetic.ClientCosmeticCheckoutPacket
 import gg.essential.connectionmanager.common.packet.cosmetic.ServerCosmeticsUserUnlockedPacket
-import gg.essential.data.VersionData
-import gg.essential.gui.common.sendUnlockedToast
+import gg.essential.cosmetics.isAvailable
+import gg.essential.gui.common.sendCosmeticUnlockedToast
+import gg.essential.gui.elementa.state.v2.ObservedInstant
 import gg.essential.mod.Model
 import gg.essential.mod.cosmetics.settings.CosmeticProperty
 import gg.essential.network.connectionmanager.ConnectionManager
 import gg.essential.network.connectionmanager.handler.PacketHandler
 import gg.essential.network.cosmetics.Cosmetic
+import gg.essential.util.BuildInfo
+import java.time.Instant
 
 inline fun <reified T : Packet> ConnectionManager.registerPacketHandler(handler: PacketHandler<T>) =
     registerPacketHandler(T::class.java, handler)
@@ -51,13 +54,12 @@ fun primeCache(modelLoader: ModelLoader, assetLoader: AssetLoader, cosmetic: Cos
 }
 
 fun ConnectionManager.unlockSpsCosmetics() {
-    // Current version of Minecraft (e.g. 1.21.4) as array of ints, [1, 21, 4] or [1, 20]
-    val currentVersionInts = VersionData.getMinecraftVersion().split("-", ".").map {
-        it.toIntOrNull() ?: run {
-            Essential.logger.warn("When unlocking SPS cosmetic the current version could not be parsed from {}", VersionData.getMinecraftVersion())
-            return
-        }
-    }.take(3)
+    // Current version of Minecraft (e.g. 1.21.4) as list of ints, [1, 21, 4]
+    val currentVersionInts = listOf(
+        BuildInfo.TARGET_MC_VERSION / 10000,
+        (BuildInfo.TARGET_MC_VERSION % 10000) / 100,
+        BuildInfo.TARGET_MC_VERSION % 100,
+    )
 
     unlock<CosmeticProperty.RequiresUnlockAction.Data.JoinSps> { joinSPSProperty ->
         val requiredVersionInts = joinSPSProperty.requiredVersion?.split(".")?.map {
@@ -80,21 +82,20 @@ fun ConnectionManager.unlockServerCosmetics(address: String) {
 }
 
 private inline fun <reified T : CosmeticProperty.RequiresUnlockAction.Data> ConnectionManager.unlock(filter: (T) -> Boolean) {
+    val now = ObservedInstant(Instant.now()) {}
     val toUnlock = cosmeticsManager.cosmetics.get()
-        .filter { it.id !in cosmeticsManager.unlockedCosmetics.get() && it.isAvailable() }
+        .filter { it.id !in cosmeticsManager.unlockedCosmetics.get() && it.isAvailable(now) }
         .filter { cosmetic -> cosmetic.properties<CosmeticProperty.RequiresUnlockAction>().mapNotNull { it.data as? T }.any(filter) }
-        .map { it.id }
-        .toSet()
 
     if (toUnlock.isEmpty()) return
 
-    send(ClientCosmeticCheckoutPacket(toUnlock)) { packetOptional ->
+    send(ClientCosmeticCheckoutPacket(toUnlock.map { it.id }.toSet())) { packetOptional ->
         val packet = packetOptional.orElse(null)
         if (packet !is ServerCosmeticsUserUnlockedPacket) {
             Essential.logger.error("Failed to unlock cosmetics: $packet")
         } else {
             for (unlockedCosmeticId in packet.unlockedCosmetics.keys) {
-                sendUnlockedToast(unlockedCosmeticId)
+                sendCosmeticUnlockedToast(toUnlock.find { it.id == unlockedCosmeticId } ?: continue)
             }
         }
     }

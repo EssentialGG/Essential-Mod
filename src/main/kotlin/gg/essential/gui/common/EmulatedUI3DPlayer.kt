@@ -116,6 +116,8 @@ class EmulatedUI3DPlayer(
     //#if MC>=11903
     //$$ init {
     //$$     errored = true // TODO: can this be done without the fallback renderer?
+    //$$     // Note: The Wardrobe hover outline effect is no longer supported via the 1.21.9 vanilla renderer, so even
+    //$$     //       if we do re-enable the vanilla renderer on 1.19.3+, we still have to use the fallback for that.
     //$$ }
     //#endif
 
@@ -169,7 +171,11 @@ class EmulatedUI3DPlayer(
                     //$$ override fun getSkinTextures(): SkinTextures {
                     //$$     return with(super.getSkinTextures()) {
                     //$$         if (showCape.get()) this
-                    //$$         else SkinTextures(texture, textureUrl, null, elytraTexture, model, secure)
+                            //#if MC>=12109
+                            //$$ else SkinTextures(body(), null, elytra(), model(), secure())
+                            //#else
+                            //$$ else SkinTextures(texture, textureUrl, null, elytraTexture, model, secure)
+                            //#endif
                     //$$     }
                     //$$ }
                     //#else
@@ -225,12 +231,14 @@ class EmulatedUI3DPlayer(
                 player.eyeHeight = 1.82f
                 //#endif
 
+                //#if MC<12109
                 player.chasingPosX = player.posX
                 player.chasingPosY = player.posY
                 player.chasingPosZ = player.posZ
                 player.prevChasingPosX = player.posX
                 player.prevChasingPosY = player.posY
                 player.prevChasingPosZ = player.posZ
+                //#endif
 
                 withFakeClientFields(player) {
                     configurePlayer(player)
@@ -262,7 +270,9 @@ class EmulatedUI3DPlayer(
         RenderPlayerBypass.bypass = true;
         withFakeClientFields {
             it.updateVisibleModelParts()
-            //#if MC>=11400
+            //#if MC>=12109
+            //$$ mcClient.entityRenderDispatcher.configure(mcClient.gameRenderer.camera, null)
+            //#elseif MC>=11400
             //$$ @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS") // `entity` parameter inappropriately marked as non-null by Forge
             //$$ mcClient.renderManager.cacheActiveRenderInfo(FakeWorld.fakeWorld, mcClient.gameRenderer.activeRenderInfo, null)
             //#endif
@@ -271,9 +281,11 @@ class EmulatedUI3DPlayer(
         RenderPlayerBypass.bypass = false;
     }
 
-    override fun animationFrame() {
-        super.animationFrame()
+    init {
+        addUpdateFunc { _, _ -> tick() }
+    }
 
+    private fun tick() {
         val ticks = ClientTickEvent.counter - tickCounter
         repeat(ticks.coerceAtMost(20)) {
             onGameTick()

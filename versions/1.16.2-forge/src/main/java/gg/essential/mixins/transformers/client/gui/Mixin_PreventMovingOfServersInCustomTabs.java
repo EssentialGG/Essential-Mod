@@ -23,6 +23,10 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+//#if MC>=12106
+//$$ import com.mojang.blaze3d.pipeline.RenderPipeline;
+//#endif
+
 //#if MC>=12102
 //$$ import net.minecraft.client.render.RenderLayer;
 //$$ import java.util.function.Function;
@@ -39,10 +43,17 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class Mixin_PreventMovingOfServersInCustomTabs {
     @Shadow
     @Final
+    //#if MC>=12109
+    //$$ private MultiplayerServerListWidget field_19117;
+    //#else
     private MultiplayerScreen owner;
+    //#endif
 
     //#if MC>=12002
-    //#if MC>=12102
+    //#if MC>=12106
+    //$$ @ModifyArg(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/DrawContext;drawGuiTexture(Lcom/mojang/blaze3d/pipeline/RenderPipeline;Lnet/minecraft/util/Identifier;IIII)V"), index = 2)
+    //$$ private int hideMovingButtonsInCustomTabs(RenderPipeline renderPipeline, Identifier location, int x, int y, int width, int height) {
+    //#elseif MC>=12102
     //$$ @ModifyArg(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/DrawContext;drawGuiTexture(Ljava/util/function/Function;Lnet/minecraft/util/Identifier;IIII)V"), index = 2)
     //$$ private int hideMovingButtonsInCustomTabs(Function<Identifier, RenderLayer> renderLayers, Identifier location, int x, int y, int width, int height) {
     //#else
@@ -72,7 +83,11 @@ public abstract class Mixin_PreventMovingOfServersInCustomTabs {
     private void preventSwappingInCustomTabs(CallbackInfo ci) {
         if (EssentialConfig.INSTANCE.getCurrentMultiplayerTab() != 0) {
             ci.cancel();
+            //#if MC>=12109
+            //$$ this.field_19117.setSelected((MultiplayerServerListWidget.Entry) (Object) this);
+            //#else
             this.owner.func_214287_a((ServerSelectionList.NormalEntry) (Object) this);
+            //#endif
         }
     }
 }

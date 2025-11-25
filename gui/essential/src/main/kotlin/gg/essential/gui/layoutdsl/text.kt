@@ -14,6 +14,7 @@ package gg.essential.gui.layoutdsl
 import gg.essential.elementa.UIComponent
 import gg.essential.elementa.components.UIText
 import gg.essential.elementa.components.UIWrappedText
+import gg.essential.elementa.components.inspector.Inspector
 import gg.essential.elementa.dsl.coerceAtMost
 import gg.essential.elementa.dsl.constrain
 import gg.essential.elementa.dsl.percent
@@ -114,6 +115,11 @@ fun LayoutScope.wrappedText(
         }
     component(modifier)
     return component
+}
+
+@Suppress("unused")
+private val init = run {
+    Inspector.registerComponentFactory(null)
 }
 
 fun Modifier.bold() = this then BasicTextPrefixModifier(ChatColor.BOLD.toString())

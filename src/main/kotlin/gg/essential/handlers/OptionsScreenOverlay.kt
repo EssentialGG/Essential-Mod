@@ -13,6 +13,7 @@ package gg.essential.handlers
 
 import gg.essential.config.McEssentialConfig
 import gg.essential.elementa.components.UIContainer
+import gg.essential.elementa.components.Window
 import gg.essential.elementa.constraints.AspectConstraint
 import gg.essential.elementa.constraints.CenterConstraint
 import gg.essential.elementa.constraints.SiblingConstraint
@@ -20,12 +21,17 @@ import gg.essential.elementa.dsl.*
 import gg.essential.elementa.state.BasicState
 import gg.essential.event.gui.GuiDrawScreenEvent
 import gg.essential.event.gui.GuiOpenEvent
+import gg.essential.event.gui.InitGuiEvent
 import gg.essential.gui.EssentialPalette
 import gg.essential.gui.common.EssentialTooltip
 import gg.essential.gui.common.MenuButton
 import gg.essential.gui.elementa.VanillaButtonConstraint.Companion.constrainTo
+import gg.essential.gui.layoutdsl.BasicXModifier
+import gg.essential.gui.layoutdsl.BasicYModifier
+import gg.essential.gui.layoutdsl.layout
 import gg.essential.gui.overlay.Layer
 import gg.essential.gui.overlay.LayerPriority
+import gg.essential.gui.proxies.ScreenWithProxiesHandler.Companion.mountWithProxy
 import gg.essential.util.GuiUtil
 import gg.essential.util.ModLoaderUtil
 import gg.essential.util.findButtonByLabel
@@ -39,12 +45,15 @@ class OptionsScreenOverlay {
     private var layer: Layer? = null
 
     fun init(screen: GuiScreen) {
-        val layer = GuiUtil.createPersistentLayer(LayerPriority.AboveScreenContent).also {
+        val layer = GuiUtil.addLayer(LayerPriority.AboveScreenContent).also {
             this.layer = it
         }
 
         val window = layer.window
+        init(screen, window)
+    }
 
+    fun init(screen: GuiScreen, window: Window) {
         // This mod removes the telemetry button, causing the credits and attribution button to move to the left.
         // This makes our options button look weird, so let's put it back to the position that it was in on 1.19.2.
         // Linear issue for reference: EM-1802
@@ -71,11 +80,23 @@ class OptionsScreenOverlay {
         val settingsButton by MenuButton(shouldBeRetextured = true) {
             GuiUtil.openScreen { McEssentialConfig.gui() }
         }.constrain {
-            x = SiblingConstraint(4f) boundTo bottomRightButton
-            y = 0.pixels boundTo bottomRightButton
+            x = CenterConstraint()
+            y = CenterConstraint()
             width = 20.pixels
             height = AspectConstraint()
-        }.setIcon(BasicState(EssentialPalette.SETTINGS_9X8)) childOf window
+        }.setIcon(BasicState(EssentialPalette.SETTINGS_9X8))
+
+        // use dsl for proxy mounting
+        window.layout {
+            mountWithProxy(
+                "settings",
+                BasicXModifier { SiblingConstraint(4f) boundTo bottomRightButton }.then(
+                    BasicYModifier { 0.pixels boundTo bottomRightButton }
+                )
+            ) {
+                settingsButton()
+            }
+        }
 
         val settingsTooltip by EssentialTooltip(
             settingsButton,
@@ -87,8 +108,11 @@ class OptionsScreenOverlay {
             .bindVisibility(settingsButton.hoveredState())
     }
 
-    @Subscribe
-    fun guiOpen(event: GuiOpenEvent) {
+    @Subscribe fun guiOpen(event: GuiOpenEvent) = close()
+    // need to re-create the buttons on resize to re-attach to necessarily re-created vanilla button proxies
+    @Subscribe fun guiInit(event: InitGuiEvent) = close()
+
+    fun close() {
         layer?.also {
             GuiUtil.removeLayer(it)
             layer = null

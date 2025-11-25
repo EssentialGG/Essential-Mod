@@ -20,6 +20,7 @@ import gg.essential.elementa.state.toConstraint
 import gg.essential.gui.EssentialPalette
 import gg.essential.gui.common.AutoImageSize
 import gg.essential.gui.common.onSetValueAndNow
+import gg.essential.gui.elementa.state.v2.toV2
 import gg.essential.gui.image.ImageFactory
 import gg.essential.gui.util.hoveredState
 import java.awt.Color
@@ -66,7 +67,7 @@ class ShadowIcon(
             }.setColor(CopyConstraintColor() boundTo this) childOf this@ShadowIcon
 
             if(shadow) {
-                image effect ShadowEffect().rebindColor(shadowColorState)
+                image effect ShadowEffect(shadowColorState.toV2())
             }
 
         }

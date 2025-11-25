@@ -13,6 +13,7 @@ package gg.essential.cosmetics;
 
 import com.mojang.authlib.minecraft.MinecraftProfileTexture;
 import gg.essential.api.cosmetics.RenderCosmetic;
+import gg.essential.config.EssentialConfig;
 import gg.essential.event.entity.PlayerTickEvent;
 import gg.essential.gui.common.EmulatedUI3DPlayer;
 import gg.essential.gui.elementa.state.v2.State;
@@ -82,7 +83,9 @@ public class PlayerWearableManager {
         State<Map<CosmeticSlot, EquippedCosmetic>> cosmeticsSource = playerExt.getCosmeticsSource();
         CosmeticsState oldState = playerExt.getCosmeticsState();
 
-        //#if MC>=12002
+        //#if MC>=12109
+        //$$ Model newSkinType = Model.byTypeOrDefault(player.getSkin().model().asString());
+        //#elseif MC>=12002
         //$$ Model newSkinType = Model.byTypeOrDefault(player.getSkinTextures().model().getName());
         //#else
         Model newSkinType = Model.byTypeOrDefault(player.getSkinType());
@@ -92,8 +95,8 @@ public class PlayerWearableManager {
         // FIXME should use State effect instead of checking every tick
         Map<CosmeticSlot, EquippedCosmetic> newCosmetics = cosmeticsSource.getUntracked();
         Map<CosmeticSlot, EquippedCosmetic> oldCosmetics = oldState.getCosmetics();
-        Set<EnumPart> newArmour = getArmourFromPlayer(player);
-        Set<EnumPart> oldArmour = oldState.getArmor();
+        ArmorSlots newArmour = getArmourFromPlayer(player);
+        ArmorSlots oldArmour = oldState.getArmor();
 
         if (Objects.equals(newCosmetics, oldCosmetics) && Objects.equals(newSkinType, oldSkinType) && Objects.equals(oldArmour, newArmour)) {
             return;
@@ -132,6 +135,9 @@ public class PlayerWearableManager {
                         //#else
                         CompletableFuture.completedFuture(skinProvider.loadSkin(texture, MinecraftProfileTexture.Type.CAPE))
                         //#endif
+                            //#if MC>=12109
+                            //$$ .thenApply(it -> it.texturePath())
+                            //#endif
                             .thenApply(it -> new Pair<>(singletonList(toU(it)), null));
                 } else {
                     // otherwise we need to use the texture data from the cosmetic
@@ -186,29 +192,18 @@ public class PlayerWearableManager {
         }
     }
 
-    private Set<EnumPart> getArmourFromPlayer(AbstractClientPlayer player) {
-
-        Set<EnumPart> equippedSlots = new HashSet<>();
-
-        int armorSetting = ArmorRenderingUtil.getCosmeticArmorSetting(player);
-        if (armorSetting > 0) {
-            return equippedSlots;
+    private ArmorSlots getArmourFromPlayer(AbstractClientPlayer player) {
+        EssentialConfig.CosmeticOrArmor armorSetting = ArmorRenderingUtil.getCosmeticArmorSetting(player);
+        if (armorSetting != EssentialConfig.CosmeticOrArmor.ONLY_ARMOR) {
+            return new ArmorSlots((byte) 0);
         }
 
-        if (!canRenderCosmetic(player, 0) || !canRenderCosmetic(player, 1)) {
-            equippedSlots.add(EnumPart.LEFT_LEG);
-            equippedSlots.add(EnumPart.RIGHT_LEG);
-        }
-        if (!canRenderCosmetic(player, 2)) {
-            equippedSlots.add(EnumPart.LEFT_ARM);
-            equippedSlots.add(EnumPart.RIGHT_ARM);
-            equippedSlots.add(EnumPart.BODY);
-        }
-        if (!canRenderCosmetic(player, 3)) {
-            equippedSlots.add(EnumPart.HEAD);
-        }
-
-        return equippedSlots;
+        return new ArmorSlots(
+                !canRenderCosmetic(player, 0),
+                !canRenderCosmetic(player, 1),
+                !canRenderCosmetic(player, 2),
+                !canRenderCosmetic(player, 3)
+        );
     }
 
     private boolean canRenderCosmetic(AbstractClientPlayer player, int slot) {
@@ -218,7 +213,11 @@ public class PlayerWearableManager {
         InventoryPlayer inventory = player.inventory;
         //#endif
 
+        //#if MC>=12105
+        //$$ ItemStack stack = inventory.getStack(inventory.getMainStacks().size() + slot);
+        //#else
         ItemStack stack = inventory.armorItemInSlot(slot);
+        //#endif
         if (isEmpty(stack)) return true;
         if (stack.getItem() instanceof RenderCosmetic) return true;
         //#if MC>=12102

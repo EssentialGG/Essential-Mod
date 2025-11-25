@@ -26,6 +26,9 @@ interface RenderBackend {
         val height: Int
     }
 
+    fun interface CommandQueue {
+        fun submit(texture: Texture, translucent: Boolean, emissive: Boolean, render: (UVertexConsumer) -> Unit)
+    }
     fun interface VertexConsumerProvider {
         fun provide(texture: Texture, emissive: Boolean, block: (UVertexConsumer) -> Unit)
     }

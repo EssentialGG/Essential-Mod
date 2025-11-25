@@ -40,33 +40,32 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static gg.essential.gui.skin.SkinUtilsKt.showSkinReceivedToast;
+import static gg.essential.util.ChannelExtensionsKt.getOtherUser;
 import static gg.essential.util.ExtensionsKt.getExecutor;
 
 public class ServerChatChannelMessagePacketHandler extends PacketHandler<ServerChatChannelMessagePacket> {
-
-    public static final AtomicInteger prefetching = new AtomicInteger();
 
     @Override
     protected void onHandle(@NotNull final ConnectionManager connectionManager, @NotNull final ServerChatChannelMessagePacket packet) {
         final ChatManager chatManager = connectionManager.getChatManager();
 
-        List<@NotNull Message> sortedMessages = Arrays.stream(packet.getMessages()).sorted(Comparator.comparing(message -> ExtensionsKt.getSentTimestamp((Message) message)).reversed()).collect(Collectors.toList());
+        List<@NotNull Message> sortedMessages = Arrays.stream(packet.getMessages()).sorted(Comparator.comparing(message -> ((Message) message).getCreatedAt()).reversed()).collect(Collectors.toList());
         for (@NotNull final Message message : sortedMessages) {
             final Optional<Channel> channelOptional = chatManager.getChannel(message.getChannelId());
             if (!channelOptional.isPresent()) {
                 return;
             }
 
+            boolean isFromHistoryRequest = packet.getPacketUniqueId() != null;
             final Channel channel = channelOptional.get();
 
             // Upsert the message and cancel the toast if the message already existed
             // and therefore this is an edit
-            if (chatManager.upsertMessageToChannel(channel.getId(), message)) {
+            if (chatManager.upsertMessageToChannel(channel.getId(), message, isFromHistoryRequest)) {
                 continue;
             }
 
@@ -76,10 +75,21 @@ public class ServerChatChannelMessagePacketHandler extends PacketHandler<ServerC
             // - from muted channels
             // - if we are prefetching
             // - if essential is not enabled
-            if (message.isRead() ||
+            final boolean isRead;
+            if (connectionManager.getUsingProtocol() >= 9) {
+                Long lastReadMessageId = channel.getLastReadMessageId();
+                if (lastReadMessageId == null) {
+                    isRead = false;
+                } else {
+                    isRead = channel.getLastReadMessageId() >= message.getId();
+                }
+            } else {
+                isRead = message.isRead();
+            }
+            if (isRead ||
                     message.getSender().equals(UUIDUtil.getClientUUID()) ||
                     channel.isMuted() ||
-                    prefetching.get() != 0 ||
+                    isFromHistoryRequest ||
                     !EssentialConfig.INSTANCE.getEssentialFull()
             ) continue;
 
@@ -100,7 +110,7 @@ public class ServerChatChannelMessagePacketHandler extends PacketHandler<ServerC
             boolean notification = !(GuiUtil.INSTANCE.openedScreen() instanceof SocialMenu);
 
             if (notification) {
-                final UUID uuid = channel.getType() == ChannelType.DIRECT_MESSAGE ? ExtensionsKt.getOtherUser(channel) : message.getSender();
+                final UUID uuid = channel.getType() == ChannelType.DIRECT_MESSAGE ? getOtherUser(channel) : message.getSender();
                 UUIDUtil.getName(uuid).thenAcceptAsync(new NotificationHandler(channel, message), getExecutor(Minecraft.getMinecraft()));
             }
         }
@@ -121,30 +131,34 @@ public class ServerChatChannelMessagePacketHandler extends PacketHandler<ServerC
 
         @Override
         public void accept(String name) {
-            String notificationTitle = channel.getType() == ChannelType.DIRECT_MESSAGE ? name : String.format(Locale.ROOT, "%s [%s]", name, channel.getName());
+            boolean dm = channel.getType() == ChannelType.DIRECT_MESSAGE;
 
-            if (EssentialConfig.INSTANCE.getMessageSound() && !EssentialConfig.INSTANCE.getStreamerMode()) {
-                USound.INSTANCE.playExpSound();
-            }
+            if((dm && EssentialConfig.INSTANCE.getMessageReceivedNotifications()) || (!dm && EssentialConfig.INSTANCE.getGroupMessageReceivedNotifications())) {
+                String notificationTitle = dm ? name : String.format(Locale.ROOT, "%s [%s]", name, channel.getName());
 
-            Notifications.INSTANCE.push(
-                notificationTitle,
-                message.getContents(),
-                4f,
-                () -> {
-                    GuiUtil.openScreen(SocialMenu.class, () -> new SocialMenu(channel.getId()));
-                    return Unit.INSTANCE;
-                },
-                () -> Unit.INSTANCE,
-                (notificationBuilder) -> {
-                    notificationBuilder.setTrimTitle(true);
-                    notificationBuilder.setTrimMessage(true);
-
-                    notificationBuilder.withCustomComponent(Slot.ICON, CachedAvatarImage.create(message.getSender()));
-
-                    return Unit.INSTANCE;
+                if (EssentialConfig.INSTANCE.getMessageSound() && !EssentialConfig.INSTANCE.getStreamerMode()) {
+                    USound.INSTANCE.playExpSound();
                 }
-            );
+               
+                Notifications.INSTANCE.push(
+                        notificationTitle,
+                        message.getContents(),
+                        4f,
+                        () -> {
+                            GuiUtil.openScreen(SocialMenu.class, () -> new SocialMenu(channel.getId()));
+                            return Unit.INSTANCE;
+                        },
+                        () -> Unit.INSTANCE,
+                        (notificationBuilder) -> {
+                            notificationBuilder.setTrimTitle(true);
+                            notificationBuilder.setTrimMessage(true);
+
+                            notificationBuilder.withCustomComponent(Slot.ICON, CachedAvatarImage.create(message.getSender()));
+
+                            return Unit.INSTANCE;
+                        }
+                );
+            }
         }
     }
 }

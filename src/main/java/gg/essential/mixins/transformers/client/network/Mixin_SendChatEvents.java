@@ -38,7 +38,12 @@ import net.minecraft.client.network.NetHandlerPlayClient;
 @Mixin(NetHandlerPlayClient.class)
 //#endif
 public abstract class Mixin_SendChatEvents {
+    // FIXME `sendPacket` doesn't remap automatically any more
+    //#if NEOFORGE && MC>=12006
+    //$$ @Inject(method = "send", at = @At("HEAD"), cancellable = true)
+    //#else
     @Inject(method = "sendPacket(Lnet/minecraft/network/Packet;)V", at = @At("HEAD"), cancellable = true)
+    //#endif
     public void chat(Packet<?> packetIn, CallbackInfo ci) {
         if (packetIn instanceof CPacketChatMessage) {
             //#if MC>=11901

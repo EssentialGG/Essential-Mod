@@ -55,4 +55,5 @@ fun <T> MutableSetState<T>.add(element: T) = set { it.add(element) }
 fun <T> MutableSetState<T>.addAll(toAdd: Collection<T>) = set { it.addAll(toAdd) }
 fun <T> MutableSetState<T>.setAll(newSet: Set<T>) = set { it.applyChanges(TrackedSet.Change.estimate(it, newSet)) }
 fun <T> MutableSetState<T>.remove(element: T) = set { it.remove(element) }
+fun <T> MutableSetState<T>.removeAll(toRemove: Collection<T>) = set { it.removeAll(toRemove) }
 fun <T> MutableSetState<T>.clear() = set { it.clear() }

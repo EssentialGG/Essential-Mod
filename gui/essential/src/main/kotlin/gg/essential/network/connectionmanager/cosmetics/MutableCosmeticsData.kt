@@ -16,6 +16,8 @@ import gg.essential.cosmetics.CosmeticCategoryId
 import gg.essential.cosmetics.CosmeticId
 import gg.essential.cosmetics.CosmeticTypeId
 import gg.essential.cosmetics.FeaturedPageCollectionId
+import gg.essential.cosmetics.ImplicitOwnership
+import gg.essential.cosmetics.ImplicitOwnershipId
 import gg.essential.gui.elementa.state.v2.*
 import gg.essential.gui.elementa.state.v2.collections.*
 import gg.essential.mod.cosmetics.CosmeticBundle
@@ -29,6 +31,7 @@ class MutableCosmeticsData : CosmeticsData {
     override val types: MutableListState<CosmeticType> = mutableListStateOf()
     override val bundles: MutableListState<CosmeticBundle> = mutableListStateOf()
     override val featuredPageCollections: MutableListState<FeaturedPageCollection> = mutableListStateOf()
+    override val implicitOwnerships: MutableListState<ImplicitOwnership> = mutableListStateOf()
     override val cosmetics: MutableListState<Cosmetic> = mutableListStateOf()
 
     private val refHolder = ReferenceHolderImpl()
@@ -36,6 +39,7 @@ class MutableCosmeticsData : CosmeticsData {
     private val typesMap = types.asMap(refHolder) { it.id to it }
     private val bundlesMap = bundles.asMap(refHolder) { it.id to it }
     private val featuredPageCollectionsMap = featuredPageCollections.asMap(refHolder) { it.id to it }
+    private val implicitOwnershipsMap = implicitOwnerships.asMap(refHolder) { it.id to it }
     private val cosmeticsMap = cosmetics.asMap(refHolder) { it.id to it }
 
     override fun getCategory(id: CosmeticCategoryId): CosmeticCategory? = categoriesMap[id]
@@ -45,6 +49,8 @@ class MutableCosmeticsData : CosmeticsData {
     override fun getCosmeticBundle(id: CosmeticBundleId): CosmeticBundle? = bundlesMap[id]
 
     override fun getFeaturedPageCollection(id: FeaturedPageCollectionId): FeaturedPageCollection? = featuredPageCollectionsMap[id]
+
+    override fun getImplicitOwnership(id: ImplicitOwnershipId): ImplicitOwnership? = implicitOwnershipsMap[id]
 
     override fun getCosmetic(id: CosmeticId): Cosmetic? = cosmeticsMap[id]
 }

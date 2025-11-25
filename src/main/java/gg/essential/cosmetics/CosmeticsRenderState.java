@@ -17,6 +17,8 @@ import gg.essential.connectionmanager.common.enums.ProfileStatus;
 import gg.essential.gui.common.EmulatedUI3DPlayer;
 import gg.essential.mixins.impl.client.entity.AbstractClientPlayerExt;
 import gg.essential.mixins.impl.client.renderer.entity.ArmorRenderingUtil;
+import gg.essential.mod.cosmetics.CosmeticSlot;
+import gg.essential.model.ModelInstance;
 import gg.essential.model.backend.PlayerPose;
 import gg.essential.model.util.PlayerPoseManager;
 import gg.essential.network.connectionmanager.profile.ProfileManager;
@@ -43,12 +45,16 @@ public interface CosmeticsRenderState {
     ResourceLocation emissiveCapeTexture();
 
     boolean onlineIndicator();
+    ModelInstance nametagIcon();
 
     boolean isSneaking();
 
     void setRenderedPose(PlayerPose pose);
     void setPoseModified(boolean poseModified);
     void setSuppressedArmor(boolean[] slots);
+
+    float cosmeticFrozenYaw();
+    void setCosmeticFrozenYaw(float frozenYaw);
 
     /**
      * Implementation which delegates to the underlying entity.
@@ -84,8 +90,8 @@ public interface CosmeticsRenderState {
             if (!EssentialModelRenderer.shouldRender(player)) {
                 return Collections.emptySet();
             }
-            int armorHidingSetting = ArmorRenderingUtil.getCosmeticArmorSetting(player);
-            if (armorHidingSetting != 1) {
+            EssentialConfig.CosmeticOrArmor armorHidingSetting = ArmorRenderingUtil.getCosmeticArmorSetting(player);
+            if (armorHidingSetting != EssentialConfig.CosmeticOrArmor.ONLY_COSMETICS) {
                 return Collections.emptySet();
             }
             return playerExt().getCosmeticsState().getPartsEquipped();
@@ -93,7 +99,9 @@ public interface CosmeticsRenderState {
 
         @Override
         public ResourceLocation skinTexture() {
-            //#if MC>=12002
+            //#if MC>=12109
+            //$$ return player.getSkin().body().texturePath();
+            //#elseif MC>=12002
             //$$ return player.getSkinTextures().texture();
             //#else
             return player.getLocationSkin();
@@ -122,6 +130,14 @@ public interface CosmeticsRenderState {
         }
 
         @Override
+        public ModelInstance nametagIcon() {
+            if (!EssentialConfig.INSTANCE.getShowEssentialIndicatorOnNametag()) return null;
+            EquippedCosmetic cosmetic = playerExt().getCosmeticsState().getCosmetics().get(CosmeticSlot.ICON);
+            if (cosmetic == null) return null;
+            return playerExt().getWearablesManager().getModels().get(cosmetic.getCosmetic());
+        }
+
+        @Override
         public boolean isSneaking() {
             return player.isSneaking();
         }
@@ -140,6 +156,16 @@ public interface CosmeticsRenderState {
         public void setSuppressedArmor(boolean[] slots) {
             System.arraycopy(slots, 0, playerExt().wasArmorRenderingSuppressed(), 0, slots.length);
         }
+
+        @Override
+        public float cosmeticFrozenYaw() {
+            return playerExt().essential$getCosmeticFrozenYaw();
+        }
+
+        @Override
+        public void setCosmeticFrozenYaw(final float frozenYaw) {
+            playerExt().essential$setCosmeticFrozenYaw(frozenYaw);
+        }
     }
 
     /**
@@ -154,7 +180,9 @@ public interface CosmeticsRenderState {
         private ResourceLocation skinTexture;
         private ResourceLocation emissiveCapeTexture;
         private boolean onlineIndicator;
+        private ModelInstance nametagIcon;
         private boolean isSneaking;
+        private float cosmeticFrozenYaw;
 
         @Override
         public WearablesManager wearablesManager() {
@@ -187,6 +215,16 @@ public interface CosmeticsRenderState {
         }
 
         @Override
+        public ModelInstance nametagIcon() {
+            return nametagIcon;
+        }
+
+        @Override
+        public float cosmeticFrozenYaw() {
+            return cosmeticFrozenYaw;
+        }
+
+        @Override
         public boolean isSneaking() {
             return isSneaking;
         }
@@ -200,7 +238,9 @@ public interface CosmeticsRenderState {
             skinTexture = live.skinTexture();
             emissiveCapeTexture = live.emissiveCapeTexture();
             onlineIndicator = live.onlineIndicator();
+            nametagIcon = live.nametagIcon();
             isSneaking = live.isSneaking();
+            cosmeticFrozenYaw = live.cosmeticFrozenYaw();
         }
 
         @Override
@@ -224,6 +264,14 @@ public interface CosmeticsRenderState {
             Live live = this.live;
             if (live != null) {
                 live.setSuppressedArmor(slots);
+            }
+        }
+
+        @Override
+        public void setCosmeticFrozenYaw(final float frozenYaw) {
+            Live live = this.live;
+            if (live != null) {
+                live.setCosmeticFrozenYaw(frozenYaw);
             }
         }
     }

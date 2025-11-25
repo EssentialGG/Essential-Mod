@@ -11,7 +11,15 @@
  */
 package gg.essential.gui.layoutdsl
 
+import gg.essential.elementa.components.inspector.Inspector
+import gg.essential.gui.EssentialPalette
 import gg.essential.gui.common.Checkbox
+import gg.essential.gui.elementa.state.v2.MutableState
+import gg.essential.gui.elementa.state.v2.State
+import gg.essential.gui.elementa.state.v2.combinators.not
+import gg.essential.gui.elementa.state.v2.stateOf
+import gg.essential.universal.USound
+import gg.essential.util.onLeftClick
 
 fun LayoutScope.checkbox(
     initialValue: Boolean,
@@ -28,4 +36,33 @@ fun LayoutScope.checkbox(
     initialValue: Boolean,
 ): Checkbox {
     return Checkbox(initialValue)()
+}
+
+// Alternative checkbox style used in modern modals
+fun LayoutScope.checkboxAlt(selected: MutableState<Boolean>, modifier: Modifier = Modifier, disabled: State<Boolean> = stateOf(false)) {
+    val selectedModifier = Modifier.color(EssentialPalette.CHECKBOX_SELECTED_BACKGROUND)
+        .whenTrue(disabled, Modifier.color(EssentialPalette.CHECKBOX_SELECTED_BACKGROUND.darker()), Modifier.hoverColor(EssentialPalette.CHECKBOX_SELECTED_BACKGROUND_HOVER))
+    val outlineColorModifier = Modifier.whenTrue(selected, selectedModifier, Modifier.color(EssentialPalette.CHECKBOX_OUTLINE)
+        .whenTrue(disabled, Modifier.color(EssentialPalette.CHECKBOX_OUTLINE.darker())))
+    val innerColorModifier = Modifier.whenTrue(selected, selectedModifier, Modifier.color(EssentialPalette.CHECKBOX_BACKGROUND)
+        .whenTrue(disabled, Modifier.color(EssentialPalette.CHECKBOX_BACKGROUND.darker()), Modifier.hoverColor(EssentialPalette.CHECKBOX_BACKGROUND_HOVER)))
+
+    box(Modifier.width(9f).heightAspect(1f).hoverScope() then outlineColorModifier then modifier) {
+        box(Modifier.width(7f).heightAspect(1f) then innerColorModifier) {
+            if_(selected) {
+                image(EssentialPalette.CHECKMARK_7X5, Modifier.color(EssentialPalette.TEXT_HIGHLIGHT).whenTrue(disabled, Modifier.color(EssentialPalette.TEXT_HIGHLIGHT.darker())))
+            }
+        }
+    }.onLeftClick {
+        it.stopPropagation()
+        if (!disabled.getUntracked()) {
+            USound.playButtonPress()
+            selected.set { !it }
+        }
+    }
+}
+
+@Suppress("unused")
+private val init = run {
+    Inspector.registerComponentFactory(null)
 }

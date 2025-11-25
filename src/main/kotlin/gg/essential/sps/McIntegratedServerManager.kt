@@ -25,16 +25,18 @@ import gg.essential.gui.elementa.state.v2.mutableListStateOf
 import gg.essential.gui.elementa.state.v2.mutableStateOf
 import gg.essential.gui.elementa.state.v2.withSetter
 import gg.essential.mixins.ext.server.coroutineScope
+import gg.essential.mixins.ext.server.dispatcher
 import gg.essential.mixins.transformers.server.integrated.LanConnectionsAccessor
 import gg.essential.sps.IntegratedServerManager.Difficulty
 import gg.essential.sps.IntegratedServerManager.GameMode
 import gg.essential.sps.IntegratedServerManager.ServerResourcePack
 import gg.essential.universal.wrappers.UPlayer
-import gg.essential.universal.wrappers.message.UTextComponent
 import gg.essential.util.Client
 import gg.essential.util.ModLoaderUtil
 import gg.essential.util.USession
 import gg.essential.util.UuidNameLookup
+import gg.essential.util.textTranslatable
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -51,6 +53,10 @@ import java.nio.file.Path
 import net.minecraft.world.EnumDifficulty as McDifficulty
 import net.minecraft.world.GameType as McGameMode
 import java.util.*
+
+//#if MC>=12109
+//$$ import net.minecraft.server.PlayerConfigEntry
+//#endif
 
 class McIntegratedServerManager(val server: IntegratedServer) : IntegratedServerManager {
     private val refHolder = ReferenceHolderImpl()
@@ -73,6 +79,9 @@ class McIntegratedServerManager(val server: IntegratedServer) : IntegratedServer
     override val coroutineScope: CoroutineScope
         get() = server.coroutineScope + Dispatchers.Client
 
+    override val serverDispatcher: CoroutineDispatcher
+        get() = server.dispatcher
+
     private val mutableStatusResponseJson = mutableStateOf<String?>(null)
     override val statusResponseJson: State<String?> = mutableStatusResponseJson
 
@@ -81,7 +90,8 @@ class McIntegratedServerManager(val server: IntegratedServer) : IntegratedServer
     private val opsSourceState = mutableStateOf<State<Set<UUID>>?>(null)
     private val resourcePackSourceState = mutableStateOf<State<ServerResourcePack?>?>(null)
     private val difficultySourceState = mutableStateOf<MutableState<Difficulty>?>(null)
-    private val defaultGameModeSourceState = mutableStateOf<State<GameMode>?>(null)
+    private val difficultyLockedSourceState = mutableStateOf<MutableState<Boolean>?>(null)
+    private val defaultGameModeSourceState = mutableStateOf<MutableState<GameMode>?>(null)
     private val cheatsEnabledSourceState = mutableStateOf<State<Boolean>?>(null)
     private var openToLanUpdateJob: Job? = null
     private var whitelistUpdateJob: Job? = null
@@ -96,6 +106,8 @@ class McIntegratedServerManager(val server: IntegratedServer) : IntegratedServer
     //$$ // For Mixin_ControlAreCommandsAllowed only
     //$$ var appliedCheatsEnabled: Boolean? = null
     //#endif
+
+    var appliedOpenToLan: Boolean = false
 
     init {
         effect(refHolder) {
@@ -114,6 +126,8 @@ class McIntegratedServerManager(val server: IntegratedServer) : IntegratedServer
                 // We cannot just cancel the previous job because openToLan can only be called once, and if the previous
                 // job has already called it, we need to allow it to finish.
                 prevJob?.join()
+
+                appliedOpenToLan = openToLan
 
                 if (openToLan && !server.public) {
                     // IntegratedServer.openToLan assumes that the client is fully connected (mc.player is initialized).
@@ -174,7 +188,11 @@ class McIntegratedServerManager(val server: IntegratedServer) : IntegratedServer
             whitelistUpdateJob?.cancel()
             whitelistUpdateJob = server.coroutineScope.launch {
                 applyWhitelist(whitelist)
+                //#if MC>=12109
+                //$$ server.useAllowlist = true
+                //#else
                 server.playerList.isWhiteListEnabled = true
+                //#endif
             }
         }
 
@@ -203,11 +221,27 @@ class McIntegratedServerManager(val server: IntegratedServer) : IntegratedServer
             val difficulty = (difficultySourceState() ?: return@effect)()
 
             server.coroutineScope.launch {
+                isDifficultyControlledByState = false
                 //#if MC>=11600
                 //$$ server.setDifficultyForAllWorlds(difficulty.toMc(), true)
                 //#else
                 server.setDifficultyForAllWorlds(difficulty.toMc())
                 //#endif
+                isDifficultyControlledByState = true
+            }
+        }
+
+        effect(refHolder) {
+            val difficultyLocked = (difficultyLockedSourceState() ?: return@effect)()
+
+            server.coroutineScope.launch {
+                isDifficultyLockedControlledByState = false
+                //#if MC>=11600
+                //$$ server.setDifficultyLocked(difficultyLocked )
+                //#else
+                server.worlds.filterNotNull().forEach { it.worldInfo.isDifficultyLocked = difficultyLocked }
+                //#endif
+                isDifficultyLockedControlledByState = true
             }
         }
 
@@ -215,6 +249,7 @@ class McIntegratedServerManager(val server: IntegratedServer) : IntegratedServer
             val gameMode = (defaultGameModeSourceState() ?: return@effect)()
 
             server.coroutineScope.launch {
+                isDefaultGameModeControlledByState = false
                 // TODO this doesn't set the default game mode (at least on 1.12.2)
                 //  it sets the gamemode which is applied to everyone who joins, regardless of whether they've joined
                 //  or even changed their gamemode before
@@ -225,6 +260,7 @@ class McIntegratedServerManager(val server: IntegratedServer) : IntegratedServer
                 //#else
                 server.playerList.setGameType(gameMode.toMc())
                 //#endif
+                isDefaultGameModeControlledByState = true
             }
         }
 
@@ -252,7 +288,8 @@ class McIntegratedServerManager(val server: IntegratedServer) : IntegratedServer
     override fun setOpsSource(source: State<Set<UUID>>) = opsSourceState.set(source.memo())
     override fun setResourcePackSource(source: State<ServerResourcePack?>) = resourcePackSourceState.set(source.memo())
     override fun setDifficultySource(source: MutableState<Difficulty>) = difficultySourceState.set(source.memo().withSetter { source.set(it) })
-    override fun setDefaultGameModeSource(source: State<GameMode>) = defaultGameModeSourceState.set(source.memo())
+    override fun setDifficultyLockedSource(source: MutableState<Boolean>) = difficultyLockedSourceState.set(source.memo().withSetter { source.set(it) })
+    override fun setDefaultGameModeSource(source: MutableState<GameMode>) = defaultGameModeSourceState.set(source.memo().withSetter { source.set(it) })
     override fun setCheatsEnabledSource(source: State<Boolean>) = cheatsEnabledSourceState.set(source.memo())
 
     override val whitelist: State<Set<UUID>?> = State { whitelistSourceState()?.invoke() }
@@ -263,7 +300,11 @@ class McIntegratedServerManager(val server: IntegratedServer) : IntegratedServer
         // Add new players to the whitelist
         for (uuid in desiredWhitelist) {
             val name = UuidNameLookup.getName(uuid).asDeferred().await()
+            //#if MC>=12109
+            //$$ val profile = PlayerConfigEntry(uuid, name)
+            //#else
             val profile = GameProfile(uuid, name)
+            //#endif
             @Suppress("SENSELESS_COMPARISON") // Forge applies an inappropriate NonNullByDefault
             if (whitelist.getEntry(profile) == null) {
                 whitelist.addEntry(UserListWhitelistEntry(profile))
@@ -274,7 +315,11 @@ class McIntegratedServerManager(val server: IntegratedServer) : IntegratedServer
         for (userName in whitelist.keys) {
             val profile = server.findProfileForName(userName)
             if (profile != null && profile.id !in desiredWhitelist) {
+                //#if MC>=12109
+                //$$ whitelist.remove(PlayerConfigEntry(profile))
+                //#else
                 whitelist.removeEntry(profile)
+                //#endif
             }
         }
 
@@ -282,10 +327,7 @@ class McIntegratedServerManager(val server: IntegratedServer) : IntegratedServer
         for (entity in (server.playerList as LanConnectionsAccessor).getPlayerEntityList()) {
             if (entity.uniqueID !in desiredWhitelist) {
                 //#if MC>=11200
-                entity.connection.disconnect(
-                    UTextComponent(I18n.format("multiplayer.disconnect.server_shutdown"))
-                        .component // need the MC one cause it cannot serialize the universal one
-                )
+                entity.connection.disconnect(textTranslatable("multiplayer.disconnect.server_shutdown"))
                 //#else
                 //$$ entity.playerNetServerHandler.kickPlayerFromServer(
                 //$$     I18n.format("multiplayer.disconnect.server_shutdown")
@@ -304,14 +346,22 @@ class McIntegratedServerManager(val server: IntegratedServer) : IntegratedServer
         // Remove all players that are no longer op
         for (profile in allProfiles) {
             if (profile.id !in desiredOps) {
+                //#if MC>=12109
+                //$$ playerList.removeFromOperators(PlayerConfigEntry(profile))
+                //#else
                 playerList.removeOp(profile)
+                //#endif
             }
         }
 
         // Op all new players
         for (uuid in desiredOps) {
             val name = UuidNameLookup.getName(uuid).asDeferred().await()
+            //#if MC>=12109
+            //$$ val profile = PlayerConfigEntry(uuid, name)
+            //#else
             val profile = GameProfile(uuid, name)
+            //#endif
             @Suppress("SENSELESS_COMPARISON") // Forge applies an inappropriate NonNullByDefault
             if (opList.getEntry(profile) == null) {
                 playerList.addOp(profile)
@@ -320,6 +370,9 @@ class McIntegratedServerManager(val server: IntegratedServer) : IntegratedServer
     }
 
     private fun IntegratedServer.findProfileForName(name: String): GameProfile? {
+        //#if MC>=12109
+        //$$ return apiServices.nameToIdCache.findByName(name).map { GameProfile(it.id, it.name) }.orElse(null)
+        //#else
         val userCache = playerProfileCache
             //#if MC>=12000
             //$$ ?: error("userCache should not be null") // it's only nullable for TestServer
@@ -329,6 +382,7 @@ class McIntegratedServerManager(val server: IntegratedServer) : IntegratedServer
         //#else
         return userCache.getGameProfileForUsername(name)
         //#endif
+        //#endif
     }
 
     // NOTE: Called from server main thread!
@@ -337,6 +391,16 @@ class McIntegratedServerManager(val server: IntegratedServer) : IntegratedServer
             mutableStatusResponseJson.set(statusJson)
         }
     }
+
+    // These serve dual purpose:
+    // 1. Once true, they prevent the server from changing its own state, instead calling the updateServerX methods
+    //    below which delegate the change requests to the configured MutableState.
+    // 2. When the server state is to be modified because our State changed, they are temporarily set to false so the
+    //    redirection in point 1 is skipped and the actual server state is properly updated.
+    var isDifficultyControlledByState: Boolean = false
+    var isDifficultyLockedControlledByState: Boolean = false
+    var isDefaultGameModeControlledByState: Boolean = false
+
 }
 
 fun Difficulty.toMc(): McDifficulty = McDifficulty.getDifficultyEnum(ordinal)

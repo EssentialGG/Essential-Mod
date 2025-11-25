@@ -43,7 +43,9 @@ import static dev.folomeev.kotgl.matrix.matrices.mutables.MutableMatrices.timesS
 //#if MC>=11600
 //$$ import gg.essential.mixins.impl.util.math.Matrix4fExt;
 //$$ import com.mojang.blaze3d.matrix.MatrixStack;
+//$$ import net.minecraft.util.math.vector.Matrix3f;
 //$$ import static dev.folomeev.kotgl.matrix.matrices.mutables.MutableMatrices.times;
+//$$ import static gg.essential.util.ExtensionsKt.setKotgl;
 //#endif
 
 @Mixin(LayerEntityOnShoulder.class)
@@ -83,6 +85,9 @@ public abstract class Mixin_ApplyPoseTransform_EntityOnShoulder {
         }
         //#if MC>=11600
         //$$ GLUtil.INSTANCE.glMultMatrix(matrixStack, modelMatrix, 1 / 16f);
+        //$$ Matrix3f normalMatrix = new Matrix3f();
+        //$$ setKotgl(normalMatrix, uMatrixStack.peek().getNormal());
+        //$$ matrixStack.getLast().getNormal().mul(normalMatrix);
         //#else
         GLUtil.INSTANCE.glMultMatrix(modelMatrix, scale);
         //#endif
@@ -90,7 +95,11 @@ public abstract class Mixin_ApplyPoseTransform_EntityOnShoulder {
 
     //#if MC>=12102
     //$$ @Inject(
-    //$$     method = "render(Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;ILnet/minecraft/client/render/entity/state/PlayerEntityRenderState;Lnet/minecraft/entity/passive/ParrotEntity$Variant;FFZ)V",
+        //#if MC>=12109
+        //$$ method = "render(Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/command/OrderedRenderCommandQueue;ILnet/minecraft/client/render/entity/state/PlayerEntityRenderState;Lnet/minecraft/entity/passive/ParrotEntity$Variant;FFZ)V",
+        //#else
+        //$$ method = "render(Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;ILnet/minecraft/client/render/entity/state/PlayerEntityRenderState;Lnet/minecraft/entity/passive/ParrotEntity$Variant;FFZ)V",
+        //#endif
     //$$     at = @At(value = "INVOKE", target = "Lnet/minecraft/client/util/math/MatrixStack;push()V", shift = At.Shift.AFTER)
     //$$ )
     //$$ private void applyPoseTransform(
@@ -147,7 +156,7 @@ public abstract class Mixin_ApplyPoseTransform_EntityOnShoulder {
         //$$ float netHeadYaw,
         //$$ float headPitch,
         //$$ // FIXME remap bug
-        //#if MC>=11700 && FORGE
+        //#if MC>=11700 && FORGELIKE
         //$$ net.minecraft.world.entity.EntityType<?> entityType,
         //#else
         //$$ net.minecraft.entity.EntityType<?> entityType,
@@ -198,7 +207,7 @@ public abstract class Mixin_ApplyPoseTransform_EntityOnShoulder {
     //$$     float netHeadYaw,
     //$$     float headPitch,
     //$$     // FIXME remap bug
-        //#if MC>=11700 && FORGE
+        //#if MC>=11700 && FORGELIKE
         //$$ net.minecraft.world.entity.EntityType<?> entityType,
         //#else
         //$$ net.minecraft.entity.EntityType<?> entityType,
@@ -224,7 +233,7 @@ public abstract class Mixin_ApplyPoseTransform_EntityOnShoulder {
     //$$     float netHeadYaw,
     //$$     float headPitch,
     //$$     // FIXME remap bug
-        //#if MC>=11700 && FORGE
+        //#if MC>=11700 && FORGELIKE
         //$$ net.minecraft.world.entity.EntityType<?> entityType,
         //#else
         //$$ net.minecraft.entity.EntityType<?> entityType,

@@ -38,7 +38,7 @@ val Platform.kotlinVersion
         when {
             isModLauncher ->
                 when (mcVersion) {
-                    12004, 12002, 12001, 11904, 11903 -> KotlinVersion.kotlinForForge4
+                    12107, 12105, 12104, 12103, 12101, 12006, 12004, 12002, 12001, 11904, 11903 -> KotlinVersion.kotlinForForge4
                     11902, 11802 -> KotlinVersion.kotlinForForge3
                     11701 -> KotlinVersion.kotlinForForge2
                     11602 -> KotlinVersion.kotlinForForge1

@@ -26,18 +26,19 @@ dependencies {
     implementation(project(":utils"))
     implementation(project(":libs"))
     implementation(project(":infra"))
-    implementation(project(":cosmetics", configuration = "minecraftRuntimeElements"))
+    implementation(project(":cosmetics"))
     implementation(project(":vigilance2"))
     implementation(project(":gui:elementa"))
     implementation(project(":ice"))
     implementation(project(":quic-connector"))
+    implementation(project(":pseudotcp"))
+    implementation(project(":lwjgl3"))
+    implementation(project(":clipboard"))
 
     // For NotificationBuilder
     compileOnly(project(":api:1.12.2-forge")) { isTransitive = false}
 
-    implementation("org.jitsi:ice4j:3.0-52-ga9ba80e") {
-        isTransitive = false // for PseudoTCPBase only
-    }
+    testImplementation(kotlin("test"))
 }
 
 kotlin.jvmToolchain(8)
@@ -46,4 +47,8 @@ tasks.compileKotlin {
     kotlinOptions {
         moduleName = "essential" + project.path.replace(':', '-').lowercase()
     }
+}
+
+tasks.test {
+    useJUnitPlatform()
 }

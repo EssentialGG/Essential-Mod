@@ -12,9 +12,8 @@
 package gg.essential.mixins.transformers.client.network;
 
 import com.llamalad7.mixinextras.sugar.Local;
-import gg.essential.Essential;
-import gg.essential.network.connectionmanager.sps.SPSManager;
 import gg.essential.network.pingproxy.ProxyPingServerKt;
+import gg.essential.sps.SpsAddress;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.network.ServerPinger;
 import org.spongepowered.asm.mixin.Mixin;
@@ -81,7 +80,6 @@ public abstract class MixinServerPinger {
     }
 
     private boolean requiresProxy(ServerData serverData) {
-        SPSManager spsManager = Essential.getInstance().getConnectionManager().getSpsManager();
-        return !getExt(serverData).getEssential$isTrusted() || spsManager.isSpsAddress(serverData.serverIP);
+        return !getExt(serverData).getEssential$isTrusted() || SpsAddress.parse(serverData.serverIP) != null;
     }
 }

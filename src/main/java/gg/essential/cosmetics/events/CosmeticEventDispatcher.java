@@ -26,10 +26,10 @@ import static gg.essential.gui.elementa.state.v2.StateKt.stateOf;
 
 public class CosmeticEventDispatcher {
     public static void dispatchEvents(AbstractClientPlayer player, WearablesManager wearablesManager) {
-        //#if MC>=12000
-        //$$ World world = player.clientWorld;
+        //#if MC>=12106
+        //$$ World world = player.getWorld();
         //#else
-        World world = player.world;
+        World world = player.getEntityWorld();
         //#endif
         ParticleSystem particleSystem;
         if (player instanceof EmulatedUI3DPlayer.EmulatedPlayer) {

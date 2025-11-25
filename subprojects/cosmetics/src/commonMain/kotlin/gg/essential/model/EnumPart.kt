@@ -12,6 +12,7 @@
 package gg.essential.model
 
 import kotlin.jvm.JvmStatic
+import gg.essential.model.ModelParser.Companion.ROOT_BONE_NAME
 
 /** Different bones cosmetics can be bound to */
 enum class EnumPart(
@@ -19,6 +20,9 @@ enum class EnumPart(
      /** represents the armor slot IDs that the part covers */
     val armorSlotIds: Set<Int>,
 ) {
+    // Represents the model root, also used to differentiate geometry or emitters that are otherwise disconnected from any other EnumParts
+    ROOT(emptySet()),
+    // Body parts
     HEAD(setOf(3)),
     BODY(setOf(2)),
     RIGHT_ARM(setOf(2)),
@@ -40,6 +44,7 @@ enum class EnumPart(
         fun fromBoneName(name: String): EnumPart? {
             // Don't use .toLowercase since it will create a ton more objects
             return when (name) {
+                ROOT_BONE_NAME -> ROOT
                 "rightArm", "arm_right", "right_arm", "RightArm",
                 "__arm_right__" -> RIGHT_ARM
                 "leftArm", "arm_left", "left_arm", "LeftArm",

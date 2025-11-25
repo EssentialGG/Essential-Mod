@@ -45,6 +45,7 @@ class EmoteWheelManager(
         emoteWheels().sortedBy { it.createdAt.toEpochMilli() }
     }
     private val mutableSelectedEmoteWheelId: MutableState<String?> = mutableStateOf(null)
+    val selectedEmoteWheelId: State<String?> = mutableSelectedEmoteWheelId
     val selectedEmoteWheel = memo { orderedEmoteWheels().firstOrNull { it.id == mutableSelectedEmoteWheelId() } }
     val selectedEmoteWheelIndex = memo { orderedEmoteWheels().indexOfFirst { it.id == mutableSelectedEmoteWheelId() } }
     val selectedEmoteWheelSlots = memo {
@@ -63,6 +64,10 @@ class EmoteWheelManager(
     override fun resetState() {
         emoteWheels.clear()
         sentEmoteWheelId = null
+    }
+
+    fun getEmoteWheel(id: String): EmoteWheelPage? {
+        return emoteWheels.getUntracked().find { it.id == id }
     }
 
     fun selectEmoteWheel(id: String) {
@@ -117,15 +122,27 @@ class EmoteWheelManager(
         connectionManager.call(ClientCosmeticEmoteWheelSelectPacket(selectedEmoteWheelId)).fireAndForget()
     }
 
+    /**
+     * Sets one of the saved emotes for an emote wheel.
+     *
+     * @param emoteWheelId The emote wheel id of the emote wheel to change
+     * @param slotIndex The id of slot in the emote wheel to change
+     * @param emoteId The (CosmeticId) emote id to save
+     */
+    fun setEmote(emoteWheelId: String, slotIndex: Int, emoteId: CosmeticId?) {
+        val emoteWheel = emoteWheels.getUntracked().find { it.id == emoteWheelId } ?: return
+        setEmotes(emoteWheelId, emoteWheel.slots.toMutableList().apply { this[slotIndex] = emoteId })
+    }
 
     /**
-     * Sets the saved emotes for the emote wheel
+     * Sets the saved emotes for an emote wheel
      *
+     * @param emoteWheelId The emote wheel id of the emote wheel to change
      * @param emotes The (CosmeticId) list of emotes to save
      */
-    fun setEmotes(emotes: List<CosmeticId?>) {
-        val selectedEmoteWheel = selectedEmoteWheel.getUntracked() ?: return
-        val slots = selectedEmoteWheelSlots.getUntracked().toMutableList()
+    fun setEmotes(emoteWheelId: String, emotes: List<CosmeticId?>) {
+        val emoteWheel = emoteWheels.getUntracked().find { it.id == emoteWheelId } ?: return
+        val slots = emoteWheel.slots.toMutableList()
         val unlockedCosmetics = unlockedCosmetics.getUntracked()
         for ((i, value) in emotes.withIndex()) {
             if (value != null && !unlockedCosmetics.contains(value)) {
@@ -133,17 +150,10 @@ class EmoteWheelManager(
             }
 
             if (value != slots.set(i, value)) {
-                connectionManager.call(ClientCosmeticEmoteWheelUpdatePacket(selectedEmoteWheel.id, i, value)).fireAndForget()
+                connectionManager.call(ClientCosmeticEmoteWheelUpdatePacket(emoteWheel.id, i, value)).fireAndForget()
             }
         }
-        editEmoteWheel(selectedEmoteWheel.copy(slots = slots.toList()))
-    }
-
-    /**
-     * Changes one of the emotes saved for the emote wheel.
-     */
-    fun setEmote(slotIndex: Int, emoteId: String?) {
-        setEmotes(ArrayList(selectedEmoteWheelSlots.getUntracked()).apply { this[slotIndex] = emoteId })
+        editEmoteWheel(emoteWheel.copy(slots = slots.toList()))
     }
 
     private fun editEmoteWheel(new: EmoteWheelPage) {

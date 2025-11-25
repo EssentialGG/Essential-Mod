@@ -31,4 +31,5 @@ enum class AnimationEventType {
     IDLE,
     TEXTURE_ANIMATION_START,
     EMOTE,
+    BY_OTHER, // triggered by other cosmetic animation event
 }

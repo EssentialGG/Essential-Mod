@@ -13,7 +13,6 @@ package gg.essential.gui.notification
 
 import gg.essential.api.gui.NotificationType
 import gg.essential.api.gui.NotificationBuilder
-import gg.essential.elementa.components.Window
 import gg.essential.elementa.dsl.childOf
 import gg.essential.api.gui.Notifications
 import gg.essential.api.gui.Slot
@@ -22,8 +21,8 @@ import gg.essential.elementa.ElementaVersion
 import gg.essential.elementa.UIComponent
 import gg.essential.elementa.state.BasicState
 import gg.essential.elementa.state.State
+import gg.essential.gui.overlay.Layer
 import gg.essential.gui.overlay.LayerPriority
-import gg.essential.gui.util.onAnimationFrame
 import gg.essential.util.GuiUtil
 import gg.essential.util.executor
 import net.minecraft.client.Minecraft
@@ -33,8 +32,16 @@ object NotificationsImpl : Notifications, NotificationsManager {
     private const val MAXIMUM_NOTIFICATIONS = 3
 
     private val mc = Minecraft.getMinecraft()
-    private val layer = GuiUtil.createPersistentLayer(LayerPriority.Notifications)
-    private val window: Window = layer.window
+
+    private var layer: Layer? = null
+
+    /** @see [Layer.rendered] */
+    private var rendered = true
+        set(value) {
+            field = value
+            layer?.rendered = value
+        }
+
     private var beforeFirstDraw = true
 
     /**
@@ -47,17 +54,28 @@ object NotificationsImpl : Notifications, NotificationsManager {
      * to complete before either being displayed, or added to the standard [notifications] queue.
      */
     private val blockedNotifications = mutableListOf<() -> Unit>()
+        get() = field.also { layer() } // this queue is flushed via an UpdateFunc, so need to make sure one's registered
 
-    init {
-        window.onAnimationFrame {
+    private fun layer(): Layer {
+        layer?.let { return it }
+
+        val layer = GuiUtil.addLayer(LayerPriority.Notifications).also { layer = it }
+        layer.rendered = rendered
+        layer.window.addUpdateFunc { _, _ ->
             if (beforeFirstDraw) {
                 beforeFirstDraw = false
             }
 
             if (!blocked && blockedNotifications.isNotEmpty()) {
-                Window.enqueueRenderOperation { flushBlockedNotifications() }
+                flushBlockedNotifications()
+            }
+
+            if (layer.window.children.isEmpty() && blockedNotifications.isEmpty()) {
+                GuiUtil.removeLayer(layer)
+                this.layer = null
             }
         }
+        return layer
     }
 
     override fun push(title: String, message: String) {
@@ -149,6 +167,7 @@ object NotificationsImpl : Notifications, NotificationsManager {
             return
         }
 
+        val window = layer().window
         if (window.children.size < MAXIMUM_NOTIFICATIONS) {
             notification childOf window
             notification.animateIn()
@@ -160,7 +179,7 @@ object NotificationsImpl : Notifications, NotificationsManager {
     private fun addFromQueue() {
         val notification = notifications.removeFirstOrNull() ?: return
 
-        notification childOf window
+        notification childOf layer().window
         notification.animateIn()
     }
 
@@ -231,19 +250,21 @@ object NotificationsImpl : Notifications, NotificationsManager {
     }
 
     override fun hide() {
-        layer.rendered = false
+        rendered = false
     }
 
     override fun show() {
-        layer.rendered = true
+        rendered = true
     }
 
     override fun hasActiveNotifications(): Boolean {
-        return window.children.size > 0
+        return layer?.window?.children?.isNotEmpty() ?: false
     }
 
     override fun removeNotificationById(id: Any) {
         notifications.removeIf { it.uniqueId == id }
+
+        val window = layer?.window ?: return
 
         window.childrenOfType<Notification>()
             .filter { it.uniqueId == id }
@@ -255,6 +276,6 @@ object NotificationsImpl : Notifications, NotificationsManager {
     }
 
     private fun hasNotification(uniqueId: Any): Boolean {
-        return notifications.any { it.uniqueId == uniqueId } || window.childrenOfType<Notification>().any { it.uniqueId == uniqueId }
+        return notifications.any { it.uniqueId == uniqueId } || layer?.window?.childrenOfType<Notification>()?.any { it.uniqueId == uniqueId } ?: false
     }
 }

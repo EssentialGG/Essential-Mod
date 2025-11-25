@@ -19,8 +19,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import static gg.essential.network.connectionmanager.ice.IceManager.ICE_CLIENT_EVENT_LOOP_GROUP;
-import static gg.essential.network.connectionmanager.ice.IceManager.ICE_SERVER_EVENT_LOOP_GROUP;
+import static gg.essential.network.connectionmanager.ice.IceEventLoopGroups.ICE_CLIENT_EVENT_LOOP_GROUP;
+import static gg.essential.network.connectionmanager.ice.IceEventLoopGroups.ICE_SERVER_EVENT_LOOP_GROUP;
 
 @Mixin(NetworkManager.class)
 public class Mixin_IceChannelIsNotLocal {

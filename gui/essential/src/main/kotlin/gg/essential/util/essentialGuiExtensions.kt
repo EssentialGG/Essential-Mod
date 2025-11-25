@@ -12,47 +12,60 @@
 package gg.essential.util
 
 import gg.essential.elementa.UIComponent
-import gg.essential.elementa.components.GradientComponent
 import gg.essential.elementa.components.ScrollComponent
 import gg.essential.elementa.components.UIBlock
 import gg.essential.elementa.components.UIContainer
+import gg.essential.elementa.components.UIImage
 import gg.essential.elementa.components.UIText
 import gg.essential.elementa.components.Window
+import gg.essential.elementa.components.image.DefaultLoadingImage
+import gg.essential.elementa.components.image.ImageProvider
 import gg.essential.elementa.constraints.*
 import gg.essential.elementa.constraints.animation.*
 import gg.essential.elementa.dsl.*
 import gg.essential.elementa.events.UIClickEvent
-import gg.essential.elementa.state.BasicState
 import gg.essential.elementa.state.State
 import gg.essential.elementa.utils.withAlpha
 import gg.essential.gui.EssentialPalette
 import gg.essential.gui.common.AbstractTooltip
 import gg.essential.gui.common.EssentialTooltip
+import gg.essential.gui.common.ImageLoadCallback
 import gg.essential.gui.common.LayoutDslTooltip
 import gg.essential.gui.common.bindParent
 import gg.essential.gui.common.constraints.DivisionConstraint
 import gg.essential.gui.common.constraints.MultiplicativeConstraint
+import gg.essential.gui.common.effect.EffectWithFakeComponent
+import gg.essential.gui.effects.GradientEffect
 import gg.essential.gui.elementa.lazyPosition
 import gg.essential.gui.elementa.state.v2.*
+import gg.essential.gui.elementa.state.v2.State as StateV2
+import gg.essential.gui.elementa.state.v2.combinators.map
 import gg.essential.gui.elementa.state.v2.utils.toState
+import gg.essential.gui.image.ImageFactory
 import gg.essential.gui.layoutdsl.*
-import gg.essential.gui.util.hoveredState
+import gg.essential.gui.util.hoveredStateV2
 import gg.essential.gui.util.isComponentInParentChain
-import gg.essential.gui.util.stateBy
+import gg.essential.universal.UMatrixStack
+import gg.essential.universal.UMouse
 import gg.essential.vigilance.utils.onLeftClick
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import java.awt.Color
+import java.awt.image.BufferedImage
 import java.util.concurrent.CompletableFuture
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 
 
+@Deprecated("Use LayoutDSL instead")
 infix fun <T : UIComponent> T.hiddenChildOf(parent: UIComponent) = apply {
     parent.addChild(this)
     hide(instantly = true)
 }
 
+@Deprecated("Use `Modifier.animateColor` instead")
 fun <T : UIComponent> T.animateColor(
     color: ColorConstraint,
     time: Float = .3f,
@@ -63,11 +76,17 @@ fun <T : UIComponent> T.animateColor(
     }
 }
 
+@Deprecated("Use `Modifier.animateColor` instead")
+@Suppress("DEPRECATION")
 fun <T : UIComponent> T.animateColor(
     color: Color,
     time: Float = .3f,
     strategy: AnimationStrategy = Animations.OUT_EXP
 ): T = animateColor(color.toConstraint(), time, strategy)
+
+fun UIImage.toImageFactory(loadingImage: ImageProvider = DefaultLoadingImage): ImageFactory {
+    return ImageFactory { UIImage(CompletableFuture.completedFuture(null), loadingImage).also { supply(it) } }
+}
 
 fun UIComponent.createLayoutDslTooltip(
     position: EssentialTooltip.Position = EssentialTooltip.Position.BELOW,
@@ -122,6 +141,13 @@ fun UIComponent.createEssentialTooltip(
 /**
  * @param windowPadding Sets the padding from the window borders. The tooltip will be constrained to stay within the window+padding. Disabled if null
  */
+@Deprecated("Replace with StateV2 version",
+    ReplaceWith(
+        "component.bindEssentialTooltip(display.toV2(), tooltipContent.toV2(), position, padding, wrapAtWidth, configure, windowPadding)",
+        "gg.essential.gui.elementa.state.v2.toV2"
+        )
+)
+@Suppress("DEPRECATION")
 fun <T : UIComponent> T.bindEssentialTooltip(
     display: State<Boolean>,
     tooltipContent: State<String>,
@@ -130,16 +156,31 @@ fun <T : UIComponent> T.bindEssentialTooltip(
     wrapAtWidth: Float? = null,
     configure: UIText.() -> Unit = {},
     windowPadding: Float? = null,
-): T {
+): T = bindEssentialTooltip(display.toV2(), tooltipContent.toV2(), position, padding, wrapAtWidth, configure, windowPadding)
+
+/**
+ * @param windowPadding Sets the padding from the window borders. The tooltip will be constrained to stay within the window+padding. Disabled if null
+ */
+@Deprecated("Use `Modifier.whenTrue` + `Modifier.tooltip` instead")
+fun <T : UIComponent> T.bindEssentialTooltip(
+    display: StateV2<Boolean>,
+    tooltipContent: StateV2<String>,
+    position: EssentialTooltip.Position = EssentialTooltip.Position.BELOW,
+    padding: Float = 5f,
+    wrapAtWidth: Float? = null,
+    configure: UIText.() -> Unit = {},
+    windowPadding: Float? = null,
+): T = apply {
     val tooltip = createEssentialTooltip(tooltipContent, position, padding, wrapAtWidth, configure, windowPadding)
     tooltip.bindVisibility(display)
-    return this
 }
 
 /**
  * @param windowPadding Sets the padding from the window borders. The tooltip will be constrained to stay within the window+padding. Disabled if null
  */
 @JvmOverloads
+@Deprecated("Use `Modifier.hoverTooltip` instead")
+@Suppress("DEPRECATION")
 fun <T : UIComponent> T.bindHoverEssentialTooltip(
     tooltipContent: State<String>,
     position: EssentialTooltip.Position = EssentialTooltip.Position.BELOW,
@@ -148,7 +189,7 @@ fun <T : UIComponent> T.bindHoverEssentialTooltip(
     configure: UIText.() -> Unit = {},
     windowPadding: Float? = null,
 ): T {
-    return bindEssentialTooltip(hoveredState(), tooltipContent, position, padding, wrapAtWidth, configure, windowPadding)
+    return bindEssentialTooltip(hoveredStateV2(), tooltipContent.toV2(), position, padding, wrapAtWidth, configure, windowPadding)
 }
 
 private fun UIComponent.positionTooltip(
@@ -162,15 +203,38 @@ private fun UIComponent.positionTooltip(
         EssentialTooltip.Position.LEFT -> SiblingConstraint(padding = padding, alignOpposite = true)
         EssentialTooltip.Position.RIGHT -> SiblingConstraint(padding = padding)
         EssentialTooltip.Position.ABOVE, EssentialTooltip.Position.BELOW -> CenterConstraint()
+        EssentialTooltip.Position.MOUSE -> MousePositionConstraint()
+        is EssentialTooltip.Position.MOUSE_OFFSET -> MousePositionConstraint()
     } boundTo this@positionTooltip
 
     var yConstraint: YConstraint = when (position) {
         EssentialTooltip.Position.LEFT, EssentialTooltip.Position.RIGHT -> CenterConstraint()
         EssentialTooltip.Position.ABOVE -> SiblingConstraint(padding = padding, alignOpposite = true)
         EssentialTooltip.Position.BELOW -> SiblingConstraint(padding = padding)
+        EssentialTooltip.Position.MOUSE -> MousePositionConstraint()
+        is EssentialTooltip.Position.MOUSE_OFFSET -> MousePositionConstraint()
     } boundTo this@positionTooltip
 
-    if (windowPadding != null) {
+    // Since an additive constraint can't be boundTo
+    if (position is EssentialTooltip.Position.MOUSE_OFFSET) {
+        xConstraint += position.xOffset.pixels
+        yConstraint += position.yOffset.pixels
+    }
+
+    if (position is EssentialTooltip.Position.MOUSE) {
+        val xPadding = 7f
+        val yPadding = 16f
+        xConstraint += basicXConstraint {
+            if (Window.of(tooltip).getRight() - UMouse.Scaled.x <= tooltip.getWidth() + xPadding + (windowPadding ?: 0f)) {
+                -tooltip.getWidth() - xPadding
+            } else {
+                xPadding
+            }
+        }
+        yConstraint -= yPadding.pixels
+    }
+
+    if (windowPadding != null && position !is EssentialTooltip.Position.MOUSE) {
         val minConstraint = lazyPosition { windowPadding.pixels boundTo Window.of(this) }
         val maxConstraint = lazyPosition { windowPadding.pixels(alignOpposite = true) boundTo Window.of(this) }
 
@@ -184,6 +248,7 @@ private fun UIComponent.positionTooltip(
     }
 }
 
+@Deprecated("Use LayoutDSL instead, centering is the default behavior for LayoutDSL containers")
 fun <T : UIComponent> T.centered(): T = apply {
     constrain {
         x = CenterConstraint()
@@ -240,25 +305,25 @@ fun <T : UIComponent> UIComponent.findParentOfTypeOrNull(type: Class<T>): T? = w
     else -> null
 }
 
-fun ScrollComponent.getHeightState(): State<Float> {
-    val height = BasicState(0f)
+fun ScrollComponent.getHeightState(): StateV2<Float> {
+    val height = mutableStateOf(0f)
     addScrollAdjustEvent(false) { _, percentageOfParent ->
         height.set((1f / percentageOfParent) * getHeight())
     }
     return height
 }
 
-fun LayoutScope.scrollGradient(scroller: ScrollComponent, top: Boolean, modifier: Modifier, maxGradient: Int = 204, opposite: Boolean = false) {
-    val percentState = BasicState(0f)
+fun scrollGradient(scroller: ScrollComponent, top: Boolean, height: Float, maxGradient: Int = 204, opposite: Boolean = false) {
+    val percentState = mutableStateOf(0f)
 
     scroller.addScrollAdjustEvent(false) { percent, _ ->
         percentState.set(if (opposite) percent + 1 else percent)
     }
 
     val heightState = scroller.getHeightState()
-    val percentAndHeightState = stateBy { Pair(percentState(), heightState()) }
-    val gradient = scroller.newGradient(top, 0.pixels, maxGradient = maxGradient, percentAndHeightState = percentAndHeightState)
-    gradient(Modifier.fillWidth().alignVertical(if (top) Alignment.Start else Alignment.End).then(modifier))
+    val percentAndHeightState = memo { Pair(percentState(), heightState()) }
+
+    scroller.effect(newGradient(top, height.pixels, maxGradient = maxGradient, percentAndHeightState = percentAndHeightState))
 }
 
 fun ScrollComponent.createScrollGradient(
@@ -267,16 +332,16 @@ fun ScrollComponent.createScrollGradient(
     color: Color = EssentialPalette.GUI_BACKGROUND,
     maxGradient: Int = 204,
     opposite: Boolean = false,
-): GradientComponent {
+) {
 
-    val percentState = BasicState(0f)
+    val percentState = mutableStateOf(0f)
 
     this.addScrollAdjustEvent(false) { percent, _ ->
         percentState.set(if (opposite) percent + 1 else percent)
     }
 
     val heightState = getHeightState()
-    return createGradient(top, heightSize, color, maxGradient, percentState, heightState)
+    createGradient(top, heightSize, color, maxGradient, percentState, heightState)
 }
 
 fun <T : UIComponent> T.createGradient(
@@ -284,54 +349,58 @@ fun <T : UIComponent> T.createGradient(
     heightSize: HeightConstraint,
     color: Color = EssentialPalette.GUI_BACKGROUND,
     maxGradient: Int = 204,
-    percentState: State<Float>,
-    heightState: State<Float>
-): GradientComponent {
-    val percentAndHeightState = stateBy { Pair(percentState(), heightState()) }
-    val gradient = newGradient(top, heightSize, color, maxGradient, percentAndHeightState)
-    gradient.parent = this
-    this.children.add(gradient)
-    return gradient
+    percentState: StateV2<Float>,
+    heightState: StateV2<Float>
+) {
+    val percentAndHeightState = memo { Pair(percentState(), heightState()) }
+    effect(newGradient(top, heightSize, color, maxGradient, percentAndHeightState))
 }
 
-fun <T : UIComponent> T.newGradient(
+fun newGradient(
     top: Boolean,
     heightSize: HeightConstraint,
     color: Color = EssentialPalette.GUI_BACKGROUND,
     maxGradient: Int = 204,
-    percentAndHeightState: State<Pair<Float, Float>> = BasicState(Pair(if (top) 1f else 0f, 0f)),
-): GradientComponent {
-    return object : GradientComponent(
-        color.withAlpha(0),
-        color.withAlpha(0)
-    ) {
-        // Override because the gradient should be treated as if it does not exist from an input point of view
-        override fun isPointInside(x: Float, y: Float): Boolean {
-            return false
-        }
-    }.bindStartColor(percentAndHeightState.map { (percentage, height) ->
+    percentAndHeightState: StateV2<Pair<Float, Float>> = stateOf(Pair(if (top) 1f else 0f, 0f)),
+): EffectWithFakeComponent {
+    val topColor = percentAndHeightState.map { (percentage, height) ->
         if (top) {
             color.withAlpha((percentage * (height).coerceAtLeast(1000f)).toInt().coerceIn(0..maxGradient))
         } else {
             color.withAlpha(0)
         }
-    }).bindEndColor(percentAndHeightState.map { (percentage, height) ->
+    }
+    val bottomColor = percentAndHeightState.map { (percentage, height) ->
         if (top) {
             color.withAlpha(0)
         } else {
             color.withAlpha(((1 - percentage) * (height).coerceAtLeast(1000f)).toInt().coerceIn(0..maxGradient))
         }
-    }).constrain {
-        y = 0.pixels(alignOpposite = !top) boundTo this@newGradient
-        x = CopyConstraintFloat() boundTo this@newGradient
-        width = CopyConstraintFloat() boundTo this@newGradient
-        height = heightSize
+    }
+    return object : EffectWithFakeComponent(GradientEffect(topColor, topColor, bottomColor, bottomColor)) {
+        override fun preFirstDraw() {
+            dummyComponent.constrain {
+                x = CopyConstraintFloat() boundTo boundComponent
+                y = if (top) 0.pixels boundTo boundComponent else (-1).pixels(alignOpposite = true) boundTo boundComponent
+                width = CopyConstraintFloat() boundTo boundComponent
+                height = heightSize
+            }
+            super.preFirstDraw()
+        }
+
+        override fun beforeChildrenDraw(matrixStack: UMatrixStack) {
+            // Run in afterDraw
+        }
+
+        override fun afterDraw(matrixStack: UMatrixStack) {
+            super.beforeChildrenDraw(matrixStack)
+        }
     }
 }
 
 infix fun ScrollComponent.scrollGradient(heightSize: HeightConstraint) = apply {
-    val topGradient = createScrollGradient(true, heightSize)
-    createScrollGradient(false, 100.percent boundTo topGradient)
+    createScrollGradient(true, heightSize)
+    createScrollGradient(false, heightSize)
 }
 
 /**
@@ -352,6 +421,8 @@ fun createScrollbarRelativeTo(
         x = CenterConstraint() boundTo xPositionAndWidth
         width = ChildBasedSizeConstraint()
         height = 100.percent boundTo yPositionAndHeight
+    }.apply {
+        isFloating = true
     } childOf parent
 
     val scrollbar by UIContainer().constrain {
@@ -470,4 +541,11 @@ fun Color.darker(percentage: Float): Color {
         (blue * brightnessFactor).toInt().coerceIn(0, 255),
         alpha
     )
+}
+
+suspend fun loadUIImage(image: BufferedImage): UIImage = suspendCoroutine { continuation ->
+    val uiImage = UIImage(CompletableFuture.completedFuture(image))
+    uiImage.supply(ImageLoadCallback {
+        continuation.resume(uiImage)
+    })
 }

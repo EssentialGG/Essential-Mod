@@ -13,7 +13,7 @@ package gg.essential.network.connectionmanager.notices;
 
 import gg.essential.notices.model.Notice;
 
-interface NoticeListener {
+public interface NoticeListener {
     void noticeAdded(Notice notice);
 
     void noticeRemoved(Notice notice);

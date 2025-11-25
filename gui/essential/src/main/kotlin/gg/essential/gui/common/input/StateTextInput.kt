@@ -15,7 +15,6 @@ import gg.essential.elementa.constraints.animation.*
 import gg.essential.elementa.dsl.*
 import gg.essential.gui.EssentialPalette
 import gg.essential.gui.common.input.StateTextInput.*
-import gg.essential.gui.common.onSetValueAndNow
 import gg.essential.gui.elementa.state.v2.*
 import gg.essential.vigilance.utils.onLeftClick
 import org.jetbrains.annotations.ApiStatus
@@ -52,8 +51,8 @@ class StateTextInput<T>(
                 cloneStateToInput()
             }
         }
-        state.onSetValueAndNow(this) {
-            cloneStateToInput()
+        effect(this) {
+            setText(formatToText(state()))
         }
     }
 
@@ -61,7 +60,7 @@ class StateTextInput<T>(
      * Sets the value of the input to the current value of the state
      */
     private fun cloneStateToInput() {
-        setText(formatToText(state.get()))
+        setText(formatToText(state.getUntracked()))
     }
 
     override fun onEnterPressed() {

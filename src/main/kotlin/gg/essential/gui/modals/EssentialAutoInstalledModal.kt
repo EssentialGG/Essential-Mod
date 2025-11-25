@@ -16,16 +16,21 @@ import gg.essential.elementa.constraints.CopyConstraintFloat
 import gg.essential.elementa.constraints.SiblingConstraint
 import gg.essential.elementa.dsl.boundTo
 import gg.essential.elementa.dsl.constrain
-import gg.essential.elementa.dsl.pixels
+import gg.essential.elementa.dsl.effect
 import gg.essential.elementa.dsl.provideDelegate
 import gg.essential.elementa.dsl.width
-import gg.essential.elementa.state.BasicState
 import gg.essential.gui.EssentialPalette
-import gg.essential.gui.common.MenuButton
+import gg.essential.gui.common.OutlineButton
+import gg.essential.gui.common.OutlineButtonStyle
 import gg.essential.gui.common.modal.EssentialModal
 import gg.essential.gui.common.modal.configure
+import gg.essential.gui.common.shadow.ShadowEffect
+import gg.essential.gui.common.textStyle
+import gg.essential.gui.elementa.state.v2.stateOf
+import gg.essential.gui.layoutdsl.Alignment
 import gg.essential.gui.layoutdsl.Arrangement
 import gg.essential.gui.layoutdsl.Modifier
+import gg.essential.gui.layoutdsl.alignVertical
 import gg.essential.gui.layoutdsl.color
 import gg.essential.gui.layoutdsl.column
 import gg.essential.gui.layoutdsl.fillWidth
@@ -40,9 +45,11 @@ import gg.essential.gui.layoutdsl.underline
 import gg.essential.gui.overlay.ModalManager
 import gg.essential.gui.util.layoutSafePollingState
 import gg.essential.universal.ChatColor
+import gg.essential.universal.USound
 import gg.essential.util.EssentialContainerUtil
 import gg.essential.util.GuiUtil
 import gg.essential.util.ModLoaderUtil
+import gg.essential.util.onLeftClick
 import gg.essential.util.openInBrowser
 import java.awt.Color
 import java.net.URI
@@ -63,16 +70,19 @@ class EssentialAutoInstalledModal(modalManager: ModalManager) : EssentialModal(m
             updatePreviouslyLaunchedWithContainer()
         }
 
-        val okayButton by MenuButton(
-            "Okay", defaultStyle = BasicState(MenuButton.BLUE), hoverStyle = BasicState(MenuButton.LIGHT_BLUE)
-        ) {
-            replaceWith(null)
-            updatePreviouslyLaunchedWithContainer()
-        }.constrain {
-            x = SiblingConstraint(8f)
-            width = CopyConstraintFloat() boundTo primaryActionButton
-            height = 20.pixels
-        }
+        val okayButton by OutlineButton(
+                stateOf(OutlineButtonStyle.BLUE),
+                stateOf(false),
+            ) { currentStyle ->
+                text("Okay", Modifier.alignVertical(Alignment.Center(true)).textStyle(currentStyle))
+            }.effect(ShadowEffect(EssentialPalette.BLACK)).constrain {
+                x = SiblingConstraint(8f)
+                width = CopyConstraintFloat() boundTo primaryActionButton
+            }.onLeftClick {
+                USound.playButtonPress()
+                replaceWith(null)
+                updatePreviouslyLaunchedWithContainer()
+            }
 
         buttonContainer.insertChildAfter(okayButton, primaryActionButton)
 

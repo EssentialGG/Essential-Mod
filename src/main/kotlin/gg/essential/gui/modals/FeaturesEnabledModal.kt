@@ -18,7 +18,7 @@ import gg.essential.elementa.constraints.*
 import gg.essential.elementa.dsl.*
 import gg.essential.elementa.state.BasicState
 import gg.essential.gui.EssentialPalette
-import gg.essential.gui.common.MenuButton
+import gg.essential.gui.common.OutlineButtonStyle
 import gg.essential.gui.common.Spacer
 import gg.essential.gui.common.modal.EssentialModal
 import gg.essential.gui.common.modal.configure
@@ -35,8 +35,8 @@ class FeaturesEnabledModal(modalManager: ModalManager) : EssentialModal(modalMan
             titleText = "Experimental Features"
             contentText = "This is an experimental version of Essential, it has these new features:"
             contentTextColor = EssentialPalette.TEXT
-            primaryButtonStyle = MenuButton.BLUE
-            primaryButtonHoverStyle = MenuButton.LIGHT_BLUE
+            primaryButtonStyle = OutlineButtonStyle.BLUE.defaultStyle
+            primaryButtonHoverStyle = OutlineButtonStyle.BLUE.hoveredStyle
         }
 
         // Top padding

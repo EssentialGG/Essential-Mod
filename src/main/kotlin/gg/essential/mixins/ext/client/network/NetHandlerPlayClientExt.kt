@@ -11,9 +11,14 @@
  */
 package gg.essential.mixins.ext.client.network
 
+import gg.essential.cosmetics.IngameEquippedOutfitsManager
+import gg.essential.cosmetics.IngameEquippedOutfitsUpdateEncoder
 import java.util.*
 
 interface NetHandlerPlayClientExt {
 
     fun `essential$getNameIdCache`(): Map<String, UUID>
+
+    val `essential$ingameEquippedOutfitsManager`: IngameEquippedOutfitsManager
+    val `essential$ingameEquippedOutfitsUpdateEncoder`: IngameEquippedOutfitsUpdateEncoder
 }

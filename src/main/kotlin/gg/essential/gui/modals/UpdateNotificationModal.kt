@@ -16,31 +16,50 @@ import gg.essential.config.EssentialConfig
 import gg.essential.data.MenuData
 import gg.essential.data.VersionData
 import gg.essential.elementa.components.UIContainer
-import gg.essential.elementa.components.UIText
 import gg.essential.elementa.components.UIWrappedText
 import gg.essential.elementa.components.Window
 import gg.essential.elementa.constraints.*
 import gg.essential.elementa.dsl.*
-import gg.essential.elementa.state.BasicState
 import gg.essential.gui.EssentialPalette
-import gg.essential.gui.about.AboutMenu
-import gg.essential.gui.about.Category
 import gg.essential.gui.common.Checkbox
+import gg.essential.gui.common.MenuButton
 import gg.essential.gui.common.modal.VerticalConfirmDenyModal
 import gg.essential.gui.common.modal.configure
+import gg.essential.gui.common.textStyle
+import gg.essential.gui.elementa.state.v2.State
+import gg.essential.gui.layoutdsl.Alignment
+import gg.essential.gui.layoutdsl.Arrangement
+import gg.essential.gui.layoutdsl.LayoutScope
+import gg.essential.gui.layoutdsl.Modifier
+import gg.essential.gui.layoutdsl.alignVertical
+import gg.essential.gui.layoutdsl.checkboxAlt
+import gg.essential.gui.layoutdsl.color
+import gg.essential.gui.layoutdsl.hoverScope
+import gg.essential.gui.layoutdsl.image
+import gg.essential.gui.layoutdsl.inheritHoverScope
+import gg.essential.gui.layoutdsl.layoutAsRow
+import gg.essential.gui.layoutdsl.shadow
+import gg.essential.gui.layoutdsl.text
+import gg.essential.gui.layoutdsl.wrappedText
 import gg.essential.gui.overlay.ModalManager
-import gg.essential.util.GuiUtil
+import gg.essential.universal.USound
 import gg.essential.util.findChildOfTypeOrNull
+import gg.essential.util.openInBrowser
 import gg.essential.vigilance.utils.onLeftClick
 import java.awt.Color
+import java.net.URI
 
-class UpdateNotificationModal(modalManager: ModalManager) : VerticalConfirmDenyModal(modalManager, requiresButtonPress = false) {
+class UpdateNotificationModal(modalManager: ModalManager) : VerticalConfirmDenyModal(
+    modalManager,
+    requiresButtonPress = false,
+    buttonPadding = 17f
+) {
 
     init {
         configure {
             titleText = "Essential has been updated!"
             titleTextColor = EssentialPalette.ACCENT_BLUE
-            cancelButtonText = "See Changelog"
+            cancelButtonText = "Changelog"
         }
 
         spacer.setHeight(11.pixels)
@@ -53,33 +72,25 @@ class UpdateNotificationModal(modalManager: ModalManager) : VerticalConfirmDenyM
             height = ChildBasedMaxSizeConstraint()
         }.onLeftClick { findChildOfTypeOrNull<Checkbox>()?.toggle() } childOf customContent
 
-        // Notification checkbox
-        val notifyToggle by Checkbox(checkmarkColor = BasicState(EssentialPalette.TEXT)).constrain {
-            width = 9.pixels
-            height = AspectConstraint()
-            y = CenterConstraint()
-        } childOf notifyContainer
+        notifyContainer.layoutAsRow(Modifier.hoverScope(), Arrangement.spacedBy(5f)) {
+            checkboxAlt(EssentialConfig.updateModalState, Modifier.shadow(EssentialPalette.BLACK).inheritHoverScope())
+            text("Don’t notify me about updates", modifier = Modifier.alignVertical(Alignment.Center(true)).color(EssentialPalette.TEXT_DISABLED).shadow(EssentialPalette.BLACK))
+        }.onLeftClick {
+            it.stopPropagation()
+            USound.playButtonPress()
+            EssentialConfig.updateModalState.set { !it }
+        }
 
-        // Notification label
-        UIText("Do not notify me about updates", shadow = false).constrain {
-            x = SiblingConstraint(5f)
-            y = CenterConstraint()
-            color = EssentialPalette.TEXT_DISABLED.toConstraint()
-        } childOf notifyContainer
 
         onCancel { buttonClicked ->
             if (buttonClicked) {
-                GuiUtil.openScreen { AboutMenu(Category.CHANGELOG) }
+                openInBrowser(URI.create("https://essential.gg/changelog"))
             }
             VersionData.updateLastSeenModal()
         }
 
         onPrimaryAction {
             VersionData.updateLastSeenModal()
-        }
-
-        notifyToggle.isChecked.onSetValue {
-            EssentialConfig.updateModal = !it
         }
 
         val current = VersionData.getMajorComponents(VersionData.essentialVersion)
@@ -117,4 +128,12 @@ class UpdateNotificationModal(modalManager: ModalManager) : VerticalConfirmDenyM
             }
         }, Window::enqueueRenderOperation)
     }
+
+    override fun LayoutScope.layoutCancelButton(text: State<String>, currentStyle: State<MenuButton.Style>) {
+        wrappedText("{text} {icon}", Modifier.alignVertical(Alignment.Center(true))) {
+            "text" { text(text, Modifier.textStyle(currentStyle)) }
+            "icon" { image(EssentialPalette.ARROW_UP_RIGHT_5X5, Modifier.textStyle(currentStyle)) }
+        }
+    }
+
 }

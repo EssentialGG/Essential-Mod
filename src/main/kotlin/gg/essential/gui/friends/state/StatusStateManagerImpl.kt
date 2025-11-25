@@ -13,10 +13,12 @@ package gg.essential.gui.friends.state
 
 import gg.essential.connectionmanager.common.enums.ProfileStatus
 import gg.essential.gui.elementa.state.v2.MutableState
+import gg.essential.gui.elementa.state.v2.ReferenceHolderImpl
 import gg.essential.gui.elementa.state.v2.mutableStateOf
 import gg.essential.gui.elementa.state.v2.State
 import gg.essential.network.connectionmanager.profile.ProfileManager
 import gg.essential.network.connectionmanager.sps.SPSManager
+import gg.essential.sps.SpsAddress
 import gg.essential.util.AddressUtil
 import gg.essential.util.MinecraftUtils
 import gg.essential.util.UUIDUtil
@@ -29,11 +31,18 @@ class StatusStateManagerImpl(
     private val spsManager: SPSManager
 ) : IStatusStates, IStatusManager {
 
+    private val refHolder = ReferenceHolderImpl()
+
     private val statesMap = mutableMapOf<UUID, MutableState<PlayerActivity>>()
 
     init {
         profileManager.registerStateManager(this)
         spsManager.registerStateManager(this)
+
+    }
+
+    private fun haveSpsSession(host: UUID): Boolean {
+        return spsManager.remoteSessions.any { it.hostUUID == host }
     }
 
     override fun getActivityState(uuid: UUID): State<PlayerActivity> = getWritableState(uuid)
@@ -47,7 +56,7 @@ class StatusStateManagerImpl(
             )
             ProfileStatus.ONLINE -> when (activity) {
                 null -> {
-                    if (spsManager.remoteSessions.any { it.hostUUID == uuid }) {
+                    if (haveSpsSession(uuid)) {
                         PlayerActivity.SPSSession(uuid, true)
                     } else {
                         PlayerActivity.Online
@@ -58,10 +67,10 @@ class StatusStateManagerImpl(
                     if (AddressUtil.isSpecialFormattedAddress(address)) {
                         return PlayerActivity.OnlineWithDescription(address)
                     }
-                    spsManager.getHostFromSpsAddress(address)?.let { host ->
+                    SpsAddress.parse(address)?.host?.let { host ->
                         return PlayerActivity.SPSSession(
                             host,
-                            spsManager.remoteSessions.any { it.hostUUID == host }
+                            haveSpsSession(host),
                         )
                     }
                     PlayerActivity.Multiplayer(address)
@@ -74,7 +83,7 @@ class StatusStateManagerImpl(
         val activity = getActivity(uuid)
         val address = when {
             activity is PlayerActivity.Multiplayer -> activity.serverAddress
-            activity is PlayerActivity.SPSSession && activity.invited -> spsManager.getSpsAddress(uuid)
+            activity is PlayerActivity.SPSSession && activity.invited -> SpsAddress(uuid).toString()
             else -> return false
         }
         UUIDUtil.getName(uuid).thenAcceptOnMainThread {

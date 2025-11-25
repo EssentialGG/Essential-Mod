@@ -19,7 +19,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Set;
 import java.util.UUID;
 
-public class Channel {
+public final class Channel {
 
     @SerializedName("a")
     private final long id;
@@ -55,11 +55,20 @@ public class Channel {
     @SerializedName("i")
     private boolean muted;
 
+    @SerializedName("joined_at")
+    public final long joinedAt;
+
+    @SerializedName("last_read_message_id")
+    private @Nullable Long lastReadMessageId;
+
+    @SerializedName("unread_messages")
+    private int unreadMessages;
+
     public Channel(
             final long id, @NotNull final ChannelType type, @NotNull final String name, @Nullable final String topic,
             @Nullable final ChannelSettings settings, @NotNull final Set<UUID> members,
             @NotNull final CreatedInfo createdInfo, @Nullable final ClosedInfo closedInfo,
-            final boolean muted
+            final boolean muted, final long joinedAt, @Nullable Long lastReadMessageId, int unreadMessages
     ) {
         this.id = id;
         this.type = type;
@@ -70,6 +79,9 @@ public class Channel {
         this.createdInfo = createdInfo;
         this.closedInfo = closedInfo;
         this.muted = muted;
+        this.joinedAt = joinedAt;
+        this.lastReadMessageId = lastReadMessageId;
+        this.unreadMessages = unreadMessages;
     }
 
     public long getId() {
@@ -110,6 +122,18 @@ public class Channel {
         return this.muted;
     }
 
+    public long getJoinedAt() {
+        return this.joinedAt;
+    }
+
+    public @Nullable Long getLastReadMessageId() {
+        return lastReadMessageId;
+    }
+
+    public int getUnreadMessages() {
+        return unreadMessages;
+    }
+
     public void setName(@NotNull final String name) {
         this.name = name;
     }
@@ -122,4 +146,11 @@ public class Channel {
         this.muted = muted;
     }
 
+    public void setLastReadMessageId(@Nullable Long lastReadMessageId) {
+        this.lastReadMessageId = lastReadMessageId;
+    }
+
+    public void setUnreadMessages(int unreadMessages) {
+        this.unreadMessages = unreadMessages;
+    }
 }

@@ -11,7 +11,7 @@
  */
 package gg.essential.mixins.transformers.client.options;
 
-import gg.essential.Essential;
+import gg.essential.key.EssentialKeybindingRegistry;
 import net.minecraft.client.settings.GameSettings;
 import net.minecraft.client.settings.KeyBinding;
 import org.spongepowered.asm.mixin.Mixin;
@@ -44,6 +44,6 @@ public class MixinGameOptions {
         }
         this.essentialBindingsRegistered = true;
 
-        this.keyBindings = Essential.getInstance().getKeybindingRegistry().registerKeyBinds(this.keyBindings);
+        this.keyBindings = EssentialKeybindingRegistry.getInstance().registerKeyBinds(this.keyBindings);
     }
 }

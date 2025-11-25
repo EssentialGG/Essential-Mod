@@ -21,6 +21,7 @@ import gg.essential.gui.overlay.ModalManager
 open class VerticalConfirmDenyModal(
     modalManager: ModalManager,
     requiresButtonPress: Boolean,
+    buttonPadding: Float = 12f
 ) : ConfirmDenyModal(modalManager, requiresButtonPress) {
 
     init {
@@ -28,7 +29,7 @@ open class VerticalConfirmDenyModal(
 
         buttonContainer.constrain {
             x = CenterConstraint()
-            y = SiblingConstraint(12f)
+            y = SiblingConstraint(buttonPadding)
             width = ChildBasedMaxSizeConstraint()
             height = ChildBasedSizeConstraint()
         }

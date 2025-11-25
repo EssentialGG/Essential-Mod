@@ -33,6 +33,7 @@ public class Message {
     @NotNull
     private final String contents;
 
+    @Deprecated
     @SerializedName("e")
     private final boolean read;
 
@@ -44,6 +45,9 @@ public class Message {
     @Nullable
     private final Long lastEditTime;
 
+    @SerializedName("created_at")
+    public final long createdAt;
+
     public Message(
             final long id,
             final long channelId,
@@ -51,7 +55,8 @@ public class Message {
             final @NotNull String contents,
             final boolean read,
             final @Nullable Long replyTargetId,
-            final @Nullable Long lastEditTime
+            final @Nullable Long lastEditTime,
+            final long createdAt
     ) {
         this.id = id;
         this.channelId = channelId;
@@ -60,6 +65,7 @@ public class Message {
         this.read = read;
         this.replyTargetId = replyTargetId;
         this.lastEditTime = lastEditTime;
+        this.createdAt = createdAt;
     }
 
     public long getId() {
@@ -80,6 +86,7 @@ public class Message {
         return this.contents;
     }
 
+    @Deprecated
     public boolean isRead() {
         return this.read;
     }
@@ -94,6 +101,10 @@ public class Message {
         return lastEditTime;
     }
 
+    public long getCreatedAt() {
+        return this.createdAt;
+    }
+
     @Override
     public boolean equals(final @Nullable Object object) {
         if (this == object) return true;
@@ -101,12 +112,12 @@ public class Message {
 
         final Message message = (Message) object;
 
-        return id == message.id;
+        return id == message.id && channelId == message.channelId;
     }
 
     @Override
     public int hashCode() {
-        return (int) (id ^ (id >>> 32));
+        return 31 * (217 + Long.hashCode(id)) + Long.hashCode(channelId);
     }
 
 }

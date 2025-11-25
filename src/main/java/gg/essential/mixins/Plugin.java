@@ -16,6 +16,8 @@ import com.google.common.collect.Multimap;
 import com.llamalad7.mixinextras.MixinExtrasBootstrap;
 import gg.essential.asm.EssentialTransformer;
 
+import gg.essential.asm.GlErrorCheckingTransformer;
+import gg.essential.asm.MixinTransformerWrapper;
 import gg.essential.data.VersionInfo;
 import gg.essential.mixins.injection.points.AfterInvokeInInit;
 import gg.essential.mixins.injection.points.BeforeConstantInInit;
@@ -32,15 +34,25 @@ import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 import org.spongepowered.asm.service.MixinService;
 
+import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Predicate;
 
 //#if FABRIC
 //$$ import java.lang.management.ManagementFactory;
 //$$ import java.lang.management.RuntimeMXBean;
 //#endif
 
+//#if MC>=11600
+//$$ import org.spongepowered.asm.mixin.transformer.IMixinTransformer;
+//#else
+import net.minecraft.launchwrapper.IClassTransformer;
+//#endif
+
 public class Plugin implements IMixinConfigPlugin {
+    static { IntegrationTestsPlugin.registerUncaughtExceptionHandler(); }
     private static final Logger logger = LogManager.getLogger("Essential Logger - Plugin");
 
     private final boolean inOurDevEnv = Boolean.getBoolean("essential.feature.dev_only");
@@ -49,6 +61,9 @@ public class Plugin implements IMixinConfigPlugin {
     private final boolean hasOptifine = hasClass("optifine.OptiFineForgeTweaker") || hasClass("me.modmuss50.optifabric.mod.OptifineInjector");
 
     private final EssentialTransformer[] transformers = new EssentialTransformer[]{
+            //#if MC>=11600 && MC<11700
+            //$$ new gg.essential.asm.compat.RandomPatchesTransformer(),
+            //#endif
     };
 
     static {
@@ -82,6 +97,20 @@ public class Plugin implements IMixinConfigPlugin {
         //$$         + " (Arch: " + System.getProperty("os.arch") + ")"
         //$$ );
         //#endif
+
+
+        // Note: These are not properly supported! Use only for debugging!
+        List<MixinTransformerWrapper.Transformer> globalTransformers = new ArrayList<>();
+        if (Boolean.getBoolean("essential.gl_debug.asm")) {
+            globalTransformers.add(new GlErrorCheckingTransformer());
+        }
+        if (!globalTransformers.isEmpty()) {
+            try {
+                registerGlobalTransformers(globalTransformers);
+            } catch (ReflectiveOperationException e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 
     private final Multimap<String, EssentialTransformer> transformerMap = ArrayListMultimap.create();
@@ -115,10 +144,7 @@ public class Plugin implements IMixinConfigPlugin {
         }
 
         //#if FORGE
-        if (mixinClassName.endsWith("MixinFramebuffer")) {
-            return false; // Forge already includes this patch
-        }
-        if (mixinClassName.endsWith("MixinKeyBinding")) {
+        if (mixinClassName.endsWith("Mixin_FixKeyBindingCategorySortingNPE")) {
             return false; // Forge already includes this patch
         }
         //#endif
@@ -147,6 +173,26 @@ public class Plugin implements IMixinConfigPlugin {
                 return false;
             }
         }
+
+        //#if MC>=12006 && MC<12102
+        //$$ // mixin is already dummy targeted outside this range
+        //$$ if (mixinClassName.endsWith("Mixin_FancyMainMenu_3_2_1_GuiDrawScreenEvent")) {
+        //$$     // underlying issue was fixed in FancyMenu v3.4.0, but we still need to apply this mixin for 1.20.6 and 1.21, as they do not have v3.4.0+
+        //$$     // this is a check just in case v3.4.0 ever gets backported to 1.20.6 or 1.21, so we don't apply this mixin in that case.
+        //$$     // there were no classes removed in 3.4.0 that could be used to detect the affected version so lets check the mixin directly
+        //$$     return testClass("de.keksuccino.fancymenu.mixin.mixins.common.client.MixinTitleScreen",
+        //$$             clazz -> {
+        //$$                 for (MethodNode method : clazz.methods) {
+        //$$                     if (method.name.equals("wrap_super_render_in_render_FancyMenu")) {
+        //$$                         // this is the mixin that cancels the super.render call in TitleScreen, which is the cause of the issue
+        //$$                         return true;
+        //$$                     }
+        //$$                 }
+        //$$                 return false;
+        //$$             }
+        //$$     );
+        //$$ }
+        //#endif
 
         // Due to changes in FancyMenu, we need a different Mixin for v2.14.10 and above. This version can be identified
         // by the ScreenBackgroundRenderedEvent class.
@@ -180,7 +226,7 @@ public class Plugin implements IMixinConfigPlugin {
         IntegrationTestsPlugin.enableInjectionCounting(mixinInfo);
 
         for (EssentialTransformer transformer : transformerMap.get(targetClassName)) {
-            transformer.transform(targetClass);
+            transformer.preApply(targetClass);
         }
 
         //#if MC==11602 && FABRIC || MC==12004 && FABRIC
@@ -218,17 +264,46 @@ public class Plugin implements IMixinConfigPlugin {
 
     @Override
     public void postApply(String targetClassName, ClassNode targetClass, String mixinClassName, IMixinInfo mixinInfo) {
+        for (EssentialTransformer transformer : transformerMap.get(targetClassName)) {
+            transformer.postApply(targetClass);
+        }
+    }
 
+    private static void registerGlobalTransformers(List<MixinTransformerWrapper.Transformer> extraTransformers) throws ReflectiveOperationException {
+        //#if FABRIC
+        //$$ ClassLoader classLoader = Plugin.class.getClassLoader();
+        //$$ Field delegateField = classLoader.getClass().getDeclaredField("delegate");
+        //$$ delegateField.setAccessible(true);
+        //$$ Object delegate = delegateField.get(classLoader);
+        //$$ Field transformerField = delegate.getClass().getDeclaredField("mixinTransformer");
+        //$$ transformerField.setAccessible(true);
+        //$$ IMixinTransformer transformer = (IMixinTransformer) transformerField.get(delegate);
+        //$$ transformer = new MixinTransformerWrapper(transformer, extraTransformers);
+        //$$ transformerField.set(delegate, transformer);
+        //#elseif MC>=11600
+        //$$ throw new UnsupportedOperationException(); // not yet implemented for modern forge
+        //#else
+        ClassLoader classLoader = net.minecraft.launchwrapper.Launch.classLoader;
+        Field transformersField = classLoader.getClass().getDeclaredField("transformers");
+        transformersField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        List<IClassTransformer> transformers = (List<IClassTransformer>) transformersField.get(classLoader);
+        transformers.addAll(extraTransformers);
+        //#endif
     }
 
     static boolean hasClass(String name) {
+        return testClass(name, cls -> true);
+    }
+
+    static boolean testClass(String className, Predicate<ClassNode> test) {
         try {
-            MixinService.getService().getBytecodeProvider().getClassNode(name);
-            return true;
+            ClassNode classNode = MixinService.getService().getBytecodeProvider().getClassNode(className);
+            return test.test(classNode);
         } catch (ClassNotFoundException e) {
             return false;
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Exception when testing class {}: ", className, e);
             return false;
         }
     }

@@ -11,12 +11,14 @@
  */
 package gg.essential.data
 
+import gg.essential.Essential
 import gg.essential.gui.about.Category
 import gg.essential.gui.about.components.ChangelogComponent
 import gg.essential.lib.caffeine.cache.AsyncLoadingCache
 import gg.essential.lib.caffeine.cache.Caffeine
 import gg.essential.lib.gson.Gson
-import gg.essential.util.WebUtil
+import gg.essential.util.httpGetToStringBlocking
+import java.io.IOException
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CompletableFuture
@@ -39,9 +41,8 @@ object MenuData {
 
     // Fetch five changelogs before provided version and populate CHANGELOGS cache, then return current changelog
     private fun fetchChangelogs(version: String): Pair<String?, ChangelogComponent.Changelog> {
-
         val encodedVersion = URLEncoder.encode(version, StandardCharsets.UTF_8.toString()).replace("+", "%20").replace("#", "%23")
-        val dataString = WebUtil.fetchString("$BASE_URL/mods/v1/essential:essential/changelogs?branch=${VersionData.essentialBranch}&before=$encodedVersion")
+        val dataString = httpGetToStringBlocking("$BASE_URL/mods/v1/essential:essential/changelogs?branch=${VersionData.essentialBranch}&before=$encodedVersion")
         val data = Gson().fromJson(dataString, Array<ChangelogComponent.Changelog>::class.java).toList()
 
         var nextVersion: String? = null
@@ -58,8 +59,7 @@ object MenuData {
             previousVersion = log.version
         }
 
-        val versionResponse =
-            WebUtil.fetchString("$BASE_URL/mods/v1/essential:essential/versions/$encodedVersion/changelog")
+        val versionResponse = httpGetToStringBlocking("$BASE_URL/mods/v1/essential:essential/versions/$encodedVersion/changelog")
         return Pair(nextVersion, Gson().fromJson(versionResponse, ChangelogComponent.Changelog::class.java))
     }
 
@@ -68,10 +68,12 @@ object MenuData {
         var url = "$BASE_URL/v2/documents/"
         url += category.query
 
-        var data = WebUtil.fetchString(url)
-
-        if (data.contains("Failed to fetch")) {
+        var data: String
+        try {
+            data = httpGetToStringBlocking(url)
+        } catch (e: IOException) {
             INFO.asMap().remove(category)
+            Essential.logger.error("Failed to fetch menu data", e)
             data = "An error occurred fetching this data. Please check your internet connection and try again."
         }
 

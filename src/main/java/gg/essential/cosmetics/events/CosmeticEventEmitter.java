@@ -11,9 +11,12 @@
  */
 package gg.essential.cosmetics.events;
 
+import gg.essential.cosmetics.IngameEquippedOutfitsManager;
+import gg.essential.cosmetics.IngameEquippedOutfitsUpdateDispatcher;
 import gg.essential.mod.cosmetics.CosmeticSlot;
 import gg.essential.model.ModelInstance;
 import gg.essential.network.cosmetics.Cosmetic;
+import kotlin.Pair;
 import me.kbrewster.eventbus.Subscribe;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.AbstractClientPlayer;
@@ -22,6 +25,7 @@ import net.minecraft.entity.player.EntityPlayer;
 import gg.essential.event.entity.PlayerTickEvent;
 import gg.essential.mixins.impl.client.entity.AbstractClientPlayerExt;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
 
@@ -32,6 +36,13 @@ public class CosmeticEventEmitter {
     }
 
     public void triggerEvent(UUID playerUuid, CosmeticSlot slot, String event) {
+        IngameEquippedOutfitsUpdateDispatcher.Companion.sendUpdates(Collections.singletonList(new Pair<>(
+            playerUuid,
+            Collections.singletonList(new IngameEquippedOutfitsManager.Update.AnimationEvent(slot, event))
+        )));
+    }
+
+    public static void doTriggerEvent(UUID playerUuid, CosmeticSlot slot, String event) {
         WorldClient world = Minecraft.getMinecraft().world;
         if (world == null) {
             return;
@@ -51,12 +62,12 @@ public class CosmeticEventEmitter {
             player.getWearablesManager().getModels();
         for (ModelInstance value : essentialCosmeticModels.values()) {
             if (slot == value.getCosmetic().getType().getSlot()) {
-                value.getEssentialAnimationSystem().fireTriggerFromAnimation(event);
+                value.getEssentialAnimationSystem().fireTriggerFromAnimation(event, null);
             }
         }
     }
 
-    private AbstractClientPlayerExt findPlayerByCosmeticsSourceUuid(WorldClient world, UUID uuid) {
+    private static AbstractClientPlayerExt findPlayerByCosmeticsSourceUuid(WorldClient world, UUID uuid) {
         //#if MC>=11400
         //$$ for (PlayerEntity player : world.getPlayers()) {
         //#else

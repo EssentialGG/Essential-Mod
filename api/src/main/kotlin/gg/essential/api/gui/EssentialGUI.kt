@@ -20,7 +20,6 @@ import gg.essential.elementa.components.UIContainer
 import gg.essential.elementa.components.UIWrappedText
 import gg.essential.elementa.constraints.*
 import gg.essential.elementa.dsl.*
-import gg.essential.universal.USound
 import gg.essential.vigilance.utils.onLeftClick
 import org.jetbrains.annotations.ApiStatus
 import java.awt.Color
@@ -98,7 +97,7 @@ open class EssentialGUI(
         height = 75.percent
     } childOf window
 
-    private val container by UIContainer().constrain {
+    protected val container by UIContainer().constrain {
         x = CenterConstraint()
         y = CenterConstraint()
         width = 85.percent.coerceAtMost(100.percent - basicWidthConstraint { backContainer.getWidth() * 2 }).coerceAtLeast(0.pixels)
@@ -180,7 +179,6 @@ open class EssentialGUI(
 
     @ApiStatus.Internal
     open fun backButtonPressed() {
-        USound.playButtonPress()
         restorePreviousScreen()
     }
 

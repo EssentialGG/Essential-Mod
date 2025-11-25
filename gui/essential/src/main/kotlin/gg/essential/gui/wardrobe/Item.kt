@@ -42,7 +42,7 @@ sealed interface Item {
 
     fun getCost(wardrobeState: WardrobeState): State<Int?> = getPricingInfo(wardrobeState).map { it?.realCost }
 
-    data class CosmeticOrEmote(val cosmetic: Cosmetic, val settingsOverride: List<CosmeticSetting>? = null) : Item {
+    data class CosmeticOrEmote(val cosmetic: Cosmetic, val settingsOverride: List<CosmeticSetting> = emptyList()) : Item {
         override val id: String
             get() = cosmetic.id
         override val itemId: ItemId
@@ -126,7 +126,7 @@ sealed interface Item {
         override val tier: Tier,
         val discountPercent: Float,
         val rotateOnPreview: Boolean,
-        val skin: CosmeticBundle.Skin,
+        val skin: CosmeticBundle.Skin?,
         val cosmetics: Map<CosmeticSlot, CosmeticId>,
         val settings: Map<CosmeticId, List<CosmeticSetting>>,
     ) : Item {

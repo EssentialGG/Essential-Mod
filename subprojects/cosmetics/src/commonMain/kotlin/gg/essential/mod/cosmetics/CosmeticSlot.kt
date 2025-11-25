@@ -56,6 +56,7 @@ data class CosmeticSlot private constructor(val id: String) {
         @JvmField val TOP = make("TOP")
         @JvmField val ACCESSORY = make("ACCESSORY")
         @JvmField val HEAD = make("HEAD")
+        @JvmField val SKIRT = make("SKIRT")
     }
 
     internal object Serializer : KSerializer<CosmeticSlot> {

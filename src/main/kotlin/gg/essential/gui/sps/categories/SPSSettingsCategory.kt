@@ -38,7 +38,7 @@ class SPSSettingsCategory : WorldSettingsCategory(
             SettingInformation.SettingWithOptionalTooltip("Game Mode"),
             getCurrentGameMode(),
             mutableListStateOf(*allGameModes.map { EssentialDropDown.Option(I18n.format("selectWorld.gameMode.${it.name.lowercase()}"), it) }.toTypedArray())
-        ) { spsManager.updateWorldSettings(spsManager.isAllowCheats, it, spsManager.difficulty) } childOf scroller
+        ) { spsManager.updateWorldSettings(spsManager.isAllowCheats, it, spsManager.difficulty, spsManager.isDifficultyLocked) } childOf scroller
 
     // @formatter:off
     private fun getCurrentGameMode() =
@@ -54,7 +54,7 @@ class SPSSettingsCategory : WorldSettingsCategory(
             SettingInformation.SettingWithOptionalTooltip("Difficulty"),
             spsManager.difficulty ?: world.difficulty,
             mutableListStateOf(*getDifficulties().map { EssentialDropDown.Option(it.value, it.key) }.toTypedArray())
-        ) { spsManager.updateWorldSettings(spsManager.isAllowCheats, spsManager.currentGameMode, it) }.apply {
+        ) { spsManager.updateWorldSettings(spsManager.isAllowCheats, spsManager.currentGameMode, it, spsManager.isDifficultyLocked) }.apply {
         if (!world.worldInfo.isDifficultyLocked) {
             this childOf scroller
         }
@@ -72,7 +72,7 @@ class SPSSettingsCategory : WorldSettingsCategory(
 
     val cheatsEnabled = BasicState(spsManager.isAllowCheats).apply {
         onSetValue {
-            spsManager.updateWorldSettings(it, spsManager.currentGameMode, spsManager.difficulty)
+            spsManager.updateWorldSettings(it, spsManager.currentGameMode, spsManager.difficulty, spsManager.isDifficultyLocked)
         }
     }
 

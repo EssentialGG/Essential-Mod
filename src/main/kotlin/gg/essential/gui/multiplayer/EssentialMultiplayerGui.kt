@@ -31,9 +31,11 @@ import gg.essential.gui.common.TextFlag
 import gg.essential.gui.common.modal.ConfirmDenyModal
 import gg.essential.gui.common.modal.configure
 import gg.essential.gui.elementa.VanillaButtonConstraint.Companion.constrainTo
+import gg.essential.gui.elementa.state.v2.ReferenceHolderImpl
 import gg.essential.gui.elementa.state.v2.mutableStateOf
 import gg.essential.gui.elementa.state.v2.stateOf
-import gg.essential.gui.modals.TOSModal
+import gg.essential.gui.modals.ensurePrerequisites
+import gg.essential.gui.overlay.ModalManager
 import gg.essential.gui.serverdiscovery.VersionDownloadModal
 import gg.essential.mixins.ext.client.gui.acc
 import gg.essential.mixins.ext.client.gui.close
@@ -44,8 +46,8 @@ import gg.essential.mixins.ext.client.multiplayer.ext
 import gg.essential.mixins.ext.client.multiplayer.recommendedVersion
 import gg.essential.mixins.ext.client.multiplayer.showDownloadIcon
 import gg.essential.network.connectionmanager.serverdiscovery.NewServerDiscoveryManager
-import gg.essential.universal.UMatrixStack
 import gg.essential.util.GuiUtil
+import gg.essential.util.UDrawContext
 import gg.essential.util.createEssentialTooltip
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiButton
@@ -58,6 +60,10 @@ import net.minecraft.client.multiplayer.ServerData
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
 import java.time.Instant
 import java.util.concurrent.ThreadLocalRandom
+
+//#if MC>=12106
+//$$ import gg.essential.util.AdvancedDrawContext
+//#endif
 
 //#if MC >= 11600
 //$$ import gg.essential.util.textLiteral
@@ -83,12 +89,13 @@ class EssentialMultiplayerGui {
 
     private lateinit var essentialServerList: EssentialServerSelectionList
 
+    private val refHolder = ReferenceHolderImpl()
     private val connectionManager = Essential.getInstance().connectionManager
 
     // fixme remove lateinit after feature flags are cleaned up
     lateinit var impressionTracker: NewServerDiscoveryManager.ImpressionTracker
 
-    private val window = Window(ElementaVersion.V6)
+    private val window = Window(ElementaVersion.V10)
 
     private val tooltipParent = UIContainer() childOf window
 
@@ -162,12 +169,8 @@ class EssentialMultiplayerGui {
             }
 
             if (shouldShowServerPrivacyModal) {
-                GuiUtil.pushModal { manager -> 
-                    ConfirmDenyModal(manager, false).configure {
-                        titleText = "Do you want your friends to see what servers you are playing on?"
-                        primaryButtonText = "Yes"
-                        cancelButtonText = "No"
-                    }.onPrimaryAction {
+                GuiUtil.pushModal { manager ->
+                    ShareActivityModal(manager).onPrimaryAction {
                         OnboardingData.setSeenFriendsOption()
                         EssentialConfig.sendServerUpdates = true
                     }.onCancel {
@@ -188,6 +191,22 @@ class EssentialMultiplayerGui {
             isRefreshing = false
         }
     }
+
+    class ShareActivityModal(manager: ModalManager) : ConfirmDenyModal(manager, false) {
+        init {
+            configure {
+                titleText = "Share your activity with friends?"
+                contentText = "Display the server or world you\n" +
+                        "are playing on to your friends in\n" +
+                        "the social and multiplayer menu."
+                contentTextColor = EssentialPalette.TEXT_MID_GRAY
+                primaryButtonText = "Yes"
+                cancelButtonText = "No"
+            }
+        }
+    }
+
+    private val oldButtons = mutableListOf<GuiButton>()
 
     fun setupButtons(
         buttons: List<GuiButton>,
@@ -220,6 +239,13 @@ class EssentialMultiplayerGui {
         }
 
         when (EssentialConfig.currentMultiplayerTab) {
+            0 -> {
+                oldButtons.forEach { removeButton(it) }
+                oldButtons.clear()
+                oldButtons.add(favouritesTabButton)
+                oldButtons.add(friendsTabButton)
+                oldButtons.add(discoverTabButton)
+            }
             1 -> {
                 removeAllButtons()
                 repositionJoinServerButton(false, "Join Friend")
@@ -285,7 +311,11 @@ class EssentialMultiplayerGui {
                     val newList = newScreen.acc.serverListSelector
                     //#if MC>=11600
                     //$$ val lastServer = newList.eventListeners.lastOrNull { it is NormalEntry }
+                    //#if MC>=12109
+                    //$$ newScreen.acc.serverListSelector.setSelected(lastServer)
+                    //#else
                     //$$ newScreen.func_214287_a(lastServer)
+                    //#endif
                     //#if MC>=12104
                     //$$ newList.scrollY = Double.MAX_VALUE
                     //#else
@@ -348,13 +378,16 @@ class EssentialMultiplayerGui {
 
     private fun withTosAccepted(block: () -> Unit) {
         if (!OnboardingData.hasAcceptedTos()) {
-            GuiUtil.pushModal { TOSModal(it, unprompted = false, requiresAuth = true, { block() }) }
+            GuiUtil.launchModalFlow {
+                ensurePrerequisites()
+                block()
+            }
         } else {
             block()
         }
     }
 
-    fun draw(matrixStack: UMatrixStack) {
+    fun draw(drawContext: UDrawContext) {
         if (!EssentialConfig.essentialFull) return
 
         updateFriendsButton()
@@ -371,9 +404,17 @@ class EssentialMultiplayerGui {
             tooltip.hideTooltip()
         }
 
-        window.draw(matrixStack)
+        //#if MC>=12106
+        //$$ AdvancedDrawContext.drawImmediate(drawContext.mc) { matrixStack ->
+        //$$     window.draw(matrixStack)
+        //$$ }
+        //#else
+        window.draw(drawContext.matrixStack)
+        //#endif
     }
 
+    init {
+    }
     fun updateSpsSessions() {
         if (!EssentialConfig.essentialFull) return
         if (EssentialConfig.currentMultiplayerTab == 1) {

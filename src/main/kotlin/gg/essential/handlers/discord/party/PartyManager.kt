@@ -22,16 +22,18 @@ import gg.essential.gui.notification.markdownBody
 import gg.essential.util.Client
 import gg.essential.util.MinecraftUtils
 import gg.essential.util.UUIDUtil
+import gg.essential.util.UuidNameLookup
 import gg.essential.util.colored
-import gg.essential.util.logExceptions
-import gg.essential.util.thenAcceptOnMainThread
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.future.asDeferred
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.*
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 
 class PartyManager(private val scope: CoroutineScope) {
     private val hostsToHideNotifications = mutableListOf<UUID>()
@@ -69,7 +71,7 @@ class PartyManager(private val scope: CoroutineScope) {
     fun shouldHideNotificationForHost(uuid: UUID) = hostsToHideNotifications.contains(uuid)
 
     /**
-     * Calls [onCompletion] with `true` or `false` depending on if the [target] is allowed to join the world or not.
+     * Returns whether the [target] is allowed to join the world or not.
      *
      * If the [target] is blocked by the user, false will be returned.
      * If the [target] is friends with the user, true will be returned.
@@ -77,30 +79,33 @@ class PartyManager(private val scope: CoroutineScope) {
      * If the [target] is not blocked by the user, but is also not friends with the user, the user will be asked
      * for confirmation on weather or not this user should be allowed to join.
      */
-    fun shouldAllowUserToJoin(target: UUID, onCompletion: (Boolean) -> Unit) {
+    suspend fun shouldAllowUserToJoin(target: UUID): Boolean {
         val relationshipManager = Essential.getInstance().connectionManager.relationshipManager
 
         // If the target is blocked by the user...
         if (relationshipManager.isBlockedByMe(target)) {
             // We don't want to do anything, deny the request.
-            return onCompletion(false)
+            return false
         }
 
         // If the target and the user are friends...
         if (relationshipManager.isFriend(target)) {
             // We don't need any further confirmation, accept the request.
-            return onCompletion(true)
+            return true
         }
 
         // If the target is not blocked, but the target isn't friends with the user, let's ask the user for confirmation.
-        UUIDUtil.getName(target).thenAcceptOnMainThread { username ->
+        val username = UuidNameLookup.getName(target).asDeferred().await()
+        val accepted = suspendCoroutine { continuation ->
             Notifications.push("Discord Join Request", "") {
                 type = NotificationType.DISCORD
+                var resumed = false
+                onClose = { if (!resumed) continuation.resume(false); resumed = true }
                 val component = ConfirmDenyNotificationActionComponent(
                     confirmTooltip = "Accept",
                     denyTooltip = "Decline",
-                    confirmAction = { onCompletion(true) },
-                    denyAction = { onCompletion(false) },
+                    confirmAction = { if (!resumed) continuation.resume(true); resumed = true },
+                    denyAction = { if (!resumed) continuation.resume(false); resumed = true },
                     dismissNotification = dismissNotification,
                 )
                 timerEnabled = component.timerEnabledState
@@ -108,7 +113,9 @@ class PartyManager(private val scope: CoroutineScope) {
                 withCustomComponent(Slot.ICON, EssentialPalette.ENVELOPE_9X7.create())
                 markdownBody("${username.colored(EssentialPalette.TEXT_HIGHLIGHT)} wants to join your world.")
             }
-        }.logExceptions()
+        }
+
+        return accepted
     }
 
     private suspend fun joinMultiplayer(serverAddress: String) {

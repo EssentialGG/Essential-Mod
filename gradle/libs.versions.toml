@@ -1,8 +1,8 @@
 [versions]
-universalcraft = "365"
-elementa = "670"
+universalcraft = "431"
+elementa = "712"
 vigilance = "306"
-mixinextras = "0.3.5"
+mixinextras = "0.4.0"
 
 [libraries]
 universalcraft-standalone = { module = "gg.essential:universalcraft-standalone", version.ref = "universalcraft" }

@@ -59,18 +59,24 @@ public class Mixin_PlayerJoinSessionEvent {
         //#endif
         CallbackInfo info) {
 
+        //#if MC>=12109
+        //$$ MinecraftServer server = player.getEntityWorld().getServer();
+        //#elseif MC>=12106
+        //$$ MinecraftServer server = player.getServer();
+        //#else
         MinecraftServer server = player.mcServer;
+        //#endif
         UUID uuid = player.getUniqueID();
+        GameProfile gameProfile = player.getGameProfile();
         ExtensionsKt.getExecutor(Minecraft.getMinecraft()).execute(() -> {
             if (server instanceof IntegratedServerExt) {
                 add(((IntegratedServerExt) server).getEssential$manager().getConnectedPlayers(), uuid);
             }
-        });
 
-        final SPSManager spsManager = Essential.getInstance().getConnectionManager().getSpsManager();
-        if (spsManager.getLocalSession() != null) {
-            GameProfile gameProfile = player.getGameProfile();
-            ExtensionsKt.getExecutor(Minecraft.getMinecraft()).execute(() -> Essential.EVENT_BUS.post(new PlayerJoinSessionEvent(gameProfile)));
-        }
+            final SPSManager spsManager = Essential.getInstance().getConnectionManager().getSpsManager();
+            if (spsManager.getLocalSession() != null) {
+                Essential.EVENT_BUS.post(new PlayerJoinSessionEvent(gameProfile));
+            }
+        });
     }
 }

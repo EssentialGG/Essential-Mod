@@ -15,12 +15,11 @@ import gg.essential.model.backend.PlayerPose
 import gg.essential.model.backend.RenderBackend
 
 data class RenderMetadata(
-    val pose: PlayerPose?,
+    val pose: PlayerPose,
     val skin: RenderBackend.Texture,
     val light: Int,
-    val scale: Float,
     val side: Side?,
     val hiddenBones: Set<String>,
     val positionAdjustment: Vector3,
-    val parts: Set<EnumPart>?,
+    val parts: Set<EnumPart>,
 )

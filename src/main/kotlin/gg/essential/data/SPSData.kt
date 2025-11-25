@@ -25,6 +25,10 @@ import kotlin.io.path.exists
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
 
+//#if MC>=12105
+//$$ import kotlin.jvm.optionals.getOrNull
+//#endif
+
 //#if MC>11202
 //$$ import net.minecraft.world.storage.IServerWorldInfo
 //#endif
@@ -40,6 +44,14 @@ object SPSData {
             "getSPSSettings must be called with either worldSummary or worldInfo; they cannot both be null."
         )
 
+        val difficultyLocked = worldSummary?.getLevelNbtValue {
+            //#if MC>=12105
+            //$$ it.getCompound("Data").getOrNull()?.getBoolean("DifficultyLocked")?.getOrNull()
+            //#else
+            it.getCompoundTag("Data").getBoolean("DifficultyLocked")
+            //#endif
+        } ?: worldInfo?.isDifficultyLocked ?: false
+
         val file = (worldFile / "spsSettings.json")
         if (file.exists()) {
             try {
@@ -47,7 +59,8 @@ object SPSData {
                 val localUuid = USession.activeNow().uuid
                 return deserialized.copy(
                     // Remove invites sent to the current player which were sent while signed into another account
-                    invited = deserialized.invited.filter { it != localUuid }.toSet()
+                    invited = deserialized.invited.filter { it != localUuid }.toSet(),
+                    difficultyLocked = difficultyLocked
                 )
             } catch (exception: Exception) {
                 Essential.logger.error("Failed to read SPS settings file.", exception)
@@ -58,8 +71,13 @@ object SPSData {
         return SPSSettings(
             worldSummary?.enumGameType ?: worldInfo!!.gameType,
             EnumDifficulty.getDifficultyEnum(worldSummary?.getLevelNbtValue {
+                //#if MC>=12105
+                //$$ it.getCompound("Data").getOrNull()?.getInt("Difficulty")?.getOrNull()
+                //#else
                 it.getCompoundTag("Data").getInteger("Difficulty")
+                //#endif
             } ?: worldInfo?.difficulty?.difficultyId ?: EnumDifficulty.NORMAL.difficultyId),
+            difficultyLocked,
             worldSummary?.cheatsEnabled ?: worldInfo!!.areCommandsAllowed(),
             spsManager.invitedUsers,
             spsManager.isShareResourcePack,
@@ -75,6 +93,7 @@ object SPSData {
     data class SPSSettings(
         val gameType: GameType = GameType.ADVENTURE,
         val difficulty: EnumDifficulty = EnumDifficulty.NORMAL,
+        val difficultyLocked: Boolean = false,
         val cheats: Boolean = false,
         val invited: Set<UUID> = emptySet(),
         val shareResourcePack: Boolean = false,

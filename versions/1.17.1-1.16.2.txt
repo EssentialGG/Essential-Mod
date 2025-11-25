@@ -1,4 +1,6 @@
 com.mojang.blaze3d.platform.GlStateManager _pixelStore() com.mojang.blaze3d.platform.GlStateManager pixelStore()
+com.mojang.blaze3d.platform.GlStateManager _genTexture() com.mojang.blaze3d.platform.GlStateManager genTextures()
+com.mojang.blaze3d.platform.GlStateManager _deleteTexture() com.mojang.blaze3d.platform.GlStateManager deleteTexture()
 net.minecraft.client.option.GameOptions net.minecraft.client.options.GameOptions
 net.minecraft.client.option.GameOptions togglePlayerModelPart() setPlayerModelPart()
 net.minecraft.client.render.entity.model.ElytraEntityModel rightWing field_3364

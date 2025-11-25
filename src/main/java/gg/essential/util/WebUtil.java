@@ -19,6 +19,7 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.Charset;
 
+@Deprecated // reason: HttpUtils should be used instead.
 public class WebUtil {
     public static boolean LOG = false;
 
@@ -35,12 +36,6 @@ public class WebUtil {
             Essential.logger.error("Failed to fetch from {}", url, e);
         }
         return "Failed to fetch";
-    }
-
-    public static byte[] downloadToBytes(String url, String userAgent) throws IOException {
-        try (InputStream in = setup(url, userAgent)) {
-            return IOUtils.toByteArray(in);
-        }
     }
 
     public static void downloadToFile(String url, File file, String userAgent) throws IOException {

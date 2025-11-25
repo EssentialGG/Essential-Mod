@@ -22,15 +22,11 @@ enum class ScreenshotPreviewActionSlot(val defaultAction: ScreenshotPreviewActio
     ;
 
     val action: ScreenshotPreviewAction
-        get() {
-            return ScreenshotPreviewAction.values().getOrNull(
-                    when (this) {
-                        TOP_LEFT -> EssentialConfig.screenshotOverlayTopLeftAction
-                        TOP_RIGTH -> EssentialConfig.screenshotOverlayTopRightAction
-                        BOTTOM_LEFT -> EssentialConfig.screenshotOverlayBottomLeftAction
-                        BOTTOM_RIGHT -> EssentialConfig.screenshotOverlayBottomRightAction
-                    }
-                ) ?: defaultAction
+        get() = when (this) {
+            TOP_LEFT -> EssentialConfig.screenshotOverlayTopLeftAction
+            TOP_RIGTH -> EssentialConfig.screenshotOverlayTopRightAction
+            BOTTOM_LEFT -> EssentialConfig.screenshotOverlayBottomLeftAction
+            BOTTOM_RIGHT -> EssentialConfig.screenshotOverlayBottomRightAction
         }
 
 }

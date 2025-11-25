@@ -54,10 +54,9 @@ import kotlin.reflect.jvm.kotlinFunction
  * ```
  * or like so in Java:
  * ```java
- * void handle(int number, @Nullable boolean choice)
+ * void handle(int number, java.util.Optional<Boolean> choice)
  * ```
- * Note: You could also wrap a type in `Optional<T>` rather than making it nullable, and that will be handled correctly.
- * Additionally, note that there are no annotations on these functions, they were omitted for the sake of brevity, you
+ * Note: There are no annotations on these functions, as they were omitted for the sake of brevity, you
  * must still use [DefaultHandler] or [SubCommand] to make them recognized by the engine.
  *
  * With the handler above, a user providing the arguments `"5"` will invoke the function with the arguments (5, null).

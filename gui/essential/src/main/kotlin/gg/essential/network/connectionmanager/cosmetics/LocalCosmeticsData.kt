@@ -16,6 +16,8 @@ import gg.essential.cosmetics.CosmeticCategoryId
 import gg.essential.cosmetics.CosmeticId
 import gg.essential.cosmetics.CosmeticTypeId
 import gg.essential.cosmetics.FeaturedPageCollectionId
+import gg.essential.cosmetics.ImplicitOwnership
+import gg.essential.cosmetics.ImplicitOwnershipId
 import gg.essential.gui.elementa.state.v2.add
 import gg.essential.gui.elementa.state.v2.removeAt
 import gg.essential.gui.elementa.state.v2.set
@@ -28,10 +30,12 @@ import gg.essential.mod.cosmetics.CosmeticType
 import gg.essential.mod.cosmetics.database.GitRepoCosmeticsDatabase
 import gg.essential.mod.cosmetics.featured.FeaturedPageCollection
 import gg.essential.network.cosmetics.Cosmetic
-import gg.essential.util.Render
+import gg.essential.util.Client
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -125,17 +129,19 @@ class LocalCosmeticsData private constructor(
             changes += database.removeFiles(removedFiles.map { it.relativeTo(rootPath).toString() }.toSet())
         }
         if (addedFiles.isNotEmpty()) {
-            changes += database.addFiles(addedFiles.associate {
-                val read = suspend {
-                    withContext(Dispatchers.IO) {
-                        it.readBytes()
-                    }
+            val files = coroutineScope {
+                addedFiles.associateWith {
+                    async(Dispatchers.IO) { it.readBytes() }
+                }.mapKeys { (path, _) ->
+                    path.relativeTo(rootPath).toString()
+                }.mapValues { (_, bytes) ->
+                    suspend { bytes.await() }
                 }
-                it.relativeTo(rootPath).toString() to read
-            })
+            }
+            changes += database.addFiles(files)
         }
 
-        withContext(Dispatchers.Render) {
+        withContext(Dispatchers.Client) {
             update(changes)
         }
 
@@ -201,6 +207,20 @@ class LocalCosmeticsData private constructor(
             }
         }
 
+        for (id in changes.implicitOwnerships) {
+            val existingIndex = state.implicitOwnerships.get().indexOfFirst { it.id == id }
+            val implicitOwnership = database.loadedImplicitOwnerships[id]
+            if (implicitOwnership != null) {
+                if (existingIndex >= 0) {
+                    state.implicitOwnerships.set(existingIndex, implicitOwnership)
+                } else {
+                    state.implicitOwnerships.add(implicitOwnership)
+                }
+            } else {
+                state.implicitOwnerships.removeAt(existingIndex)
+            }
+        }
+
         for (id in changes.cosmetics) {
             val existingIndex = state.cosmetics.get().indexOfFirst { it.id == id }
             val cosmetic = database.loadedCosmetics[id]
@@ -230,6 +250,9 @@ class LocalCosmeticsData private constructor(
         }
         for ((id, featuredPage) in msg.featuredPageCollections) {
             changes.putAll(database.computeChanges(id, featuredPage))
+        }
+        for ((id, implicitOwnership) in msg.implicitOwnerships) {
+            changes.putAll(database.computeChanges(id, implicitOwnership))
         }
         for ((id, cosmetic) in msg.cosmetics) {
             changes.putAll(database.computeChanges(id, cosmetic))
@@ -267,6 +290,7 @@ class LocalCosmeticsData private constructor(
         types: Map<CosmeticTypeId, CosmeticType?>,
         bundles: Map<CosmeticBundleId, CosmeticBundle?>,
         featuredPageCollections: Map<FeaturedPageCollectionId, FeaturedPageCollection?>,
+        implicitOwnerships: Map<ImplicitOwnershipId, ImplicitOwnership?>,
         cosmetics: Map<CosmeticId, Cosmetic?>,
     ): CompletableFuture<Unit> {
         val future = CompletableFuture<Unit>()
@@ -276,6 +300,7 @@ class LocalCosmeticsData private constructor(
                 types,
                 bundles,
                 featuredPageCollections,
+                implicitOwnerships,
                 cosmetics,
                 future
             )
@@ -290,6 +315,7 @@ class LocalCosmeticsData private constructor(
             val types: Map<CosmeticTypeId, CosmeticType?>,
             val bundles: Map<CosmeticBundleId, CosmeticBundle?>,
             val featuredPageCollections: Map<FeaturedPageCollectionId, FeaturedPageCollection?>,
+            val implicitOwnerships: Map<ImplicitOwnershipId, ImplicitOwnership?>,
             val cosmetics: Map<CosmeticId, Cosmetic?>,
             val future: CompletableFuture<Unit>,
         ) : Msg

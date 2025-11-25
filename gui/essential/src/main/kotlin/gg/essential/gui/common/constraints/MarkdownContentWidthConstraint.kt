@@ -29,23 +29,14 @@ class MarkdownContentWidthConstraint : WidthConstraint {
         get() = constrainTo as? EssentialMarkdown
             ?: throw UnsupportedOperationException("MarkdownContentWidthConstraint must be constrained to a MarkdownComponent")
 
-    override fun animationFrame() {
+    override fun getWidthImpl(component: UIComponent): Float {
         // One common pattern for this constraint is to bind it to fake components that aren't truly part of the
         // component tree and merely exist to size some container correctly. Since these components aren't part of
-        // the tree, their animationFrame and draw will never be called, so we need to call it for them before we
+        // the tree, their update and draw will never be called, so we need to call it for them before we
         // can read its effective width.
         // Surplus calls should be harmless.
         markdown.animationFrame()
-
-        super.animationFrame()
-    }
-
-    override fun getWidthImpl(component: UIComponent): Float {
-        if (markdown.maxTextLineWidth == 0f) {
-            // Same as `animationFrame` above, but for the case where the constraint is evaluated before an animation
-            // frame happens.
-            markdown.animationFrame()
-        }
+        markdown.update()
 
         return markdown.maxTextLineWidth
     }

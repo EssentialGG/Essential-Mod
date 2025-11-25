@@ -11,10 +11,13 @@
  */
 package gg.essential.config
 
+import com.sparkuniverse.toolbox.relationships.enums.FriendRequestPrivacySetting
 import gg.essential.gui.common.modal.DangerConfirmationEssentialModal
 import gg.essential.gui.common.modal.configure
 import gg.essential.gui.elementa.state.v2.*
 import gg.essential.gui.elementa.state.v2.combinators.*
+import gg.essential.gui.overlay.ModalManager
+import gg.essential.gui.screenshot.toast.ScreenshotPreviewAction
 import gg.essential.gui.screenshot.toast.ScreenshotPreviewActionSlot
 import gg.essential.mod.vigilance2.Vigilant2
 import gg.essential.util.GuiEssentialPlatform
@@ -34,8 +37,7 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
     val sendServerUpdatesState = property("Privacy.General.Display Current Server", false)
     var sendServerUpdates by sendServerUpdatesState
 
-    // options = ["Anyone", "Friends Of Friends", "Nobody"]
-    val friendRequestPrivacyState = property("Privacy.General.Friend Privacy Settings", 0)
+    val friendRequestPrivacyState = property("Privacy.General.Friend Privacy Settings", FriendRequestPrivacySetting.ANY_ONE)
     var friendRequestPrivacy by friendRequestPrivacyState
 
     val streamerModeState = property("General.General.Streamer Mode", false)
@@ -68,8 +70,12 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
     val spsIPWarningState = property("Notifications.General.Host World IP Warning", true)
     var spsIPWarning by spsIPWarningState
 
-    // options = ["3", "5", "7"] (seconds)
-    val screenshotToastDurationState = property("Notifications.General.Screenshot Toast Duration", 1)
+    enum class ScreenshotToastDuration(val seconds: Int) {
+        SHORT(3),
+        MEDIUM(5),
+        LONG(7),
+    }
+    val screenshotToastDurationState = property("Notifications.General.Screenshot Toast Duration", ScreenshotToastDuration.MEDIUM)
     var screenshotToastDuration by screenshotToastDurationState
 
     val zoomSmoothCameraState = property("Quality of Life.Zoom.Smooth Camera when Zoomed", true)
@@ -104,8 +110,10 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
     val autoUpdateState = mutableStateOf(false)
     var autoUpdate by autoUpdateState
 
-    // options = ["Full", "Minimal", "Off"]
-    val essentialMenuLayoutState = property("General.Experience.Essential Menu Layout", 0)
+    enum class EssentialMenuLayout(val label: String) {
+        FULL("Full"), MINIMAL("Minimal"), OFF("Off")
+    }
+    val essentialMenuLayoutState = property("General.Experience.Essential Menu Layout", EssentialMenuLayout.FULL)
     var essentialMenuLayout by essentialMenuLayoutState
 
     val closerMenuSidebarState = property("General.Experience.Closer placement of Minimal Essential Menu", true)
@@ -114,18 +122,17 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
     val autoRefreshSessionState = property("Quality of Life.General.Auto Refresh Session", true)
     var autoRefreshSession by autoRefreshSessionState
 
-    //#if MC<11400
     val windowedFullscreenState = property("Quality of Life.Fullscreen.Windowed Fullscreen", false)
     var windowedFullscreen by windowedFullscreenState
-    //#endif
 
     val disableCosmeticsState = property("Cosmetics.General.Disable cosmetics", false)
     var disableCosmetics: Boolean by disableCosmeticsState
 
     /** The cosmetics hidden state, as well as a flag on whether this was set by the user or the server/mod. */
-    val ownCosmeticsHiddenStateWithSource = mutableStateOf(Pair(false, false))
-    var ownCosmeticsHiddenState = ownCosmeticsHiddenStateWithSource.bimap({ it.first }, { it to false })
-    var ownCosmeticsHidden by ownCosmeticsHiddenState
+    val ownCosmeticsVisibleStateWithSource = mutableStateOf(Pair(true, CosmeticsVisibilitySource.System))
+    val ownCosmeticsVisibleState = ownCosmeticsVisibleStateWithSource.map { it.first }
+    val ownCosmeticsHidden: Boolean
+        get() = !ownCosmeticsVisibleState.getUntracked()
 
     val hideCosmeticsWhenServerOverridesSkinState = property("Cosmetics.General.Hide cosmetics on server skins", false)
     var hideCosmeticsWhenServerOverridesSkin: Boolean by hideCosmeticsWhenServerOverridesSkinState
@@ -145,9 +152,7 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
     private fun revokeTosButton() {
         val manager = platform.createModalManager()
         manager.queueModal(
-            DangerConfirmationEssentialModal(manager, "Confirm", false).configure {
-                titleText = "Revoking Essential's Terms of Service and Privacy Policy will cause Essential features not to work. Are you sure you want to proceed?"
-            }.onPrimaryAction {
+            RevokeTOSModal(manager).onPrimaryAction {
                 doRevokeTos()
             }
         )
@@ -157,13 +162,16 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
     val disableCosmeticsInInventoryState = property("Cosmetics.General.Disable cosmetics in inventory", false)
     var disableCosmeticsInInventory: Boolean by disableCosmeticsInInventoryState
 
-    // options = ["Only show armor", "Only show cosmetics", "Show cosmetics and armor"]
-    val cosmeticArmorSettingSelfState = property("Cosmetics.General.Cosmetic & Armor Conflict - On Myself", 0)
-    var cosmeticArmorSettingSelf: Int by cosmeticArmorSettingSelfState
+    enum class CosmeticOrArmor(val label: String) {
+        ONLY_ARMOR("Only armor"),
+        ONLY_COSMETICS("Only cosmetics"),
+        BOTH("Cosmetics and armor"),
+    }
+    val cosmeticArmorSettingSelfState = property("Cosmetics.General.Cosmetic & Armor Conflict - On Myself", CosmeticOrArmor.ONLY_ARMOR)
+    var cosmeticArmorSettingSelf by cosmeticArmorSettingSelfState
 
-    // options = ["Only show armor", "Only show cosmetics", "Show cosmetics and armor"]
-    val cosmeticArmorSettingOtherState = property("Cosmetics.General.Cosmetic & Armor Conflict - On Others", 0)
-    var cosmeticArmorSettingOther: Int by cosmeticArmorSettingOtherState
+    val cosmeticArmorSettingOtherState = property("Cosmetics.General.Cosmetic & Armor Conflict - On Others", CosmeticOrArmor.ONLY_ARMOR)
+    var cosmeticArmorSettingOther by cosmeticArmorSettingOtherState
 
     // Choose whether to use rear or front facing third person perspective when emoting.
     // options = ["Rear", "Front"]
@@ -207,22 +215,26 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
      * Remember to change in both places at once
      */
 
-    val screenshotOverlayTopLeftActionState = property("Quality of Life.Screenshots.Screenshot Quick Action #1 - Top Left", ScreenshotPreviewActionSlot.TOP_LEFT.defaultAction.ordinal)
+    val screenshotOverlayTopLeftActionState = property("Quality of Life.Screenshots.Screenshot Quick Action #1 - Top Left", ScreenshotPreviewActionSlot.TOP_LEFT.defaultAction)
     var screenshotOverlayTopLeftAction by screenshotOverlayTopLeftActionState
 
-    val screenshotOverlayTopRightActionState = property("Quality of Life.Screenshots.Screenshot Quick Action #2 - Top Right", ScreenshotPreviewActionSlot.TOP_RIGTH.defaultAction.ordinal)
+    val screenshotOverlayTopRightActionState = property("Quality of Life.Screenshots.Screenshot Quick Action #2 - Top Right", ScreenshotPreviewActionSlot.TOP_RIGTH.defaultAction)
     var screenshotOverlayTopRightAction by screenshotOverlayTopRightActionState
 
-    val screenshotOverlayBottomLeftActionState = property("Quality of Life.Screenshots.Screenshot Quick Action #3 - Bottom Left", ScreenshotPreviewActionSlot.BOTTOM_LEFT.defaultAction.ordinal)
+    val screenshotOverlayBottomLeftActionState = property("Quality of Life.Screenshots.Screenshot Quick Action #3 - Bottom Left", ScreenshotPreviewActionSlot.BOTTOM_LEFT.defaultAction)
     var screenshotOverlayBottomLeftAction by screenshotOverlayBottomLeftActionState
 
-    val screenshotOverlayBottomRightActionState = property("Quality of Life.Screenshots.Screenshot Quick Action #4 - Bottom Right", ScreenshotPreviewActionSlot.BOTTOM_RIGHT.defaultAction.ordinal)
+    val screenshotOverlayBottomRightActionState = property("Quality of Life.Screenshots.Screenshot Quick Action #4 - Bottom Right", ScreenshotPreviewActionSlot.BOTTOM_RIGHT.defaultAction)
     var screenshotOverlayBottomRightAction by screenshotOverlayBottomRightActionState
 
     //endregion
 
-    // options = ["Nothing", "Copy Image", "Copy URL"]
-    val postScreenshotActionState = property("Quality of Life.Screenshots.Post Screenshot Action", 0)
+    enum class PostScreenshotAction(val label: String) {
+        NOTHING("Nothing"),
+        COPY_IMAGE("Copy Image"),
+        COPY_URL("Copy URL"),
+    }
+    val postScreenshotActionState = property("Quality of Life.Screenshots.Post Screenshot Action", PostScreenshotAction.NOTHING)
     var postScreenshotAction by postScreenshotActionState
 
     override val useVanillaButtonForRetexturing = property("General.Experience.Use vanilla button texture", false)
@@ -230,12 +242,15 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
     val shouldDarkenRetexturedButtonsState = property("General.Experience.Darken re-textured menu buttons", false)
     override var shouldDarkenRetexturedButtons by shouldDarkenRetexturedButtonsState
 
-    // options = ["12 Hour", "24 Hour"]
-    val timeFormatState = property("General.General.Timestamps Format", 0)
+    enum class TimeFormat(val label: String) { AM_PM("12 Hour"), REGULAR("24 Hour") }
+    val timeFormatState = property("General.General.Timestamps Format", TimeFormat.AM_PM)
     var timeFormat by timeFormatState
 
     val showQuickActionBarState = property("General.Experience.Quick Action Bar", true)
     var showQuickActionBar by showQuickActionBarState
+
+    val replaceWindowTitleState = property("General.General.Replace Window Title", true)
+    var replaceWindowTitle by replaceWindowTitleState
 
     val screenshotBrowserItemsPerRowState = property("Hidden.Hidden.screenshotBrowserItemsPerRow", 3)
     var screenshotBrowserItemsPerRow by screenshotBrowserItemsPerRowState
@@ -259,6 +274,12 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
     val previouslyLaunchedWithContainer = property("Hidden.previously_launched_with_container", PreviouslyLaunchedWithContainer.Unknown)
 
     val playEmoteSoundsInWardrobe = property("Hidden.play_emote_sounds_in_wardrobe", true)
+
+    val hideCosmeticParticlesInFirstPerson = property("Cosmetics.General.Hide cosmetic particles in first person", false)
+
+    val showOwnNametag = property("Quality of Life.Nameplate.Show my nameplate in third-person", true)
+
+    val acknowledgedPermanentSuspension = property("Hidden.acknowledged_permanent_suspension", false)
 
     override val migrations = listOf(
         Migration { config ->
@@ -374,9 +395,9 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
 
             subcategory("Date & Time") {
                 selector(timeFormatState) {
-                    name = "Timestamps Format"
+                    name = "Timestamps format"
                     description = "Choose between using 12 or 24 hour time for dates/timestamps in Essential menus."
-                    options = listOf("12 Hour", "24 Hour")
+                    options = TimeFormat.entries.map { it.label }
                 }
             }
         }
@@ -384,24 +405,27 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
         category("Emotes") {
             subcategory("General") {
                 switch(!disableEmotesState) {
-                    name = "Show emotes"
-                    description = "Show emote animations on yourself and other players."
+                    name = "Emotes"
+                    description = "Better express yourself with emotes."
                 }
+                dynamic {
+                    if (!disableEmotesState()) {
+                        selector(allowEmoteSounds) {
+                            name = "Allow emote sounds"
+                            description = "Select who you can hear emote sounds from."
+                            options = AllowEmoteSounds.entries.map { it.label }
+                        }
 
-                selector(allowEmoteSounds) {
-                    name = "Allow emote sounds"
-                    description = "Select who you can hear emote sounds from."
-                    options = AllowEmoteSounds.entries.map { it.label }
-                }
+                        switch(thirdPersonEmotesState) {
+                            name = "Play emotes in third person view"
+                            description = "Emotes will be shown in third-person view. You can still toggle between front and back view."
+                        }
 
-                switch(thirdPersonEmotesState) {
-                    name = "Play emotes in third person view"
-                    description = "Emotes will be shown in third-person view. You can still toggle between front and back view."
-                }
-
-                switch(emotePreviewState) {
-                    name = "Emote preview"
-                    description = "When playing emotes, show a model of your character performing the emote in the upper left corner of the screen."
+                        switch(emotePreviewState) {
+                            name = "Emote preview"
+                            description = "When playing emotes, show a model of your character performing the emote in the upper left corner of the screen."
+                        }
+                    }
                 }
             }
         }
@@ -409,37 +433,51 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
         category("Cosmetics") {
             subcategory("General") {
                 switch(!disableCosmeticsState) {
-                    name = "Show cosmetics"
-                    description = "Show cosmetics on yourself and other players."
+                    name = "Cosmetics"
+                    description = "Enhance your Minecraft character with cosmetics."
                 }
-                switch(ownCosmeticsHiddenStateWithSource.bimap({ it.first }, { it to true })) {
-                    name = "Hide your cosmetics"
-                    description = "Hides your equipped cosmetics for all players."
+                dynamic {
+                    if (!disableCosmeticsState()) {
+                        switch(ownCosmeticsVisibleStateWithSource.bimap({ !it.first }, { !it to CosmeticsVisibilitySource.UserWithoutNotification })) {
+                            name = "Hide your cosmetics"
+                            description = "Hide your equipped cosmetics for everyone."
+                        }
+
+                        switch(hideCosmeticParticlesInFirstPerson) {
+                            name = "Hide cosmetic particles in first person"
+                            description = "Hide particle effects coming from your equipped cosmetics in first person."
+                        }
+
+                        val cosmeticArmorSettingsOrdered = listOf(
+                            CosmeticOrArmor.ONLY_COSMETICS,
+                            CosmeticOrArmor.ONLY_ARMOR,
+                            CosmeticOrArmor.BOTH,
+                        )
+
+                        selector(cosmeticArmorSettingSelfState, cosmeticArmorSettingsOrdered) {
+                            name = "Cosmetics & armor visibility on me"
+                            description = "Cosmetics and armor may conflict with each other on your player. This setting does not affect what other players see."
+                            options = cosmeticArmorSettingsOrdered.map { it.label }
+                        }
+
+                        selector(cosmeticArmorSettingOtherState, cosmeticArmorSettingsOrdered) {
+                            name = "Cosmetics & armor visibility on others"
+                            description = "Cosmetics and armor may conflict with each other on other players. This setting does not affect what other players see."
+                            options = cosmeticArmorSettingsOrdered.map { it.label }
+                        }
+
+                        switch(disableCosmeticsInInventoryState) {
+                            name = "Hide cosmetics in inventory"
+                            description = "Hides your equipped cosmetics on the player preview inside your inventory."
+                        }
+
+                        switch(hideCosmeticsWhenServerOverridesSkinState) {
+                            name = "Hide cosmetics on server skins"
+                            description = "Hides cosmetics on players when the joined server modifies the user’s skins."
+                        }
+                    }
                 }
 
-                val swapFirstTwo: (Int) -> Int = { if (it in 0..1) (it + 1) % 2 else it }
-
-                selector(cosmeticArmorSettingSelfState.bimap(swapFirstTwo, swapFirstTwo)) {
-                    name = "Cosmetics & armor visibility on me"
-                    description = "Cosmetics and armor may conflict with each other on your player. This setting does not effect what other players see."
-                    options = listOf("Only cosmetics", "Only armor", "Cosmetics and armor")
-                }
-
-                selector(cosmeticArmorSettingOtherState.bimap(swapFirstTwo, swapFirstTwo)) {
-                    name = "Cosmetics & armor visibility on others"
-                    description = "Cosmetics and armor may conflict with each other on other players. This setting does not effect what other players see."
-                    options = listOf("Only cosmetics", "Only armor", "Cosmetics and armor")
-                }
-
-                switch(disableCosmeticsInInventoryState) {
-                    name = "Hide cosmetics in inventory"
-                    description = "Hides your equipped cosmetics on the player preview inside your inventory."
-                }
-
-                switch(hideCosmeticsWhenServerOverridesSkinState) {
-                    name = "Hide cosmetics on server skins"
-                    description = "Hides cosmetics on players when the joined server modifies the user’s skins."
-                }
             }
         }
 
@@ -489,17 +527,7 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
                 selector(essentialMenuLayoutState) {
                     name = "Essential menu layout"
                     description = "Choose the layout of the Essential buttons on the main and pause menu."
-                    options = listOf("Full", "Minimal", "Off")
-                }
-                switch(showQuickActionBarState) {
-                    name = "Quick actions"
-                    description = "Shows the quick action bar in the main and pause menu. Quickly toggle notifications, cosmetics, and fullscreen."
-                    visible = essentialMenuLayoutState.map { it == 0 }
-                }
-                switch(closerMenuSidebarState) {
-                    name = "Wide-screen menu placement"
-                    description = "Moves the minimal Essential menu closer to the Minecraft menu."
-                    visible = essentialMenuLayoutState.map { it == 1 }
+                    options = EssentialMenuLayout.entries.map { it.label }
                 }
                 switch(useVanillaButtonForRetexturing) {
                     name = "Use Minecraft button texture"
@@ -512,25 +540,32 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
                 }
             }
 
-            subcategory("Essential Indicator") {
-                switch(showEssentialIndicatorOnTabState) {
-                    name = "Essential indicator in tab-list"
-                    description = "Shows the indicator on other Essential players in the tab-list."
+            subcategory("Nameplates") {
+                switch(showOwnNametag) {
+                    name = "Nameplate in third-person"
+                    description = "Shows your own nameplate when in third-person perspective."
                 }
                 switch(showEssentialIndicatorOnNametagState) {
-                    name = "Essential indicator on nameplates"
-                    description = "Shows the indicator on other Essential players’ nameplates."
+                    name = "Essential icon on nameplates"
+                    description = "Shows the Essential icon on Essential players’ nameplates."
                 }
             }
 
-            //#if MC<11400
-            subcategory("Fullscreen") {
-                switch(windowedFullscreenState) {
-                    name = "Windowed fullscreen"
-                    description = "Enables windowed fullscreen, allowing focusing on other windows."
+            subcategory("Tab-list") {
+                switch(showEssentialIndicatorOnTabState) {
+                    name = "Essential icon in tab-list"
+                    description = "Shows the Essential icon on Essential players in the tab-list."
                 }
             }
-            //#endif
+
+            if (platform.mcVersion < 11400) {
+                subcategory("Fullscreen") {
+                    switch(windowedFullscreenState) {
+                        name = "Windowed fullscreen"
+                        description = "Enables windowed fullscreen, allowing focusing on other windows."
+                    }
+                }
+            }
 
             subcategory("Accessibility") {
                 switch(enlargeSocialMenuChatMetadataState) {
@@ -546,40 +581,40 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
                     name = "Screenshot preview"
                     description = "Shows a screenshot preview with quick-actions on capture."
                 }
-                val quickActionOptions = listOf("Share to Friends", "Copy Picture", "Copy Link", "Favorite", "Edit", "Delete")
 
-                selector(screenshotOverlayTopLeftActionState.reorderScreenshotQuickActions()) {
+                val quickActionOptions = ScreenshotPreviewAction.DISPLAY_ORDER
+                selector(screenshotOverlayTopLeftActionState, quickActionOptions) {
                     name = "Screenshot quick-action #1"
                     description = "Select an action for the top left screenshot quick-action slot."
-                    options = quickActionOptions
+                    options = quickActionOptions.map { it.displayName }
                 }
-                selector(screenshotOverlayTopRightActionState.reorderScreenshotQuickActions()) {
+                selector(screenshotOverlayTopRightActionState, quickActionOptions) {
                     name = "Screenshot quick-action #2"
                     description = "Select an action for the top right screenshot quick-action slot."
-                    options = quickActionOptions
+                    options = quickActionOptions.map { it.displayName }
                 }
-                selector(screenshotOverlayBottomLeftActionState.reorderScreenshotQuickActions()) {
+                selector(screenshotOverlayBottomLeftActionState, quickActionOptions) {
                     name = "Screenshot quick-action #3"
                     description = "Select an action for the bottom left screenshot quick-action slot."
-                    options = quickActionOptions
+                    options = quickActionOptions.map { it.displayName }
                 }
-                selector(screenshotOverlayBottomRightActionState.reorderScreenshotQuickActions()) {
+                selector(screenshotOverlayBottomRightActionState, quickActionOptions) {
                     name = "Screenshot quick-action #4"
                     description = "Select an action for the bottom right screenshot quick-action slot."
-                    options = quickActionOptions
+                    options = quickActionOptions.map { it.displayName }
                 }
                 selector(postScreenshotActionState) {
                     name = "Post screenshot action"
                     description = "Automatically trigger an action after taking a screenshot."
-                    options = listOf("Nothing", "Copy Image", "Copy URL")
+                    options = PostScreenshotAction.entries.map { it.label }
                 }
                 selector(screenshotToastDurationState) {
                     name = "Screenshot preview duration"
                     description = "Control for how long the screenshot preview will be shown."
-                    options = listOf("3 seconds", "5 seconds", "7 seconds")
+                    options = ScreenshotToastDuration.entries.map { "${it.seconds} seconds" }
                 }
                 switch(screenshotSoundsState) {
-                    name = "Screenshot Sounds"
+                    name = "Screenshot sounds"
                     description = "Plays a capture sound when taking a screenshot."
                 }
                 switch(enableVanillaScreenshotMessageState) {
@@ -625,13 +660,19 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
         category("Privacy") {
             subcategory("Privacy") {
                 switch(sendServerUpdatesState) {
-                    name = "Show joined server to friends"
-                    description = "Displays the server you are currently connected to to your friends in the Social and Multiplayer menu."
+                    name = "Show game activity status to friends"
+                    description = "Displays the server or world you are currently playing on to your friends in the social and multiplayer menu."
                 }
                 selector(friendRequestPrivacyState) {
                     name = "Friend request permission"
                     description = "Determines who can send you a friend request on Essential."
-                    options = listOf("Everyone", "Friends of friends", "Nobody")
+                    options = FriendRequestPrivacySetting.entries.map { option ->
+                        when (option) {
+                            FriendRequestPrivacySetting.ANY_ONE -> "Everyone"
+                            FriendRequestPrivacySetting.FRIEND_OF_FRIENDS -> "Friends of friends"
+                            FriendRequestPrivacySetting.NO_ONE -> "Nobody"
+                        }
+                    }
                 }
                 button(::revokeTosButton) {
                     name = "Terms of Service and Privacy Policy"
@@ -650,5 +691,19 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
     private operator fun <T> MutableState<T>.setValue(essentialConfig: EssentialConfig, property: KProperty<*>, value: T) {
         set(value)
     }
-    private fun MutableState<Int>.reorderScreenshotQuickActions() = reorder(1, 2, 3, 5, 0, 4)
+
+    class RevokeTOSModal(manager: ModalManager) : DangerConfirmationEssentialModal(manager, "Confirm", false) {
+        init {
+            configure {
+                titleText = "Revoking Essential's Terms of Service and Privacy Policy will cause Essential features not to work. Are you sure you want to proceed?"
+            }
+        }
+    }
+
+    enum class CosmeticsVisibilitySource {
+        System, // Set by Infra, or mod for internal reasons (e.g. undoing failed infra changed)
+        UserWithNotification,
+        UserWithoutNotification
+    }
+
 }

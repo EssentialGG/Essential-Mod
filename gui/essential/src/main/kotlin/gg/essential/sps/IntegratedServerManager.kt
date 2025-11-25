@@ -14,6 +14,7 @@ package gg.essential.sps
 import gg.essential.gui.elementa.state.v2.ListState
 import gg.essential.gui.elementa.state.v2.MutableState
 import gg.essential.gui.elementa.state.v2.State
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import java.nio.file.Path
 import java.util.*
@@ -31,6 +32,12 @@ interface IntegratedServerManager {
      * Coroutines are executed using [Client], not on the server thread!
      */
     val coroutineScope: CoroutineScope
+
+    /**
+     * A coroutine dispatcher which executes coroutines on the server main thread.
+     * After server shutdown, it'll dispatch to [Dispatchers.IO] with parallelism limited to 1.
+     */
+    val serverDispatcher: CoroutineDispatcher
 
     /** Current server whitelist. May be `null` if no whitelist has been applied yet. */
     val whitelist: State<Set<UUID>?>
@@ -51,7 +58,8 @@ interface IntegratedServerManager {
     fun setOpsSource(source: State<Set<UUID>>)
     fun setResourcePackSource(source: State<ServerResourcePack?>)
     fun setDifficultySource(source: MutableState<Difficulty>)
-    fun setDefaultGameModeSource(source: State<GameMode>)
+    fun setDifficultyLockedSource(source: MutableState<Boolean>)
+    fun setDefaultGameModeSource(source: MutableState<GameMode>)
     fun setCheatsEnabledSource(source: State<Boolean>)
 
     data class ServerResourcePack(val url: String, val checksum: String)

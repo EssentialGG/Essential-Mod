@@ -12,18 +12,31 @@
 package gg.essential.gui.screenshot
 
 import gg.essential.Essential
-import gg.essential.api.gui.Slot
 import gg.essential.config.EssentialConfig
-import gg.essential.data.OnboardingData
 import gg.essential.elementa.UIComponent
 import gg.essential.elementa.components.UIBlock
 import gg.essential.elementa.components.UIContainer
 import gg.essential.elementa.components.UIImage
-import gg.essential.elementa.components.UIText
 import gg.essential.elementa.components.Window
-import gg.essential.elementa.constraints.*
-import gg.essential.elementa.constraints.animation.*
-import gg.essential.elementa.dsl.*
+import gg.essential.elementa.constraints.AspectConstraint
+import gg.essential.elementa.constraints.ChildBasedSizeConstraint
+import gg.essential.elementa.constraints.SiblingConstraint
+import gg.essential.elementa.constraints.XConstraint
+import gg.essential.elementa.constraints.animation.Animations
+import gg.essential.elementa.dsl.animate
+import gg.essential.elementa.dsl.basicHeightConstraint
+import gg.essential.elementa.dsl.basicWidthConstraint
+import gg.essential.elementa.dsl.basicXConstraint
+import gg.essential.elementa.dsl.basicYConstraint
+import gg.essential.elementa.dsl.childOf
+import gg.essential.elementa.dsl.constrain
+import gg.essential.elementa.dsl.max
+import gg.essential.elementa.dsl.percent
+import gg.essential.elementa.dsl.percentOfWindow
+import gg.essential.elementa.dsl.pixels
+import gg.essential.elementa.dsl.provideDelegate
+import gg.essential.elementa.dsl.times
+import gg.essential.elementa.dsl.toConstraint
 import gg.essential.elementa.effects.OutlineEffect
 import gg.essential.elementa.state.BasicState
 import gg.essential.elementa.state.State
@@ -36,44 +49,85 @@ import gg.essential.gui.common.onSetValueAndNow
 import gg.essential.gui.common.or
 import gg.essential.gui.common.shadow.ShadowIcon
 import gg.essential.gui.image.ImageFactory
-import gg.essential.gui.layoutdsl.*
-import gg.essential.gui.modals.NotAuthenticatedModal
-import gg.essential.gui.modals.TOSModal
-import gg.essential.gui.notification.Notifications
+import gg.essential.gui.layoutdsl.Modifier
+import gg.essential.gui.layoutdsl.fillHeight
+import gg.essential.gui.layoutdsl.fillWidth
+import gg.essential.gui.layoutdsl.layoutAsColumn
+import gg.essential.gui.layoutdsl.row
+import gg.essential.gui.modals.ensurePrerequisites
+import gg.essential.gui.overlay.Layer
 import gg.essential.gui.overlay.LayerPriority
 import gg.essential.gui.screenshot.ScreenshotOverlay.animating
 import gg.essential.gui.screenshot.components.ScreenshotBrowser
-import gg.essential.gui.screenshot.components.createShareScreenshotModal
+import gg.essential.gui.screenshot.components.shareScreenshotModal
 import gg.essential.gui.screenshot.constraints.AspectPreservingFillConstraint
 import gg.essential.gui.screenshot.toast.ScreenshotPreviewAction
 import gg.essential.gui.screenshot.toast.ScreenshotPreviewActionSlot
 import gg.essential.gui.util.hoveredState
-import gg.essential.gui.util.onAnimationFrame
 import gg.essential.universal.UResolution
 import gg.essential.universal.USound
-import gg.essential.util.*
+import gg.essential.util.GuiUtil
+import gg.essential.util.Multithreading
+import gg.essential.util.bindEssentialTooltip
+import gg.essential.util.centered
+import gg.essential.util.div
+import gg.essential.util.times
 import gg.essential.vigilance.utils.onLeftClick
 import java.awt.Color
 import java.io.File
-import java.util.function.Consumer
 
 object ScreenshotOverlay {
-    private val layer = GuiUtil.createPersistentLayer(LayerPriority.Notifications)
-    private val window: Window = layer.window
     var animating = true
+
+    fun pauseAll() {
+        animating = false
+    }
+
+    fun resumeAll() {
+        animating = true
+    }
+
+    /** see [Layer.rendered] */
+    private var rendered: Boolean = true
+        set(value) {
+            field = value
+            instance?.layer?.rendered = value
+        }
+
+    fun hide() {
+        rendered = false
+    }
+
+    fun show() {
+        rendered = true
+    }
+
+    internal var instance: ScreenshotOverlayInstance? = null
+    private fun instance(): ScreenshotOverlayInstance {
+        return instance ?: run {
+            val layer = GuiUtil.addLayer(LayerPriority.Notifications)
+            layer.rendered = rendered
+            layer.window.addUpdateFunc { _, _ ->
+                if (layer.window.children.isEmpty()) {
+                    GuiUtil.removeLayer(layer)
+                    instance = null
+                }
+            }
+            ScreenshotOverlayInstance(layer)
+        }.also { instance = it }
+    }
+
+    fun push(file: File) = instance().push(file)
+    fun hasActiveNotifications(): Boolean = instance?.layer?.window?.children?.isNotEmpty() ?: false
+    fun clearScreenshot(screenshotToast: ScreenshotToast) = instance?.clearScreenshot(screenshotToast)
+    fun delete(file: File) = instance?.delete(file)
+}
+
+internal class ScreenshotOverlayInstance(val layer: Layer) {
+    private val window = layer.window
 
     fun push(file: File) {
         pushToast(ScreenshotPreviewToast(file))
-    }
-
-    fun pushUpload(): Consumer<ScreenshotUploadToast.ToastProgress> {
-        val toast = ScreenshotUploadToast()
-
-        Notifications.push("", "") {
-            timerEnabled = toast.timerEnabled
-            withCustomComponent(Slot.LARGE_PREVIEW, toast)
-        }
-        return toast.createProgressConsumer()
     }
 
     private fun pushToast(toast: ScreenshotToast) {
@@ -97,26 +151,6 @@ object ScreenshotOverlay {
                 }
             }
         }
-    }
-
-    fun pauseAll() {
-        animating = false
-    }
-
-    fun resumeAll() {
-        animating = true
-    }
-
-    fun hide() {
-        layer.rendered = false
-    }
-
-    fun show() {
-        layer.rendered = true
-    }
-
-    fun hasActiveNotifications(): Boolean {
-        return window.children.size > 0
     }
 
     /**
@@ -163,7 +197,7 @@ open class ScreenshotToast : UIContainer() {
         // This issue becomes apparent if the screenshot above this one finishes
         // animating away while this one is animating away because both screenshots
         // were taken in quick succession.
-        onAnimationFrame {
+        addUpdateFunc { _, _ ->
             if (getLeft() == targetConstraint.getXPosition(this)) {
                 callback()
                 Window.of(this@ScreenshotToast).removeChild(this@ScreenshotToast)
@@ -195,7 +229,7 @@ class ScreenshotPreviewToast(val file: File) : ScreenshotToast() {
 
     private val screenshotId = LocalScreenshot(file.toPath())
     private val aspectRatio = BasicState(UResolution.scaledWidth / UResolution.scaledHeight.toFloat())
-    private var animationFramesRemaining = -1
+    private var timeMsRemaining = -1
     private val hovered = hoveredState()
     private val favoriteState = BasicState(false)
     private val favoriteIcon = favoriteState.map {
@@ -280,13 +314,7 @@ class ScreenshotPreviewToast(val file: File) : ScreenshotToast() {
             image.animate {
                 setColorAnimation(Animations.LINEAR, 0.5f, Color.WHITE.toConstraint())
             }
-            val time =
-                when (EssentialConfig.screenshotToastDuration) {
-                    1 -> 5
-                    2 -> 7
-                    else -> 3
-                }
-            animationFramesRemaining = Window.of(this@ScreenshotPreviewToast).animationFPS * time
+            timeMsRemaining = EssentialConfig.screenshotToastDuration.seconds * 1000
         })
     }
 
@@ -295,7 +323,7 @@ class ScreenshotPreviewToast(val file: File) : ScreenshotToast() {
             ScreenshotPreviewAction.COPY_PICTURE -> {
                 ManageAction("Copy Picture", EssentialPalette.COPY_9X).onLeftClick {
                     Multithreading.runAsync {
-                        Essential.getInstance().connectionManager.screenshotManager.copyScreenshotToClipboard(file)
+                        copyScreenshotToClipboard(file.toPath())
                     }
                 }
             }
@@ -308,19 +336,8 @@ class ScreenshotPreviewToast(val file: File) : ScreenshotToast() {
 
                     val upload: () -> Unit = { connectionManager.screenshotManager.uploadAndCopyLinkToClipboard(file.toPath()) }
 
-                    if (!OnboardingData.hasAcceptedTos()) {
-                        GuiUtil.pushModal { manager -> 
-                            TOSModal(
-                                manager,
-                                unprompted = false,
-                                requiresAuth = true,
-                                confirmAction = { upload() },
-                                cancelAction = {},
-                            )
-                        }
-                    } else if (!connectionManager.isAuthenticated) {
-                        GuiUtil.pushModal { NotAuthenticatedModal(it) { upload() } }
-                    } else {
+                    GuiUtil.launchModalFlow {
+                        ensurePrerequisites()
                         upload()
                     }
                 }
@@ -339,17 +356,12 @@ class ScreenshotPreviewToast(val file: File) : ScreenshotToast() {
                     imageColor.rebind(hovered.map { if (it) EssentialPalette.TEXT_RED else EssentialPalette.TEXT })
                 }.onLeftClick {
                     Essential.getInstance().connectionManager.screenshotManager.handleDelete(file, false)
-
-                    val screen = GuiUtil.openedScreen()
-                    if (screen is ScreenshotBrowser) {
-                        screen.externalDelete(setOf(file.toPath()))
-                    }
                 }
             }
 
             ScreenshotPreviewAction.SHARE -> {
                 ManageAction("Send to Friends", EssentialPalette.SOCIAL_10X).onLeftClick {
-                    GuiUtil.pushModal { createShareScreenshotModal(it, screenshotId) }
+                    GuiUtil.launchModalFlow { shareScreenshotModal(screenshotId) }
                 }
             }
 
@@ -433,126 +445,17 @@ class ScreenshotPreviewToast(val file: File) : ScreenshotToast() {
         ScreenshotOverlay.clearScreenshot(this)
     }
 
-    override fun animationFrame() {
-        if (animating && animationFramesRemaining > 0) {
-            animationFramesRemaining--
-            if (animationFramesRemaining == 0) {
+    init {
+        addUpdateFunc { _, dtMs -> update(dtMs) }
+    }
+
+    private fun update(dtMs: Int) {
+        if (animating && timeMsRemaining > 0) {
+            timeMsRemaining -= dtMs
+            if (timeMsRemaining <= 0) {
                 clear()
             }
         }
-        super.animationFrame()
     }
 
-}
-
-class ScreenshotUploadToast : UIContainer() {
-
-    private val maxCompletionDelayMillis = 500
-    private val startUploadMillis = System.currentTimeMillis()
-    private val initialProgress: ToastProgress = ToastProgress.Step(0)
-    private var targetProgress: ToastProgress = initialProgress
-    private var currentProgress: ToastProgress = targetProgress
-    val timerEnabled = BasicState(false)
-    private val stateText by UIText("Uploading...").constrain {
-        x = SiblingConstraint(6f)
-        y = CenterConstraint()
-        color = EssentialPalette.TEXT_HIGHLIGHT.toConstraint()
-    } childOf this
-
-    private val progressContainer by UIContainer().constrain {
-        x = SiblingConstraint(4f)
-        y = CenterConstraint()
-        width = FillConstraint(useSiblings = false) - 1.pixel
-        height = 9.pixels
-    } childOf this effect OutlineEffect(EssentialPalette.TEXT_HIGHLIGHT, 1f)
-
-    private val progressBlock by UIBlock(EssentialPalette.TEXT_HIGHLIGHT).constrain {
-        width = 0.pixels
-        height = 100.percent
-    } childOf progressContainer
-
-    init {
-        constrain {
-            width = 100.percent
-            height =
-                ChildBasedMaxSizeConstraint() + 2.pixels // so that the outline is not scissored out of existence by the notification
-        }
-    }
-
-    override fun animationFrame() {
-        super.animationFrame()
-        updateProgress()
-    }
-
-    private fun updateProgress() {
-        val targetProgress = targetProgress
-        if (currentProgress != targetProgress) {
-            val previousProgress = currentProgress
-            currentProgress = targetProgress
-
-            // If we went straight to complete, skip the upload bar and just show the result
-            if (targetProgress is ToastProgress.Complete && previousProgress == initialProgress) {
-                fireComplete(targetProgress)
-                return
-            }
-
-            val targetPercent = if (targetProgress is ToastProgress.Step) {
-                targetProgress.completionPercent
-            } else {
-                100
-            }
-            progressBlock.animate {
-                setWidthAnimation(Animations.LINEAR, 0.5f, targetPercent.pixels)
-                onComplete {
-                    if (targetProgress is ToastProgress.Complete) {
-                        // If we were successful, and it's been under maxCompletionDelayMillis, use some delay for dramatic effect.
-                        val timeElapsedMillis = System.currentTimeMillis() - startUploadMillis
-                        val delayMillis = maxCompletionDelayMillis - timeElapsedMillis
-                        if (targetProgress.success && delayMillis > 0) {
-                            delay(delayMillis) { fireComplete(targetProgress) }
-                        } else {
-                            fireComplete(targetProgress)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fun createProgressConsumer(): Consumer<ToastProgress> {
-        return Consumer<ToastProgress> { t ->
-            Window.enqueueRenderOperation {
-                targetProgress = t
-            }
-        }
-    }
-
-    private fun fireComplete(status: ToastProgress.Complete) {
-        val action = {
-            timerEnabled.set(true)
-            removeChild(progressContainer)
-            stateText.setText(status.message)
-            this.insertChildAt(
-                ShadowIcon(
-                    if (status.success) {
-                        EssentialPalette.CHECKMARK_7X5
-                    } else {
-                        EssentialPalette.CANCEL_5X
-                    }, true
-                ).rebindPrimaryColor(BasicState(EssentialPalette.TEXT_HIGHLIGHT))
-                    .rebindShadowColor(BasicState(EssentialPalette.MODAL_OUTLINE)).constrain {
-                        y = CenterConstraint()
-                    }, 0
-            )
-            USound.playLevelupSound()
-        }
-        action()
-    }
-
-    sealed class ToastProgress {
-
-        data class Complete(val message: String, val success: Boolean) : ToastProgress()
-
-        data class Step(val completionPercent: Int) : ToastProgress()
-    }
 }

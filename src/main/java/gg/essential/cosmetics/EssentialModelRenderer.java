@@ -11,6 +11,8 @@
  */
 package gg.essential.cosmetics;
 
+import gg.essential.config.EssentialConfig;
+import gg.essential.mixins.impl.client.gui.GuiInventoryExt;
 import gg.essential.model.EnumPart;
 import gg.essential.model.ModelInstance;
 import gg.essential.model.backend.PlayerPose;
@@ -31,6 +33,10 @@ import java.util.*;
 import static gg.essential.cosmetics.EssentialModelRendererKt.flush;
 import static gg.essential.cosmetics.EssentialModelRendererKt.renderForHoverOutline;
 import static gg.essential.util.ExtensionsKt.toCommon;
+
+//#if MC>=12109
+//$$ import net.minecraft.client.render.command.OrderedRenderCommandQueue;
+//#endif
 
 //#if MC>=12102
 //$$ import gg.essential.mixins.impl.client.model.PlayerEntityRenderStateExt;
@@ -55,10 +61,6 @@ import static gg.essential.model.backend.minecraft.LegacyCameraPositioningKt.get
 public class EssentialModelRenderer implements LayerRenderer<AbstractClientPlayer> {
 //#endif
 
-    /**
-     * Flag to skip cosmetic rendering
-     */
-    public static boolean suppressCosmeticRendering = false;
     private final RenderPlayer playerRenderer;
 
     public EssentialModelRenderer(RenderPlayer playerRenderer) {
@@ -69,7 +71,8 @@ public class EssentialModelRenderer implements LayerRenderer<AbstractClientPlaye
     }
 
     public static boolean shouldRender(AbstractClientPlayer player) {
-        if (suppressCosmeticRendering) {
+        if (GuiInventoryExt.isInventoryEntityRendering.getUntracked()
+                && EssentialConfig.INSTANCE.getDisableCosmeticsInInventory()) {
             return false;
         }
 
@@ -78,9 +81,16 @@ public class EssentialModelRenderer implements LayerRenderer<AbstractClientPlaye
 
     public void render(
         UMatrixStack matrixStack,
+        //#if MC>=12109
+        //$$ RenderBackend.CommandQueue queue,
+        //$$ @Nullable PlayerEntityRenderState playerState, // may be null when angles are already applied or not required
+        //#else
         RenderBackend.VertexConsumerProvider vertexConsumerProvider,
+        @Nullable Object playerState, // always null, exists for symmetry with 1.21.9+
+        //#endif
         @NotNull CosmeticsRenderState cState,
-        @Nullable Set<EnumPart> parts
+        @Nullable Set<EnumPart> parts,
+        boolean setsPose
     ) {
         WearablesManager wearablesManager = cState.wearablesManager();
         if (wearablesManager == null) {
@@ -91,7 +101,16 @@ public class EssentialModelRenderer implements LayerRenderer<AbstractClientPlaye
             return;
         }
 
-        PlayerPose pose = PlayerPoseKt.toPose(playerRenderer);
+        //#if MC>=12109
+        //$$ if (playerState != null) {
+        //$$     playerRenderer.getModel().setAngles(playerState);
+        //$$ }
+        //#endif
+        PlayerPose pose = PlayerPoseKt.toPose(
+            playerRenderer,
+            wearablesManager.getState().getUsesCapePose(),
+            wearablesManager.getState().getUsesElytraPose()
+        );
         RenderBackend.Texture skin = new MinecraftRenderBackend.SkinTexture(cState.skinTexture());
 
         matrixStack.push();
@@ -110,8 +129,8 @@ public class EssentialModelRenderer implements LayerRenderer<AbstractClientPlaye
         //#endif
 
         //#if MC<11400
-        if (cState.isSneaking() && parts == null) {
-            matrixStack.translate(0.0F, 0.2F, 0.0F); // from LayerCustomHead
+        if (cState.isSneaking() && parts == null && !pose.getChild()) {
+            matrixStack.translate(0.0F, 0.2F, 0.0F); // from ModelPlayer.render
         }
         //#endif
 
@@ -119,14 +138,27 @@ public class EssentialModelRenderer implements LayerRenderer<AbstractClientPlaye
             parts = new HashSet<>(Arrays.asList(EnumPart.values()));
         }
 
-        matrixStack.translate(0.0F, 1.501f, 0.0F); // undo RenderLivingBase.prepareScale
+        // MC renders with y = 0 at the head, we have it at the feet
+        // (un-does the 1.5 part of the 1.501 in RenderLivingBase.prepareScale)
+        matrixStack.translate(0.0F, 1.5f, 0.0F);
 
         //#if MC<11700
         GlStateManager.enableRescaleNormal();
         //#endif
 
-        wearablesManager.render(toCommon(matrixStack), vertexConsumerProvider, pose, skin, parts);
+        //#if MC>=12109
+        //$$ wearablesManager.render(toCommon(matrixStack), queue, pose, skin, parts);
+        //#else
+        MinecraftRenderBackend.CommandQueue queue = new MinecraftRenderBackend.CommandQueue();
+        wearablesManager.render(toCommon(matrixStack), queue, pose, skin, parts);
+        queue.render(vertexConsumerProvider);
+        //#endif
+
+        //#if MC>=12109
+        //$$ // Hover outline with vanilla renderer is no longer supported, UI3DPlayer.FallbackPlayer is always used
+        //#else
         renderForHoverOutline(wearablesManager, toCommon(matrixStack), vertexConsumerProvider, pose, skin, parts);
+        //#endif
 
         //#if MC<11700
         flush(vertexConsumerProvider);
@@ -138,10 +170,18 @@ public class EssentialModelRenderer implements LayerRenderer<AbstractClientPlaye
         UGraphics.GL.popMatrix();
         //#endif
 
-        cState.setRenderedPose(pose);
+        if (setsPose) cState.setRenderedPose(pose);
     }
 
     @Override
+    //#if MC>=12109
+    //$$ public void render(MatrixStack matrices, OrderedRenderCommandQueue queue, int light, PlayerEntityRenderState state, float limbAngle, float limbDistance) {
+    //$$     CosmeticsRenderState cState = ((PlayerEntityRenderStateExt) state).essential$getCosmetics();
+    //$$     UMatrixStack uMatrixStack = new UMatrixStack(matrices);
+    //$$     RenderBackend.CommandQueue uQueue = new MinecraftRenderBackend.MinecraftCommandQueue(queue, light);
+    //$$     render(uMatrixStack, uQueue, state, cState, null, true);
+    //$$ }
+    //#else
     //#if MC>=11400
     //#if MC>=12102
     //$$ public void render(MatrixStack vMatrixStack, VertexConsumerProvider buffer, int light, PlayerEntityRenderState state, float limbAngle, float limbDistance) {
@@ -158,8 +198,9 @@ public class EssentialModelRenderer implements LayerRenderer<AbstractClientPlaye
         RenderBackend.VertexConsumerProvider vertexConsumerProvider = new MinecraftRenderBackend.VertexConsumerProvider();
         CosmeticsRenderState cState = new CosmeticsRenderState.Live(player);
         //#endif
-        render(matrixStack, vertexConsumerProvider, cState, null);
+        render(matrixStack, vertexConsumerProvider, null, cState, null, true);
     }
+    //#endif
 
     //#if MC < 11400
     @Override

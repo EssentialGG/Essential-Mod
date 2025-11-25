@@ -12,17 +12,26 @@
 package gg.essential.mixins.transformers.client.resources;
 
 import com.mojang.authlib.minecraft.MinecraftProfileTexture;
-import net.minecraft.util.Identifier;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 import org.spongepowered.asm.mixin.gen.Invoker;
 
 import java.util.concurrent.CompletableFuture;
 
+//#if MC>=12109
+//$$ import net.minecraft.util.AssetInfo;
+//#else
+import net.minecraft.util.Identifier;
+//#endif
+
 @Mixin(targets = "net.minecraft.client.texture.PlayerSkinProvider$FileCache")
 public interface SkinProviderFileCacheAccessor {
     @Accessor
     MinecraftProfileTexture.Type getType();
     @Invoker
+    //#if MC>=12109
+    //$$ CompletableFuture<AssetInfo.TextureAsset> invokeGet(MinecraftProfileTexture texture);
+    //#else
     CompletableFuture<Identifier> invokeGet(MinecraftProfileTexture texture);
+    //#endif
 }

@@ -19,10 +19,10 @@ import gg.essential.api.commands.SubCommand
 import gg.essential.commands.engine.EssentialFriend
 import gg.essential.commands.engine.EssentialUser
 import gg.essential.handlers.PauseMenuDisplay
-import gg.essential.network.connectionmanager.sps.SPSManager
 import gg.essential.network.connectionmanager.sps.SPSSessionSource
 import gg.essential.universal.ChatColor
 import gg.essential.universal.UMinecraft
+import gg.essential.upnp.model.UPnPSession
 import gg.essential.util.*
 import kotlinx.coroutines.future.await
 import net.minecraft.client.Minecraft
@@ -32,37 +32,33 @@ import java.util.*
 
 abstract class CommandOpBase(name: String) : Command(name) {
 
+    val spsManager = Essential.getInstance().connectionManager.spsManager
+
     @DefaultHandler
-    fun handle(@DisplayName("player") user: EssentialUser) {
-        val spsManager = Essential.getInstance().connectionManager.spsManager
-
-        user.username.thenAcceptOnMainThread { username ->
-
-            if (!spsManager.isAllowCheats) {
-                MinecraftUtils.sendMessage("Cheats must be enabled to use the op command.")
-                return@thenAcceptOnMainThread
-            }
-
-            if (user.uuid !in spsManager.invitedUsers) {
-                if (this is CommandOp) {
-                    MinecraftUtils.sendMessage("Cannot op $username because they are not invited to your world")
-                } else {
-                    MinecraftUtils.sendMessage("Cannot deop $username because they are not invited to your world")
-                }
-                return@thenAcceptOnMainThread
-            }
-
-            apply(user.uuid, username, spsManager)
+    suspend fun handle(@DisplayName("player") user: EssentialUser) {
+        if (!spsManager.isAllowCheats) {
+            MinecraftUtils.sendMessage("Cheats must be enabled to use the op command.")
+            return
         }
+
+        if (user.uuid !in spsManager.invitedUsers) {
+            if (this is CommandOp) {
+                MinecraftUtils.sendMessage("Cannot op ${user.name} because they are not invited to your world")
+            } else {
+                MinecraftUtils.sendMessage("Cannot deop ${user.name} because they are not invited to your world")
+            }
+            return
+        }
+
+        apply(user.uuid, user.name)
     }
 
-    abstract fun apply(uuid: UUID, username: String, spsManager: SPSManager)
+    abstract suspend fun apply(uuid: UUID, username: String)
 }
 
 object CommandDeOp : CommandOpBase("deop") {
 
-    override fun apply(uuid: UUID, username: String, spsManager: SPSManager) {
-
+    override suspend fun apply(uuid: UUID, username: String) {
         if (uuid in spsManager.oppedPlayers) {
             spsManager.updateOppedPlayers(spsManager.oppedPlayers - uuid)
             MinecraftUtils.sendMessage("Removed op from $username.")
@@ -74,7 +70,7 @@ object CommandDeOp : CommandOpBase("deop") {
 
 object CommandOp : CommandOpBase("op") {
 
-    override fun apply(uuid: UUID, username: String, spsManager: SPSManager) {
+    override suspend fun apply(uuid: UUID, username: String) {
         if (uuid in spsManager.oppedPlayers) {
             MinecraftUtils.sendMessage("$username is already opped.")
         } else {
@@ -87,7 +83,7 @@ object CommandOp : CommandOpBase("op") {
 object CommandInvite : Command("einvite") {
 
     @DefaultHandler
-    fun handle(@DisplayName("friend") friend: EssentialFriend) {
+    suspend fun handle(@DisplayName("friend") friend: EssentialFriend) {
 
         if (friend.uuid == UUIDUtil.getClientUUID()) {
             MinecraftUtils.sendMessage("You cannot invite yourself.")
@@ -96,7 +92,6 @@ object CommandInvite : Command("einvite") {
 
         val username = friend.ign
         val connectionManager = Essential.getInstance().connectionManager
-        val spsManager = connectionManager.spsManager
         val socialManager = connectionManager.socialManager
         val uuid = friend.uuid
         val serverType = ServerType.current()
@@ -116,6 +111,8 @@ object CommandInvite : Command("einvite") {
             return
         }
 
+        val spsManager = connectionManager.spsManager
+
         if (uuid in spsManager.invitedUsers) {
             MinecraftUtils.sendMessage("$username is already invited to your world.")
             return
@@ -126,20 +123,17 @@ object CommandInvite : Command("einvite") {
     }
 
     @SubCommand("cancel", description = "Cancel invite to player")
-    fun handleCancelInvite(@DisplayName("friend") friend: EssentialUser) {
+    suspend fun handleCancelInvite(@DisplayName("friend") friend: EssentialUser) {
         if (friend.uuid == UUIDUtil.getClientUUID()) {
             MinecraftUtils.sendMessage("You cannot remove an invite from yourself.")
             return
         }
-        friend.username.thenAcceptOnMainThread { username ->
-            cancelInviteAndKick(friend.uuid, username, false)
-        }
+        cancelInviteAndKick(friend.uuid, friend.name, false)
     }
 }
 
-private fun cancelInviteAndKick(uuid: UUID, username: String, kick: Boolean) {
+private suspend fun cancelInviteAndKick(uuid: UUID, username: String, kick: Boolean) {
     val connectionManager = Essential.getInstance().connectionManager
-    val spsManager = connectionManager.spsManager
     val serverType = ServerType.current()
 
     if (serverType !is ServerType.SPS.Host) {
@@ -160,6 +154,8 @@ private fun cancelInviteAndKick(uuid: UUID, username: String, kick: Boolean) {
         return
     }
 
+    val spsManager = connectionManager.spsManager
+
     if (uuid !in spsManager.invitedUsers) {
         MinecraftUtils.sendMessage("$username is not invited to your world.")
         return
@@ -177,22 +173,19 @@ private fun cancelInviteAndKick(uuid: UUID, username: String, kick: Boolean) {
 object CommandKick : Command("kick") {
 
     @DefaultHandler
-    fun handle(@DisplayName("player") player: EssentialUser) {
+    suspend fun handle(@DisplayName("player") player: EssentialUser) {
         if (player.uuid == UUIDUtil.getClientUUID()) {
             MinecraftUtils.sendMessage("You cannot kick yourself.")
             return
         }
 
-        player.username.thenAcceptOnMainThread { username ->
-            cancelInviteAndKick(player.uuid, username, true)
-        }
+        cancelInviteAndKick(player.uuid, player.name, true)
     }
 }
 
 object CommandSession : Command("esession") {
 
     private val connectionManager = Essential.getInstance().connectionManager
-    private val spsManager = connectionManager.spsManager
     private val socialManager = connectionManager.socialManager
 
     @SubCommand("open", description = "Start a world share session")
@@ -208,7 +201,10 @@ object CommandSession : Command("esession") {
     fun handleClose() {
         val currentServerData = UMinecraft.getMinecraft().currentServerData
 
+        val spsManager = connectionManager.spsManager
+
         when {
+
             // Hosting a single player world
             Minecraft.getMinecraft().isIntegratedServerRunning && spsManager.localSession != null -> {
                 spsManager.closeLocalSession()
@@ -229,23 +225,32 @@ object CommandSession : Command("esession") {
 
     @SubCommand("info", description = "Info about your world share session")
     suspend fun handleInfo() {
-        val localSession = spsManager.localSession
+
+        val localSession = connectionManager.spsManager.localSession
         if (localSession == null) {
-            val currentServerData = UMinecraft.getMinecraft().currentServerData
-            if (currentServerData != null) {
-                val invitesOnServer = socialManager.getInvitesOnServer(currentServerData.serverIP)
-                if (invitesOnServer.isNotEmpty()) {
-                    MinecraftUtils.sendMessage("Invited Players: ")
-                    invitesOnServer.forEach {
-                        MinecraftUtils.sendMessage(" - ${UUIDUtil.getName(it).await()}")
-                    }
-                    return
-                }
-            }
-            MinecraftUtils.sendMessage("No session running")
+            handleInfoNoSps()
             return
         }
+        handleInfoSpsOld(localSession)
+    }
 
+    suspend fun handleInfoNoSps() {
+        val currentServerData = UMinecraft.getMinecraft().currentServerData
+        if (currentServerData != null) {
+            val invitesOnServer = socialManager.getInvitesOnServer(currentServerData.serverIP)
+            if (invitesOnServer.isNotEmpty()) {
+                MinecraftUtils.sendMessage("Invited Players: ")
+                invitesOnServer.forEach {
+                    MinecraftUtils.sendMessage(" - ${UUIDUtil.getName(it).await()}")
+                }
+                return
+            }
+        }
+        MinecraftUtils.sendMessage("No session running")
+    }
+
+    suspend fun handleInfoSpsOld(localSession: UPnPSession) {
+        val spsManager = connectionManager.spsManager
         MinecraftUtils.sendMessage("Privacy setting: ${localSession.privacy}")
         MinecraftUtils.sendMessage("Cheats for all: ${spsManager.isAllowCheats}")
         MinecraftUtils.sendMessage("Default gamemode: ${spsManager.currentGameMode}")

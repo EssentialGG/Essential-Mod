@@ -23,8 +23,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(GuiScreen.class)
 public class Mixin_GuiMouseReleaseEvent {
     @Inject(method = "mouseReleased", at = @At("HEAD"))
-    private void onMouseReleased(int mouseX, int mouseY, int state, CallbackInfo info) {
-        Essential.EVENT_BUS.post(new GuiMouseReleaseEvent(getScreen()));
+    private void onMouseReleased(int mouseX, int mouseY, int button, CallbackInfo info) {
+        Essential.EVENT_BUS.post(new GuiMouseReleaseEvent(getScreen(), button));
     }
 
     @Unique

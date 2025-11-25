@@ -18,65 +18,27 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
-import java.io.File;
-import java.net.Proxy;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-//#if MC>=11900
-//$$ import net.minecraft.util.ApiServices;
-//#endif
-
-//#if MC>=11802
-//$$ import net.minecraft.server.SaveLoader;
-//#endif
-
 //#if MC>=11400
-//$$ import net.minecraft.resources.DataPackRegistries;
-//$$ import net.minecraft.resources.ResourcePackList;
-//$$ import net.minecraft.util.registry.DynamicRegistries;
-//$$ import net.minecraft.world.chunk.listener.IChunkStatusListenerFactory;
-//$$ import net.minecraft.world.storage.IServerConfiguration;
-//$$ import net.minecraft.world.storage.SaveFormat;
 //$$ import org.spongepowered.asm.mixin.Unique;
-//#endif
-
-//#if MC>=11202
-//#if MC<11900
-import com.mojang.authlib.GameProfileRepository;
-import com.mojang.authlib.minecraft.MinecraftSessionService;
-//#if MC < 11400
-import com.mojang.authlib.yggdrasil.YggdrasilAuthenticationService;
-//#endif
-import net.minecraft.server.management.PlayerProfileCache;
-//#endif
-import net.minecraft.util.datafix.DataFixer;
 //#endif
 
 @Mixin(IntegratedServer.class)
 public abstract class MixinIntegratedServer extends MinecraftServer {
     //#if MC>=11900
-    //$$ public MixinIntegratedServer(Thread serverThread, LevelStorage.Session session, ResourcePackManager dataPackManager, SaveLoader saveLoader, Proxy proxy, DataFixer dataFixer, ApiServices apiServices, WorldGenerationProgressListenerFactory worldGenerationProgressListenerFactory) {
-    //$$     super(serverThread, session, dataPackManager, saveLoader, proxy, dataFixer, apiServices, worldGenerationProgressListenerFactory);
-    //$$ }
+    //$$ public MixinIntegratedServer() { super(null, null, null, null, null, null, null, null); }
     //#elseif MC>=11802
-    //$$ public MixinIntegratedServer(Thread serverThread, LevelStorage.Session session, ResourcePackManager dataPackManager, SaveLoader saveLoader, Proxy proxy, DataFixer dataFixer, MinecraftSessionService sessionService, GameProfileRepository gameProfileRepo, UserCache userCache, WorldGenerationProgressListenerFactory worldGenerationProgressListenerFactory) {
-    //$$     super(serverThread, session, dataPackManager, saveLoader, proxy, dataFixer, sessionService, gameProfileRepo, userCache, worldGenerationProgressListenerFactory);
-    //$$ }
+    //$$ public MixinIntegratedServer() { super(null, null, null, null, null, null, null, null, null, null); }
     //#elseif MC>=11400
-    //$$ public MixinIntegratedServer(Thread serverThread, DynamicRegistries.Impl p_i232576_2_, SaveFormat.LevelSave anvilConverterForAnvilFile, IServerConfiguration p_i232576_4_, ResourcePackList dataPacks, Proxy serverProxy, DataFixer dataFixer, DataPackRegistries dataRegistries, MinecraftSessionService sessionService, GameProfileRepository profileRepo, PlayerProfileCache profileCache, IChunkStatusListenerFactory chunkStatusListenerFactory) {
-    //$$     super(serverThread, p_i232576_2_, anvilConverterForAnvilFile, p_i232576_4_, dataPacks, serverProxy, dataFixer, dataRegistries, sessionService, profileRepo, profileCache, chunkStatusListenerFactory);
-    //$$ }
+    //$$ public MixinIntegratedServer() { super(null, null, null, null, null, null, null, null, null, null, null, null); }
     //#elseif MC>=11202
-    public MixinIntegratedServer(File anvilFileIn, Proxy proxyIn, DataFixer dataFixerIn, YggdrasilAuthenticationService authServiceIn, MinecraftSessionService sessionServiceIn, GameProfileRepository profileRepoIn, PlayerProfileCache profileCacheIn) {
-        super(anvilFileIn, proxyIn, dataFixerIn, authServiceIn, sessionServiceIn, profileRepoIn, profileCacheIn);
-    }
+    public MixinIntegratedServer() { super(null, null, null, null, null, null, null); }
     //#else
-    //$$ public MixinIntegratedServer(Proxy proxy, File workDir) {
-    //$$     super(proxy, workDir);
-    //$$ }
+    //$$ public MixinIntegratedServer() { super(null, null); }
     //#endif
 
     // There is a race condition in vanilla where it waits for a task which it submitted to the server to be finished,

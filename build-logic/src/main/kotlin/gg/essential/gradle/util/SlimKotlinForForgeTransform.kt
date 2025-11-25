@@ -37,6 +37,9 @@ abstract class SlimKotlinForForgeTransform : TransformAction<TransformParameters
                     while (true) {
                         val entry = zipIn.nextEntry ?: break
                         if (!(entry.name.startsWith("kotlin/") || entry.name.startsWith("kotlinx/")
+                                // Also need to remove Kotlin's service files, latest NeoForge versions will verify
+                                // that the implementation classes exist and fail because we removed them
+                                || entry.name.startsWith("META-INF/services/kotlin.")
                                 // Also need to delete the coroutines version file, so that lib gets overwritten as well
                                 || entry.name == "META-INF/kotlinx_coroutines_core.version")) {
                             zipOut.putNextEntry(entry)

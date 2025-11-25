@@ -29,6 +29,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+//#if MC>=12109
+//$$ import com.llamalad7.mixinextras.sugar.Local;
+//$$ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+//#endif
+
 //#if MC>=11600
 //$$ import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 //$$ import net.minecraft.client.Minecraft;
@@ -77,7 +82,18 @@ public class Mixin_SelectionListDividers_ServerSelectionList
         //$$ super(null, 0, 0, 0, 0, 0);
         //#endif
     //$$ }
-    //$$
+    //#endif
+
+    //#if MC>=12109
+    //$$ @Inject(method = "updateEntries", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screen/multiplayer/MultiplayerServerListWidget;replaceEntries(Ljava/util/Collection;)V"))
+    //$$ public void modifyListEntries(CallbackInfo ci, @Local List<MultiplayerServerListWidget.Entry> entries) {
+    //$$     if (!essential$dividers.isEmpty()) {
+    //$$         for (Map.Entry<Integer, DividerServerListEntry> entry : essential$dividers.entrySet()) {
+    //$$             entries.add(entry.getKey(), entry.getValue());
+    //$$         }
+    //$$     }
+    //$$ }
+    //#elseif MC>=11600
     //$$ @Inject(method = "setList", at = @At(value = "INVOKE", target = "Ljava/util/List;forEach(Ljava/util/function/Consumer;)V", ordinal = 0), cancellable = true)
     //$$ public void modifyListEntries(CallbackInfo ci) {
     //$$     if (!essential$dividers.isEmpty()) {
@@ -90,7 +106,6 @@ public class Mixin_SelectionListDividers_ServerSelectionList
     //$$     }
     //$$ }
     //#else
-
     @Inject(method = "getListEntry", at = @At("HEAD"), cancellable = true)
     private void modifyListEntries(int index, CallbackInfoReturnable<GuiListExtended.IGuiListEntry> cir) {
         if (!essential$dividers.isEmpty()) {

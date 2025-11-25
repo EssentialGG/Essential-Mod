@@ -11,25 +11,42 @@
  */
 package gg.essential.gui.modals
 
+import gg.essential.config.EssentialConfig
 import gg.essential.elementa.components.Window
 import gg.essential.elementa.constraints.SiblingConstraint
 import gg.essential.elementa.dsl.pixels
 import gg.essential.elementa.state.BasicState
 import gg.essential.gui.EssentialPalette
-import gg.essential.gui.common.MenuButton
+import gg.essential.gui.common.EssentialTooltip
+import gg.essential.gui.common.OutlineButtonStyle
 import gg.essential.gui.common.compactFullEssentialToggle
 import gg.essential.gui.common.modal.ConfirmDenyModal
 import gg.essential.gui.common.modal.configure
-import gg.essential.gui.common.state
-import gg.essential.gui.elementa.state.v2.mutableStateOf
+import gg.essential.gui.elementa.state.v2.stateOf
 import gg.essential.gui.elementa.state.v2.toV1
-import gg.essential.gui.layoutdsl.*
+import gg.essential.gui.layoutdsl.Arrangement
+import gg.essential.gui.layoutdsl.BasicYModifier
+import gg.essential.gui.layoutdsl.Modifier
+import gg.essential.gui.layoutdsl.box
+import gg.essential.gui.layoutdsl.childBasedHeight
+import gg.essential.gui.layoutdsl.childBasedWidth
+import gg.essential.gui.layoutdsl.color
+import gg.essential.gui.layoutdsl.column
+import gg.essential.gui.layoutdsl.hoverScope
+import gg.essential.gui.layoutdsl.inheritHoverScope
+import gg.essential.gui.layoutdsl.layoutAsBox
+import gg.essential.gui.layoutdsl.onLeftClick
+import gg.essential.gui.layoutdsl.row
+import gg.essential.gui.layoutdsl.shadow
+import gg.essential.gui.layoutdsl.spacer
+import gg.essential.gui.layoutdsl.text
 import gg.essential.gui.notification.Notifications
+import gg.essential.gui.overlay.ModalFlow
 import gg.essential.gui.overlay.ModalManager
 import gg.essential.universal.USound
 import gg.essential.util.AutoUpdate
 import gg.essential.util.MinecraftUtils.shutdown
-import gg.essential.vigilance.utils.onLeftClick
+import gg.essential.util.bindHoverEssentialTooltip
 import java.awt.Color
 
 class UpdateAvailableModal(modalManager: ModalManager) : ConfirmDenyModal(modalManager, false) {
@@ -40,32 +57,32 @@ class UpdateAvailableModal(modalManager: ModalManager) : ConfirmDenyModal(modalM
         titleText = AutoUpdate.getNotificationTitle()
         contentTextColor = EssentialPalette.TEXT
         primaryButtonText = "Update"
-        primaryButtonStyle = MenuButton.GREEN
-        primaryButtonHoverStyle = MenuButton.LIGHT_GREEN
+        primaryButtonStyle = OutlineButtonStyle.GREEN.defaultStyle
+        primaryButtonHoverStyle = OutlineButtonStyle.GREEN.hoveredStyle
         contentTextSpacingState.rebind(BasicState(17f))
 
         if (AutoUpdate.requiresUpdate()) {
             titleTextColor = EssentialPalette.MODAL_WARNING
         }
 
-        val autoUpdate = mutableStateOf(AutoUpdate.autoUpdate.get())
+        val autoUpdate = EssentialConfig.autoUpdateState
 
         customContent.layoutAsBox(BasicYModifier { SiblingConstraint(15f) }) {
             column {
                 row(
-                    Modifier.childBasedWidth(3f).onLeftClick {
+                    Modifier.childBasedWidth(3f).hoverScope().onLeftClick {
                         USound.playButtonPress()
                         autoUpdate.set { !it }
                     },
                     Arrangement.spacedBy(9f),
                 ) {
                     text("Auto-updates", Modifier.color(EssentialPalette.TEXT_DISABLED).shadow(Color.BLACK))
-                    box(Modifier.childBasedHeight(3f).hoverScope()) {
+                    box(Modifier.childBasedHeight()) {
                         compactFullEssentialToggle(
-                            autoUpdate.toV1(this@UpdateAvailableModal),
-                            offColor = EssentialPalette.TEXT_DISABLED.state()
+                            autoUpdate,
+                            Modifier.inheritHoverScope(),
+                            offColor = EssentialPalette.TEXT_DISABLED,
                         )
-                        spacer(1f, 1f)
                     }
                 }
 
@@ -75,19 +92,20 @@ class UpdateAvailableModal(modalManager: ModalManager) : ConfirmDenyModal(modalM
 
         spacer.setHeight(0.pixels)
 
-        AutoUpdate.changelog.whenCompleteAsync({ changelog, _ ->
-            changelog?.let { contentText = it }
-        }, Window::enqueueRenderOperation)
+        if(AutoUpdate.changelog.isDone) {
+            AutoUpdate.changelog.join()?.let {
+                contentText = it
+            }
+        } else {
+            AutoUpdate.changelog.whenCompleteAsync({ changelog, _ ->
+                changelog?.let { contentText = it }
+            }, Window::enqueueRenderOperation)
+        }
 
         onPrimaryAction {
             AutoUpdate.update(autoUpdate.get())
 
-            replaceWith(ConfirmDenyModal(modalManager, true).configure {
-                contentText = "Essential will update the next time\nyou launch the game."
-                primaryButtonText = "Okay"
-                cancelButtonText = "Quit & Update"
-                cancelButton.setTooltip("This will close your game!")
-            }.onCancel {
+            replaceWith(EssentialRebootUpdateModal(modalManager).onCancel {
                 shutdown()
             }.onPrimaryAction {
                 Notifications.push("Update Confirmed", "Essential will update next time you launch the game!")
@@ -98,15 +116,37 @@ class UpdateAvailableModal(modalManager: ModalManager) : ConfirmDenyModal(modalM
     }
 }
 
+class EssentialRebootUpdateModal(modalManager: ModalManager) : ConfirmDenyModal(modalManager, true) {
+    init {
+        configure {
+            contentText = "Essential will update the next time\nyou launch the game."
+            primaryButtonText = "Okay"
+            cancelButtonText = "Quit & Update"
+            cancelButton.bindHoverEssentialTooltip(
+                stateOf("This will close your game!").toV1(this),
+                EssentialTooltip.Position.ABOVE,
+                4f,
+            )
+        }
+    }
+}
+
 class UpdateRequiredModal(modalManager: ModalManager) : ConfirmDenyModal(modalManager, false) {
 
     init {
         contentText = "Sorry, you are on an outdated version of Essential. Restart your game to update."
         primaryButtonText = "Quit & Update"
-        primaryButtonStyle = MenuButton.DARK_GRAY
-        primaryButtonHoverStyle = MenuButton.GRAY
-        primaryActionButton.setTooltip("This will close your game!")
-
+        primaryButtonStyle = OutlineButtonStyle.GRAY.defaultStyle
+        primaryButtonHoverStyle = OutlineButtonStyle.GRAY.hoveredStyle
+        primaryActionButton.bindHoverEssentialTooltip(
+            stateOf("This will close your game!").toV1(this),
+            EssentialTooltip.Position.ABOVE,
+            4f,
+        )
         onPrimaryAction { shutdown() }
     }
+}
+
+suspend fun ModalFlow.updateRequiredModal() {
+    awaitModal<Unit> { UpdateRequiredModal(modalManager) }
 }

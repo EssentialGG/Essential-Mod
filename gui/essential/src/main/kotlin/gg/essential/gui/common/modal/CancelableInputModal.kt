@@ -71,7 +71,7 @@ open class CancelableInputModal(
         }
 
         inputContainer.layoutAsBox {
-            essentialInput(input, errorMessageState)
+            essentialInput(input, errorMessageState = errorMessageState, modifier = Modifier.shadow(EssentialPalette.BLACK))
         }
 
         // Top padding

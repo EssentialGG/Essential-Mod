@@ -54,6 +54,7 @@ class TextRenderTypeVertexConsumer(private val vertexConsumer: UVertexConsumer, 
         //#else
         @JvmStatic
         fun create(buffer: UGraphics): TextRenderTypeVertexConsumer {
+            @Suppress("DEPRECATION")
             buffer.beginWithDefaultShader(UGraphics.DrawMode.QUADS, UGraphics.CommonVertexFormats.POSITION_COLOR)
             return TextRenderTypeVertexConsumer(buffer.asUVertexConsumer(), false)
         }
@@ -61,6 +62,7 @@ class TextRenderTypeVertexConsumer(private val vertexConsumer: UVertexConsumer, 
         @JvmStatic
         fun createWithTexture(buffer: UGraphics, texture: ResourceLocation): TextRenderTypeVertexConsumer {
             UGraphics.bindTexture(0, texture)
+            @Suppress("DEPRECATION")
             buffer.beginWithDefaultShader(UGraphics.DrawMode.QUADS, UGraphics.CommonVertexFormats.POSITION_COLOR_TEXTURE_LIGHT)
             return TextRenderTypeVertexConsumer(buffer.asUVertexConsumer(), true)
         }

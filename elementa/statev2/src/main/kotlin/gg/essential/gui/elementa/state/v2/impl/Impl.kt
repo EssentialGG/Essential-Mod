@@ -25,6 +25,7 @@ internal interface Impl {
     fun <T> memo(func: Observer.() -> T): State<T>
     fun effect(referenceHolder: ReferenceHolder, func: Observer.() -> Unit): () -> Unit
 
+    @Suppress("DEPRECATION")
     fun <T> stateDelegatingTo(state: State<T>): DelegatingState<T> =
         object : DelegatingState<T> {
             private val target = mutableStateOf(state)
@@ -32,6 +33,7 @@ internal interface Impl {
             override fun Observer.get(): T = target()()
         }
 
+    @Suppress("DEPRECATION")
     fun <T> mutableStateDelegatingTo(state: MutableState<T>): DelegatingMutableState<T> =
         object : DelegatingMutableState<T> {
             private val target = mutableStateOf(state)

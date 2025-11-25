@@ -81,8 +81,7 @@ interface Variables {
     }
 }
 
-class VariablesMap : Variables {
-    private val map = mutableMapOf<String, Variable>()
+class VariablesMap(private val map : MutableMap<String, Variable> = mutableMapOf()) : Variables {
 
     override fun getOrNull(name: String): Variables.Variable? =
         map[name]
@@ -90,9 +89,15 @@ class VariablesMap : Variables {
     override fun getOrPut(name: String, initialValue: Float): Variables.Variable =
         map.getOrPut(name) { Variable(initialValue) }
 
-    private class Variable(var field: Float) : Variables.Variable {
+    fun copy(): VariablesMap {
+        return VariablesMap(map.mapValues{ it.value.copy() }.toMutableMap())
+    }
+
+    class Variable(var field: Float) : Variables.Variable {
         override fun get(): Float = field
         override fun set(value: Float) { field = value }
+
+        fun copy(): Variable = Variable(field)
     }
 }
 

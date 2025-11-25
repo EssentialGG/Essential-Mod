@@ -112,8 +112,13 @@ public abstract class Mixin_PreserveCustomServerData {
         // Usually this means that the vanilla data was written without the mod installed (and therefore any modded data
         // has been wiped).
         // We need to try to match the custom data in our backup with the vanilla entries so we can restore that data.
+        //#if MC>=12105
+        //$$ NbtList vanillaServers = vanillaTag.getList("servers").orElseGet(NbtList::new);
+        //$$ NbtList backupServers = backupTag.getList("servers").orElseGet(NbtList::new);
+        //#else
         NBTTagList vanillaServers = vanillaTag.getTagList("servers", 10);
         NBTTagList backupServers = backupTag.getTagList("servers", 10);
+        //#endif
 
         // Unfortunately server entries do not have a unique id, so we'll have to use a bunch of heuristics.
         // We'll do multiple passes, becoming progressively more lenient in what we match up (but never matching stuff
@@ -124,13 +129,22 @@ public abstract class Mixin_PreserveCustomServerData {
         Set<NBTTagCompound> alreadyMatched = new HashSet<>();
         for (int pass = 0; pass < 3; pass++) {
             for (int vanillaIdx = 0; vanillaIdx < vanillaServers.tagCount(); vanillaIdx++) {
+                //#if MC>=12105
+                //$$ NbtCompound vanillaServer = vanillaServers.getCompound(vanillaIdx).orElseThrow();
+                //#else
                 NBTTagCompound vanillaServer = vanillaServers.getCompoundTagAt(vanillaIdx);
+                //#endif
                 if (alreadyMatched.contains(vanillaServer)) {
                     continue;
                 }
 
+                //#if MC>=12105
+                //$$ String name = vanillaServer.getString("name").orElse("");
+                //$$ String address = vanillaServer.getString("ip").orElse("");
+                //#else
                 String name = vanillaServer.getString("name");
                 String address = vanillaServer.getString("ip");
+                //#endif
 
                 List<NBTTagCompound> backupMatches;
                 List<NBTTagCompound> vanillaMatches;
@@ -189,10 +203,18 @@ public abstract class Mixin_PreserveCustomServerData {
     private List<NBTTagCompound> find(NBTTagList list, Set<NBTTagCompound> alreadyMatched, String name, String address) {
         List<NBTTagCompound> result = new ArrayList<>();
         for (int i = 0; i < list.tagCount(); i++) {
+            //#if MC>=12105
+            //$$ NbtCompound server = list.getCompound(i).orElseThrow();
+            //$$ String serverName = server.getString("name").orElse("");
+            //$$ String serverAddress = server.getString("ip").orElse("");
+            //#else
             NBTTagCompound server = list.getCompoundTagAt(i);
+            String serverName = server.getString("name");
+            String serverAddress = server.getString("ip");
+            //#endif
             if (alreadyMatched.contains(server)) continue;
-            if (name != null && !server.getString("name").equals(name)) continue;
-            if (address != null && !server.getString("ip").equals(address)) continue;
+            if (name != null && !serverName.equals(name)) continue;
+            if (address != null && !serverAddress.equals(address)) continue;
             result.add(server);
         }
         return result;

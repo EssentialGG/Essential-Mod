@@ -104,6 +104,24 @@ sealed class CosmeticSetting {
         )
     }
 
+    @SerialName("ANIMATION_VARIANT")
+    @Serializable
+    data class AnimationVariant(
+        override val id: String?,
+        @Deprecated("unused")
+        override val enabled: Boolean,
+        val data: Data
+    ) : CosmeticSetting() {
+
+        @Transient
+        override val type: CosmeticSettingType = CosmeticSettingType.ANIMATION_VARIANT
+
+        @Serializable
+        data class Data(
+            val animationVariant: String? = null,
+        )
+    }
+
     object TheSerializer : FallbackPolymorphicSerializer<CosmeticSetting>(CosmeticSetting::class, "type", "__type", "__unknown__") {
         override val module = SerializersModule {
             polymorphic(CosmeticSetting::class) {
@@ -111,6 +129,7 @@ sealed class CosmeticSetting {
                 subclass(PlayerPositionAdjustment::class, PlayerPositionAdjustment.serializer())
                 subclass(Side::class, Side.serializer())
                 subclass(Variant::class, Variant.serializer())
+                subclass(AnimationVariant::class, AnimationVariant.serializer())
             }
         }
     }

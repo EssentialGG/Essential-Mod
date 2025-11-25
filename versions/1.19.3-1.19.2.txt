@@ -2,6 +2,7 @@ org.joml.Matrix4f net.minecraft.util.math.Matrix4f
 org.joml.Matrix4f identity() net.minecraft.util.math.Matrix4f loadIdentity()
 org.joml.Matrix4f mul() net.minecraft.util.math.Matrix4f multiply()
 org.joml.Matrix3f net.minecraft.util.math.Matrix3f
+org.joml.Matrix3f identity() net.minecraft.util.math.Matrix3f loadIdentity()
 org.joml.Matrix3f mul() net.minecraft.util.math.Matrix3f multiply()
 org.joml.Vector4f net.minecraft.util.math.Vector4f
 org.joml.Vector3f net.minecraft.util.math.Vec3f

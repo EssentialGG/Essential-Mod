@@ -12,8 +12,6 @@
 package gg.essential.gui.menu
 
 import gg.essential.Essential
-import gg.essential.elementa.components.UIContainer
-import gg.essential.elementa.state.State
 import gg.essential.elementa.utils.ObservableList
 import gg.essential.gui.EssentialPalette
 import gg.essential.gui.account.factory.InitialSessionFactory
@@ -21,31 +19,42 @@ import gg.essential.gui.account.factory.ManagedSessionFactory
 import gg.essential.gui.common.modal.DangerConfirmationEssentialModal
 import gg.essential.gui.common.modal.configure
 import gg.essential.gui.common.onSetValueAndNow
+import gg.essential.gui.elementa.state.v2.ListState
+import gg.essential.gui.elementa.state.v2.MutableState
 import gg.essential.gui.elementa.state.v2.ReferenceHolderImpl
-import gg.essential.gui.menu.compact.CompactAccountSwitcher
-import gg.essential.gui.menu.full.FullAccountSwitcher
+import gg.essential.gui.elementa.state.v2.await
+import gg.essential.gui.elementa.state.v2.awaitValue
+import gg.essential.gui.elementa.state.v2.mutableStateOf
+import gg.essential.gui.elementa.state.v2.toListState
 import gg.essential.gui.notification.Notifications
 import gg.essential.gui.notification.error
 import gg.essential.gui.notification.iconAndMarkdownBody
+import gg.essential.gui.overlay.ModalManager
 import gg.essential.handlers.account.WebAccountManager
+import gg.essential.network.connectionmanager.ConnectionManager
 import gg.essential.universal.UMinecraft
 import gg.essential.util.GuiUtil
 import gg.essential.util.USession
 import gg.essential.util.colored
 import gg.essential.util.executor
+import gg.essential.util.raceOf
 import gg.essential.util.setSession
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.lang.ref.WeakReference
 import java.util.*
 import java.util.concurrent.CompletableFuture
+import kotlin.time.Duration.Companion.seconds
 
 class AccountManager {
 
     private val accountsList = ObservableList(mutableListOf<AccountInfo>())
     private val referenceHolder = ReferenceHolderImpl()
-
-    fun getFullAccountSwitcher(collapsed: State<Boolean>) = FullAccountSwitcher(accountsList, collapsed, this)
-
-    fun getCompactAccountSwitcher(sidebarContainer: UIContainer) = CompactAccountSwitcher(accountsList, sidebarContainer, this)
+    private val allAccountsMutable = mutableStateOf<List<AccountInfo>>(listOf())
+    private val originalAccountsMutable = mutableStateOf<List<AccountInfo>>(listOf())
+    val allAccounts: ListState<AccountInfo> = allAccountsMutable.toListState()
+    val originalAccounts: ListState<AccountInfo> = originalAccountsMutable.toListState()
 
     init {
         USession.active.onSetValueAndNow(referenceHolder) {
@@ -57,12 +66,19 @@ class AccountManager {
     private fun refreshAccounts() {
         accountsList.clear()
 
-        // List all accounts except the currently active one, keeping track of what's added to avoid duplicates
-        Essential.getInstance().sessionFactories.forEach { sessionFactory ->
-            sessionFactory.sessions.filterKeys { uuid ->
-                accountsList.none { it.uuid == uuid } && uuid != USession.active.get().uuid
-            }.forEach { accountsList.add(AccountInfo(it.key, it.value.username)) }
-        }
+        val sessionFactories = Essential.getInstance().sessionFactories
+        val accounts = sessionFactories
+            .flatMap { it.sessions.values }
+            .distinctBy { it.uuid }
+            .map { AccountInfo(it.uuid, it.username) }
+        val active = accounts.find { it.uuid == USession.activeNow().uuid }
+        val accountsWithoutActive = if (active != null) accounts - active else accounts
+        accountsList.addAll(accountsWithoutActive)
+        allAccountsMutable.set(accounts.toList())
+
+        // Find original account(s) that cannot be removed
+        val managedSessions = sessionFactories.filterIsInstance<ManagedSessionFactory>().flatMap { it.sessions.keys }
+        originalAccountsMutable.set(accounts.filterNot { it.uuid in managedSessions })
     }
 
     /**
@@ -71,15 +87,13 @@ class AccountManager {
      */
     fun login(uuid: UUID) {
         if (USession.active.get().uuid != uuid) {
+            val isSwitching = mutableStateOf(true)
+            val modalManager = GuiUtil.pushModal { AccountSwitchingModal(it, isSwitching) }
             refreshSession(uuid) { session, error ->
                 if (error == null) {
-                    Notifications.push("", "", 1f) {
-                        iconAndMarkdownBody(
-                            EssentialPalette.EMOTES_7X.create(),
-                            "Logged in as ${session.username.colored(EssentialPalette.TEXT_HIGHLIGHT)}"
-                        )
-                    }
+                    monitorSwitching(modalManager.coroutineScope, isSwitching, session.username)
                 } else {
+                    isSwitching.set(false)
                     Essential.logger.error("Account Error: $error")
                     Notifications.error("Account Error", "Something went wrong\nduring login.")
                 }
@@ -88,12 +102,32 @@ class AccountManager {
         }
     }
 
+    private fun monitorSwitching(coroutineScope: CoroutineScope, isSwitching: MutableState<Boolean>, username: String) {
+        coroutineScope.launch {
+            val connectionStatus = Essential.getInstance().connectionManager.connectionStatus
+            // Stop switching if there is a connection error, cosmetics have finished loading or after a 10-second delay
+            raceOf(
+                { connectionStatus.await { it != null && it != ConnectionManager.Status.SUCCESS } },
+                {
+                    connectionStatus.awaitValue(ConnectionManager.Status.SUCCESS)
+                    Essential.getInstance().connectionManager.cosmeticsManager.cosmeticsLoaded.awaitValue(true)
+                },
+                { delay(10.seconds) }
+            )
+            isSwitching.set(false)
+            Notifications.push("", "", 1f) {
+                iconAndMarkdownBody(
+                    EssentialPalette.SMILEY_8X.create(),
+                    "Logged in as ${username.colored(EssentialPalette.TEXT_HIGHLIGHT)}"
+                )
+            }
+        }
+    }
+
     /** Display a modal prompting the user to confirm if they want to remove the account which [uuid] belongs to */
     fun promptRemove(uuid: UUID, name: String) {
-        GuiUtil.pushModal { manager -> 
-            DangerConfirmationEssentialModal(manager, "Remove", requiresButtonPress = false).configure {
-                contentText = "Are you sure you want to remove the account $name?"
-            }.onPrimaryAction {
+        GuiUtil.pushModal { manager ->
+            RemoveAccountConfirmationModal(manager, name).onPrimaryAction {
                 removeAccount(uuid)
             }
         }
@@ -161,6 +195,14 @@ class AccountManager {
                         ?: return error("Failed to refresh session: Unknown account")
                 UMinecraft.getMinecraft().setSession(initialSession.sessions[uuid]!!)
                 callback?.invoke(initialSession.sessions[uuid]!!, null)
+            }
+        }
+    }
+
+    class RemoveAccountConfirmationModal(manager: ModalManager, name: String) : DangerConfirmationEssentialModal(manager, "Remove", requiresButtonPress = false) {
+        init {
+            configure {
+                contentText = "Are you sure you want to remove the account $name?"
             }
         }
     }

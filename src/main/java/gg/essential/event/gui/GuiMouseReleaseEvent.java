@@ -15,12 +15,18 @@ import net.minecraft.client.gui.GuiScreen;
 
 public class GuiMouseReleaseEvent {
     private final GuiScreen screen;
+    private final int button;
 
-    public GuiMouseReleaseEvent(GuiScreen screen) {
+    public GuiMouseReleaseEvent(GuiScreen screen, int button) {
         this.screen = screen;
+        this.button = button;
     }
 
     public GuiScreen getScreen() {
         return screen;
+    }
+
+    public int getButton() {
+        return button;
     }
 }

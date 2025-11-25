@@ -26,4 +26,8 @@ public class ClientMediaRequestPacket extends Packet {
         this.mediaIds = mediaIds;
     }
 
+    public @Nullable Set<String> getMediaIds() {
+        return this.mediaIds;
+    }
+
 }

@@ -18,14 +18,22 @@ import gg.essential.gui.util.*
 import gg.essential.elementa.state.State as StateV1
 import gg.essential.gui.elementa.state.v2.State as StateV2
 
-inline fun Modifier.onLeftClick(crossinline callback: UIComponent.() -> Unit) = this then {
+inline fun Modifier.onLeftClick(crossinline callback: UIComponent.(UIClickEvent) -> Unit) = this then {
     val listener: UIComponent.(event: UIClickEvent) -> Unit = {
         if (it.mouseButton == 0) {
-            callback()
+            callback(it)
         }
     }
     onMouseClick(listener)
     return@then { mouseClickListeners.remove(listener) }
+}
+
+inline fun Modifier.onMouseRelease(crossinline callback: UIComponent.() -> Unit) = this then {
+    val listener: UIComponent.() -> Unit = {
+        callback()
+    }
+    onMouseRelease(listener)
+    return@then { mouseReleaseListeners.remove(listener) }
 }
 
 /** Declare this component and its children to be in a hover scope. See [makeHoverScope]. */

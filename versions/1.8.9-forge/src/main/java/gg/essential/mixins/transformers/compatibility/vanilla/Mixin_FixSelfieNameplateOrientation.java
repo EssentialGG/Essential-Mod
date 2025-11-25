@@ -26,6 +26,9 @@ public abstract class Mixin_FixSelfieNameplateOrientation {
 
     @ModifyExpressionValue(method = "renderLivingLabel", at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/entity/RenderManager;playerViewX:F", opcode = Opcodes.GETFIELD))
     private float essential$translateNameplate(float playerViewX) {
+        if (this.renderManager.options.thirdPersonView == 2) {
+            playerViewX *= -1;
+        }
         return playerViewX;
     }
 }

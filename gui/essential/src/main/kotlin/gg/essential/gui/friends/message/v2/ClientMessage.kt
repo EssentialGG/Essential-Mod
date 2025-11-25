@@ -32,9 +32,10 @@ data class ClientMessage(
     val sendState: SendState,
     val replyTo: MessageRef?,
     val lastEditTime: Long?,
+    val createdAt: Long,
 ) {
-    val sendTime: Instant = Instant.ofEpochMilli((id shr 22) + MessageUtils.messageTimeEpocMillis)
-    val sent = sendState == SendState.CONFIRMED
+    val sendTime: Instant = Instant.ofEpochMilli(createdAt)
+    val sent = sendState == SendState.Confirmed
     val parts: List<Part> = buildList {
         val cleanedText = contents.handleMarkdownUrls()
         var strippedText = cleanedText
@@ -93,8 +94,29 @@ data class ClientMessage(
     }
 }
 
-enum class SendState {
-    SENDING,
-    CONFIRMED,
-    FAILED,
+sealed interface SendState {
+
+    data object Sending : SendState
+
+    data object Confirmed : SendState
+
+    data object Failed : SendState
+
+    data class Blocked(val reason: String) : SendState {
+
+        val toastMessage = when(reason) {
+            CONTAINS_NON_WHITELISTED_DOMAIN -> "You cannot share this link"
+            else -> "You cannot send this message"
+        }
+
+        val tooltipMessage = when(reason) {
+            CONTAINS_NON_WHITELISTED_DOMAIN -> "Message not sent: This link is not allowed"
+            else -> "Message not sent: This isn't allowed"
+        }
+
+        companion object {
+
+            private const val CONTAINS_NON_WHITELISTED_DOMAIN = "CONTAINS_NON_WHITELISTED_DOMAIN"
+        }
+    }
 }

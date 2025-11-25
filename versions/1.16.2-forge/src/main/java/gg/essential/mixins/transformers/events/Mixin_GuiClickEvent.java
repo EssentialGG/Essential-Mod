@@ -25,7 +25,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class Mixin_GuiClickEvent {
 
     //#if FORGE
-    //#if MC>=11700
+    //#if MC>=12006
+    //$$ @Inject(method = "method_1611", at = @At(value = "INVOKE", target = "Lnet/minecraftforge/client/event/ForgeEventFactoryClient;onScreenMouseClicked([ZLnet/minecraft/client/gui/screens/Screen;DDI)V"), cancellable = true)
+    //#elseif MC>=11700
     //$$ @Inject(method = { "lambda$onPress$0", "m_168084_" }, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screens/Screen;mouseClicked(DDI)Z"), cancellable = true)
     //#else
     @Inject(method = { "lambda$mouseButtonCallback$0", "func_198033_b" }, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screen/Screen;mouseClicked(DDI)Z"), cancellable = true)
@@ -33,7 +35,7 @@ public abstract class Mixin_GuiClickEvent {
     //#else
     //$$ @Inject(method = "method_1611", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screen/Screen;mouseClicked(DDI)Z"), cancellable = true)
     //#endif
-    //#if MC>=11700 && FORGE==0
+    //#if MC>=11700 && FORGE==0 || MC>=12006
     //$$ static
     //#endif
     private void onMouseClicked(

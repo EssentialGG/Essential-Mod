@@ -16,7 +16,6 @@ import com.sparkuniverse.toolbox.chat.model.Channel
 import gg.essential.elementa.state.toConstraint
 import gg.essential.gui.EssentialPalette
 import gg.essential.gui.common.IconButton
-import gg.essential.gui.common.modal.defaultEssentialModalFadeTime
 import gg.essential.gui.elementa.essentialmarkdown.EssentialMarkdown
 import gg.essential.gui.elementa.essentialmarkdown.MarkdownConfig
 import gg.essential.gui.elementa.essentialmarkdown.ParagraphConfig
@@ -26,10 +25,13 @@ import gg.essential.gui.elementa.state.v2.ListState
 import gg.essential.gui.elementa.state.v2.MutableState
 import gg.essential.gui.elementa.state.v2.State
 import gg.essential.gui.elementa.state.v2.StateByScope
+import gg.essential.gui.elementa.state.v2.combinators.and
 import gg.essential.gui.elementa.state.v2.combinators.contains
 import gg.essential.gui.elementa.state.v2.combinators.map
+import gg.essential.gui.elementa.state.v2.combinators.not
 import gg.essential.gui.elementa.state.v2.filter
 import gg.essential.gui.elementa.state.v2.mapEach
+import gg.essential.gui.elementa.state.v2.mapList
 import gg.essential.gui.elementa.state.v2.stateBy
 import gg.essential.gui.elementa.state.v2.stateOf
 import gg.essential.gui.elementa.state.v2.toListState
@@ -42,9 +44,9 @@ import gg.essential.gui.modals.select.component.playerAvatar
 import gg.essential.gui.modals.select.component.playerName
 import gg.essential.gui.overlay.ModalFlow
 import gg.essential.gui.overlay.ModalManager
-import gg.essential.universal.USound
 import gg.essential.gui.util.hoveredState
 import gg.essential.gui.util.toStateV2List
+import gg.essential.universal.USound
 import gg.essential.util.GuiEssentialPlatform.Companion.platform
 import gg.essential.util.USession
 import gg.essential.util.UuidNameLookup
@@ -70,6 +72,7 @@ data class Section<T, S : Any>(
 @Suppress("UNUSED_PARAMETER", "MemberVisibilityCanBePrivate")
 class SelectModalBuilder<T>(
     val title: String,
+    val modalSimpleName: String,
 ) {
     private val socialStates by lazy { platform.createSocialStates() }
     private val relationshipStates by lazy { socialStates.relationships }
@@ -79,9 +82,11 @@ class SelectModalBuilder<T>(
     private val sections = mutableListOf<Section<T, *>>()
     internal val defaultUserRow: SectionLayoutBlock<UUID>
         get() = { selected, uuid ->
-            row(Modifier.fillParent(padding = 3f)) {
-                playerEntry(selected, uuid)
-                defaultAddRemoveButton(selected)
+            box(Modifier.fillParent()) {
+                row(Modifier.fillParent(padding = 4f)) {
+                    playerEntry(selected, uuid)
+                    defaultAddRemoveButton(selected)
+                }
             }.onLeftClick { event ->
                 USound.playButtonPress()
                 event.stopPropagation()
@@ -91,9 +96,11 @@ class SelectModalBuilder<T>(
 
     internal val defaultGroupRow: SectionLayoutBlock<Long>
         get() = { selected, id ->
-            row(Modifier.fillParent(padding = 3f)) {
-                groupEntry(selected, id)
-                defaultAddRemoveButton(selected)
+            box(Modifier.fillParent()) {
+                row(Modifier.fillParent(padding = 4f)) {
+                    groupEntry(selected, id)
+                    defaultAddRemoveButton(selected)
+                }
             }.onLeftClick { event ->
                 USound.playButtonPress()
                 event.stopPropagation()
@@ -106,13 +113,15 @@ class SelectModalBuilder<T>(
             val otherUser =
                 if (channel.type != ChannelType.DIRECT_MESSAGE) null
                 else channel.members.find { it != USession.activeNow().uuid }
-            row(Modifier.fillParent(padding = 3f)) {
-                if (otherUser == null) {
-                    groupEntry(selected, channel.id)
-                } else {
-                    playerEntry(selected, otherUser)
+            box(Modifier.fillParent()) {
+                row(Modifier.fillParent(padding = 4f)) {
+                    if (otherUser == null) {
+                        groupEntry(selected, channel.id)
+                    } else {
+                        playerEntry(selected, otherUser)
+                    }
+                    defaultAddRemoveButton(selected)
                 }
-                defaultAddRemoveButton(selected)
             }.onLeftClick { event ->
                 USound.playButtonPress()
                 event.stopPropagation()
@@ -136,11 +145,6 @@ class SelectModalBuilder<T>(
      * If you want to force the user to select at least one entry before clicking continue
      */
     var requiresSelection: Boolean = true
-
-    /**
-     * How long the modal should fade in and out for, see [defaultEssentialModalFadeTime]
-     */
-    var fadeTime: Float = defaultEssentialModalFadeTime
 
     /**
      * Adds shadows all entries
@@ -174,17 +178,17 @@ class SelectModalBuilder<T>(
     fun emptyTextNoFriends() = emptyText("You haven't added any friends yet. You can add them in the social menu.")
 
     fun LayoutScope.playerEntry(selected: MutableState<Boolean>, uuid: UUID) {
-        row(Modifier.fillRemainingWidth(), Arrangement.spacedBy(5f, FloatPosition.START)) {
-            playerAvatar(uuid, modifier = Modifier.width(8f).heightAspect(1f))
-            playerName(uuid)
+        row(Modifier.fillRemainingWidth(), Arrangement.spacedBy(7f, FloatPosition.START)) {
+            playerAvatar(uuid, shadowColor = EssentialPalette.BLACK, modifier = Modifier.width(8f).heightAspect(1f))
+            playerName(uuid, modifier = Modifier.alignVertical(Alignment.Start(1f)).shadow(EssentialPalette.BLACK))
         }
     }
 
     fun LayoutScope.groupEntry(selected: MutableState<Boolean>, id: Long) {
-        row(Modifier.fillRemainingWidth(), Arrangement.spacedBy(5f)) {
-            icon(EssentialPalette.groupIconForChannel(id))
-            row(Modifier.fillRemainingWidth(), Arrangement.spacedBy(float = FloatPosition.START)) {
-                text(messageStates.getTitle(id), truncateIfTooSmall = true)
+        row(Modifier.fillRemainingWidth(), Arrangement.spacedBy(7f)) {
+            image(EssentialPalette.groupIconForChannel(id), Modifier.shadow(EssentialPalette.BLACK))
+            row(Modifier.fillRemainingWidth().alignVertical(Alignment.Start(1f)), Arrangement.spacedBy(float = FloatPosition.START)) {
+                text(messageStates.getTitle(id), truncateIfTooSmall = true, modifier = Modifier.shadow(EssentialPalette.BLACK))
             }
         }
     }
@@ -203,7 +207,7 @@ class SelectModalBuilder<T>(
     }
 
     fun friends(map: (UUID) -> T, block: SectionLayoutBlock<UUID> = defaultUserRow) {
-        val friendsList = relationshipStates.getObservableFriendList().toStateV2List()
+        val friendsList = relationshipStates.getObservableFriendList().toStateV2List().mapList { list -> list.filter { !socialStates.isSuspended(it)() } }
         users("Friends", map, friendsList, block)
         if (whenEmpty == null) {
             emptyTextNoFriends()
@@ -251,15 +255,23 @@ class SelectModalBuilder<T>(
         map: (Channel) -> T,
         block: SectionLayoutBlock<Channel> = defaultUserOrGroupRow,
     ) {
-        val channelList = messageStates.getObservableChannelList().toStateV2List()
-            .filter { it.type == ChannelType.DIRECT_MESSAGE || it.type == ChannelType.GROUP_DIRECT_MESSAGE }
+        val channelList = messageStates.getObservableChannelList().toStateV2List().mapList { list ->
+                list.filter {
+                    if (it.type == ChannelType.DIRECT_MESSAGE) {
+                        val other = it.getOtherUser()
+                        other == null || !socialStates.isSuspended(other)()
+                    } else {
+                        it.type == ChannelType.GROUP_DIRECT_MESSAGE
+                    }
+                }
+            }
         val friendsAndGroupsState =
             stateBy {
                 // Adapted from ChatTab
                 channelList().sortedWith(
                     compareBy<Channel>(
                         { messageStates.getUnreadChannelState(it.id)() },
-                        { (messageStates.getLatestMessage(it.id)()?.id ?: it.id) shr 22 },
+                        { (messageStates.getLatestMessage(it.id)()?.createdAt ?: it.joinedAt) },
                     ).reversed()
                 )
             }
@@ -338,10 +350,10 @@ class SelectModalBuilder<T>(
 
     fun build(modalManager: ModalManager) = SelectModal(
         modalManager,
+        modalSimpleName,
         sections,
         requiresButtonPress,
         requiresSelection,
-        fadeTime,
         shadowsOnEntries,
         initiallySelected,
         whenEmpty,
@@ -360,7 +372,15 @@ class SelectModalBuilder<T>(
 
         return stateBy {
             mappedFriends().mapNotNull { (uuid, isActivity) ->
-                if (isActivity()) uuid else null
+                if (isActivity()) {
+                    if (!socialStates.isSuspended(uuid)()) {
+                        uuid
+                    } else {
+                        null
+                    }
+                } else {
+                    null
+                }
             }
         }.toListState()
     }
@@ -394,8 +414,9 @@ fun SelectModalBuilder<Channel>.friendsAndGroups(block: SectionLayoutBlock<Chann
 fun <T> selectModal(
     modalManager: ModalManager,
     title: String,
+    modalSimpleName: String,
     block: SelectModalBuilder<T>.() -> Unit = {}
-) = SelectModalBuilder<T>(title)
+) = SelectModalBuilder<T>(title, modalSimpleName)
     .apply(block)
     .build(modalManager)
 
@@ -404,9 +425,10 @@ fun <T> selectModal(
  */
 suspend fun <T> ModalFlow.selectModal(
     title: String,
+    modalSimpleName: String,
     block: SelectModalBuilder<T>.() -> Unit = {}
 ): Set<T>? = awaitModal { continuation ->
-    SelectModalBuilder<T>(title)
+    SelectModalBuilder<T>(title, modalSimpleName)
         .modalSettings {
             onPrimaryAction { result -> replaceWith(continuation.resumeImmediately(result)) }
             onCancel { button -> if (button) replaceWith(continuation.resumeImmediately(null)) }
@@ -414,3 +436,6 @@ suspend fun <T> ModalFlow.selectModal(
         .apply(block)
         .build(modalManager)
 }
+
+private fun Channel.getOtherUser(): UUID? =
+    if (type == ChannelType.DIRECT_MESSAGE) members.firstOrNull { it != USession.activeNow().uuid } else null

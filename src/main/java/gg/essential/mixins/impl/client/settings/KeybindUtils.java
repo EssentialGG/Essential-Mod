@@ -11,8 +11,8 @@
  */
 package gg.essential.mixins.impl.client.settings;
 
-import gg.essential.Essential;
 import gg.essential.key.EssentialKeybinding;
+import gg.essential.key.EssentialKeybindingRegistry;
 import gg.essential.universal.UKeyboard;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.GameSettings;
@@ -38,7 +38,7 @@ public class KeybindUtils {
 
     @Unique
     public static KeyBinding getKeyBindZoom() {
-        EssentialKeybinding zoomKey = Essential.getInstance().getKeybindingRegistry().getZoom();
+        EssentialKeybinding zoomKey = EssentialKeybindingRegistry.getInstance().getZoom();
         return zoomKey == null ? null : zoomKey.keyBinding;
     }
 

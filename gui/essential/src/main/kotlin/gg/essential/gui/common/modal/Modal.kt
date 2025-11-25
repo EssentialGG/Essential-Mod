@@ -17,6 +17,7 @@ import gg.essential.elementa.dsl.*
 import gg.essential.gui.layoutdsl.LayoutScope
 import gg.essential.gui.layoutdsl.layoutAsBox
 import gg.essential.gui.overlay.ModalManager
+import gg.essential.network.connectionmanager.telemetry.FeatureSessionTelemetry
 import gg.essential.universal.UKeyboard
 import gg.essential.util.Client
 import gg.essential.vigilance.utils.onLeftClick
@@ -24,6 +25,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import org.slf4j.LoggerFactory
 
 abstract class Modal(val modalManager: ModalManager) : UIContainer() {
 
@@ -43,6 +45,8 @@ abstract class Modal(val modalManager: ModalManager) : UIContainer() {
             }
         }
     }
+
+    open val modalName: String? = this.javaClass.name
 
     init {
         constrain {
@@ -88,13 +92,17 @@ abstract class Modal(val modalManager: ModalManager) : UIContainer() {
     }
 
     open fun onOpen() {
+
         coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Client)
 
         windowListListener = Window.of(this).keyTypedListeners.removeFirstOrNull()
         Window.of(this).onKeyType(escapeListener)
+
+        modalName?.let { FeatureSessionTelemetry.startEvent(it) }
     }
 
     open fun onClose() {
+
         val windowListListener = windowListListener
         val window = Window.of(this)
         if (windowListListener != null) {
@@ -102,9 +110,15 @@ abstract class Modal(val modalManager: ModalManager) : UIContainer() {
         }
 
         window.keyTypedListeners.remove(escapeListener) // Clean ourselves up
+
+        modalName?.let { FeatureSessionTelemetry.endEvent(it) }
     }
 
     open fun handleEscapeKeyPress() {
         close()
+    }
+
+    companion object {
+        private val LOGGER = LoggerFactory.getLogger(Modal::class.java)
     }
 }

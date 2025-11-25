@@ -11,6 +11,7 @@
  */
 package gg.essential.mixins.transformers.util;
 
+import com.llamalad7.mixinextras.sugar.Local;
 import gg.essential.Essential;
 import gg.essential.config.EssentialConfig;
 import gg.essential.gui.screenshot.components.ScreenshotComponentsKt;
@@ -28,10 +29,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Surrogate;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-
-//#if FORGE
-import net.minecraftforge.client.event.ScreenshotEvent;
-//#endif
 
 import java.io.File;
 import java.util.function.Consumer;
@@ -53,17 +50,27 @@ public class Mixin_CaptureScreenshots {
         });
     }
 
-    //#if FORGE
+    //#if FORGELIKE
     @Inject(method = {
+        //#if MC>=12105
+        //$$ "lambda$grab$1",
+        //#else
         "lambda$saveScreenshotRaw$2", // early 1.16
         "lambda$_grab$2", // late 1.16 and above
-    }, at = @At(value = "INVOKE", target = WRITE_METHOD, shift = At.Shift.AFTER))
-    private static void essential$captureNewScreenshot(NativeImage nativeImage, File file, File fil1, ScreenshotEvent event, Consumer consumer, CallbackInfo ci) {
-        //#else
-        //$$ // remap disabled because we don't want the mixin AP to qualify the method reference, since optifine changes its arguments
-        //$$ @Inject(method = "method_1661", at = @At(value = "INVOKE", target = WRITE_METHOD, shift = At.Shift.AFTER, remap = true), remap = false)
-        //$$    private static void essential$captureNewScreenshot(NativeImage nativeImage, File file, Consumer consumer, CallbackInfo ci) {
         //#endif
+    }, at = @At(value = "INVOKE", target = WRITE_METHOD, shift = At.Shift.AFTER))
+    private static void essential$captureNewScreenshot(CallbackInfo ci, @Local(argsOnly = true, ordinal = 0) File file) {
+    //#else
+    //$$ // remap disabled because we don't want the mixin AP to qualify the method reference, since optifine changes its arguments
+    //$$ @Inject(method = {
+        //#if MC>=12105
+        //$$ "method_22691"
+        //#else
+        //$$ "method_1661"
+        //#endif
+    //$$ }, at = @At(value = "INVOKE", target = WRITE_METHOD, shift = At.Shift.AFTER, remap = true), remap = false)
+    //$$ private static void essential$captureNewScreenshot(NativeImage nativeImage, File file, Consumer consumer, CallbackInfo ci) {
+    //#endif
 
         essential$captureNewScreenshot(file);
     }

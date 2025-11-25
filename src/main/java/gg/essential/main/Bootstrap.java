@@ -89,6 +89,9 @@ public class Bootstrap {
             LogManager.getLogger().warn("No CodeSource, if this is not a development environment we might run into problems!");
             LogManager.getLogger().warn(Bootstrap.class.getProtectionDomain());
         }
+
+        Launch.classLoader.registerTransformer(gg.essential.asm.compat.DisableVanillaFixAsyncScreenshotsTransformer.class.getName());
+        Launch.classLoader.registerTransformer(gg.essential.asm.compat.DisableVanillaFixIntegratedServerShutdownFixTransformer.class.getName());
         //#endif
 
         if (IntegrationTestsPlugin.ENABLED) {

@@ -18,27 +18,28 @@ import com.sparkuniverse.toolbox.chat.enums.ChannelType;
 import com.sparkuniverse.toolbox.chat.model.Channel;
 import com.sparkuniverse.toolbox.chat.model.Message;
 import gg.essential.Essential;
-import gg.essential.api.gui.Slot;
 import gg.essential.connectionmanager.common.packet.Packet;
 import gg.essential.connectionmanager.common.packet.chat.*;
 import gg.essential.connectionmanager.common.packet.response.ResponseActionPacket;
+import gg.essential.connectionmanager.common.packet.social.ServerSocialAllowedDomainsPacket;
 import gg.essential.gui.elementa.state.v2.ListKt;
 import gg.essential.gui.elementa.state.v2.MutableState;
 import gg.essential.gui.elementa.state.v2.State;
 import gg.essential.gui.EssentialPalette;
 import gg.essential.gui.elementa.state.v2.StateByKt;
 import gg.essential.gui.elementa.state.v2.collections.MutableTrackedList;
-import gg.essential.gui.friends.message.MessageUtils;
-import gg.essential.gui.friends.message.v2.ClientMessage;
+import gg.essential.gui.friends.message.ReportMessageConfirmationModal;
 import gg.essential.gui.friends.message.v2.ClientMessageKt;
 import gg.essential.gui.friends.message.v2.MessageRef;
 import gg.essential.gui.friends.state.IMessengerManager;
 import gg.essential.gui.notification.ExtensionsKt;
 import gg.essential.gui.friends.state.MessengerStateManagerImpl;
 import gg.essential.gui.notification.Notifications;
+import gg.essential.gui.overlay.ModalManager;
 import gg.essential.network.connectionmanager.ConnectionManager;
 import gg.essential.network.connectionmanager.NetworkedManager;
 import gg.essential.network.connectionmanager.StateCallbackManager;
+import gg.essential.network.connectionmanager.cosmetics.AssetLoader;
 import gg.essential.network.connectionmanager.handler.chat.ChatChannelMemberAddPacketHandler;
 import gg.essential.network.connectionmanager.handler.chat.ChatChannelMemberRemovePacketHandler;
 import gg.essential.network.connectionmanager.handler.chat.ChatChannelMessageDeletePacketHandler;
@@ -52,18 +53,20 @@ import gg.essential.network.connectionmanager.queue.PacketQueue;
 import gg.essential.network.connectionmanager.queue.SequentialPacketQueue;
 import gg.essential.util.CachedAvatarImage;
 import gg.essential.util.StringsKt;
+import gg.essential.util.USession;
 import gg.essential.util.UUIDUtil;
+import gg.essential.util.UuidNameLookup;
 import kotlin.Unit;
-import okhttp3.HttpUrl;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
-import static gg.essential.util.ExtensionsKt.isAnnouncement;
+import static gg.essential.util.ChannelExtensionsKt.isAnnouncement;
 
 public class ChatManager extends StateCallbackManager<IMessengerManager> implements NetworkedManager {
 
@@ -78,6 +81,8 @@ public class ChatManager extends StateCallbackManager<IMessengerManager> impleme
 
     @NotNull
     private final Map<String, Map<String, String>> reportReasons = Maps.newConcurrentMap();
+
+    private @NotNull List<String> allowedDomains = Collections.emptyList();
 
     @NotNull
     private final Set<Long> announcementChannelIds = Sets.newConcurrentHashSet();
@@ -99,9 +104,6 @@ public class ChatManager extends StateCallbackManager<IMessengerManager> impleme
 
     @NotNull
     private final PacketQueue mutedStateUpdateQueue, sendMessageQueue;
-
-    @NotNull
-    private final Map<Long, Message> messageMap = Maps.newConcurrentMap();
 
     /**
      * A map of channel ids to ID of the oldest message that is needed for that channel
@@ -131,6 +133,11 @@ public class ChatManager extends StateCallbackManager<IMessengerManager> impleme
         connectionManager.registerPacketHandler(ServerChatChannelMessagePacket.class, serverChatChannelMessagePacketHandler);
         connectionManager.registerPacketHandler(ServerChatChannelRemovePacket.class, new ServerChatChannelRemovePacketHandler());
         connectionManager.registerPacketHandler(ServerChatChannelMessageReportReasonsPacket.class, new ServerChatChannelMessageReportReasonsPacketHandler());
+
+        connectionManager.registerPacketHandler(ServerSocialAllowedDomainsPacket.class, packet -> {
+            this.allowedDomains = packet.getDomains();
+            return Unit.INSTANCE;
+        });
     }
 
     @NotNull
@@ -210,19 +217,13 @@ public class ChatManager extends StateCallbackManager<IMessengerManager> impleme
         this.channels.put(channel.getId(), channel);
 
         for (UUID member : channel.getMembers()) {
-            CachedAvatarImage.ofUUID(member);
+            CachedAvatarImage.create(member, AssetLoader.Priority.Background);
         }
-        ServerChatChannelMessagePacketHandler.prefetching.incrementAndGet();
-        retrieveRecentMessageHistory(channel.getId(), 10, packet -> {
-            ServerChatChannelMessagePacketHandler.prefetching.decrementAndGet();
-        }); //Prefetch a few messages to look for unread messages
+        retrieveRecentMessageHistory(channel.getId(), 10, null); // Prefetch a few messages to look for unread messages
         if (isAnnouncement(channel)) {
             for (long announcementChannelId : announcementChannelIds) {
                 if (announcementChannelId != channel.getId()) {
-                    ServerChatChannelMessagePacketHandler.prefetching.incrementAndGet();
-                    retrieveRecentMessageHistory(announcementChannelId, 100, packet -> {
-                        ServerChatChannelMessagePacketHandler.prefetching.decrementAndGet();
-                    });
+                    retrieveRecentMessageHistory(announcementChannelId, 100, null);
                 }
             }
 
@@ -271,11 +272,6 @@ public class ChatManager extends StateCallbackManager<IMessengerManager> impleme
     public Channel removeChannel(final long id) {
         Channel channel = this.channels.remove(id);
         ConcurrentMap<Long, Message> removed = this.channelMessages.remove(id);
-        if (removed != null) {
-            for (Long messsageId : removed.keySet()) {
-                this.messageMap.remove(messsageId);
-            }
-        }
         updateChannelListState();
         if (channel != null) {
             for (IMessengerManager iMessengerManager : getCallbacks()) {
@@ -294,7 +290,8 @@ public class ChatManager extends StateCallbackManager<IMessengerManager> impleme
         this.announcementChannelIds.clear();
         this.reportReasons.clear();
         this.channelEagerMessageResolverMap.clear();
-        this.messageMap.clear();
+
+        this.allowedDomains = Collections.emptyList();
 
         for (IMessengerManager callback : getCallbacks()) {
             callback.reset();
@@ -324,14 +321,12 @@ public class ChatManager extends StateCallbackManager<IMessengerManager> impleme
      *
      * @return true if the message was updated, false if it was inserted or an error occurred
      */
-    public boolean upsertMessageToChannel(final long channelId, @NotNull final Message message) {
+    public boolean upsertMessageToChannel(final long channelId, @NotNull final Message message, final boolean isFromHistoryRequest) {
         final Channel channel = getChannel(channelId).orElse(null);
         if (channel == null) {
             Essential.logger.error("Received message: " + message + " for channel that does not exist");
             return false;
         }
-
-        boolean previousMessageExisted = messageMap.put(message.getId(), message) != null; // Message was edited if it already existed
 
         ConcurrentMap<Long, Message> map = channelMessages.get(channelId);
         if (map == null) {
@@ -339,7 +334,7 @@ public class ChatManager extends StateCallbackManager<IMessengerManager> impleme
             channelMessages.put(channelId, map);
             this.updateChannelListState();
         }
-        map.put(message.getId(), message);
+        boolean previousMessageExisted = map.put(message.getId(), message) != null; // Message was edited if it already existed
 
         for (IMessengerManager iMessengerManager : getCallbacks()) {
             iMessengerManager.messageReceived(channel, message);
@@ -348,6 +343,14 @@ public class ChatManager extends StateCallbackManager<IMessengerManager> impleme
         EagerMessageResolver eagerMessageResolver = channelEagerMessageResolverMap.get(channelId);
         if (eagerMessageResolver != null) {
             eagerMessageResolver.messageReceived(message);
+        }
+
+        if (!isFromHistoryRequest) {
+            if ((channel.getLastReadMessageId() == null || channel.getLastReadMessageId() < message.getId())
+                    && !message.getSender().equals(USession.Companion.activeNow().getUuid())
+            ) {
+                changeUnreadMessageCount(channel, 1);
+            }
         }
 
         return previousMessageExisted;
@@ -374,30 +377,51 @@ public class ChatManager extends StateCallbackManager<IMessengerManager> impleme
         this.sendMessage(channelId, messageContent, null, callback);
     }
 
+    public void editMessage(
+        final long channelId,
+        final long messageId,
+        @NotNull final String messageContent,
+        @Nullable final Consumer<Boolean> callback
+    ) {
+        sendMessageQueue.enqueue(new ClientChatChannelMessageUpdatePacket(channelId, messageId, messageContent), maybePacket -> {
+            Packet packet = maybePacket.orElse(null);
+            if (packet instanceof ResponseActionPacket && ((ResponseActionPacket) packet).isSuccessful()) {
+                Message message = getMessageById(channelId, messageId);
+                if (message != null) {
+                    upsertMessageToChannel(channelId, new Message(
+                        message.getId(),
+                        message.getChannelId(),
+                        message.getSender(),
+                        messageContent,
+                        message.isRead(),
+                        message.getReplyTargetId(),
+                        message.getLastEditTime(),
+                        message.getCreatedAt()
+                    ), false);
+                }
+                if (callback != null) callback.accept(true);
+            } else {
+                if (callback != null) callback.accept(false);
+            }
+        });
+    }
+
     public void removeMessage(final long channelId, final long messageId) {
-        messageMap.remove(messageId);
         ConcurrentMap<Long, Message> channelMessages = this.channelMessages.get(channelId);
         if (channelMessages != null) {
             Message message = channelMessages.remove(messageId);
             if (message != null) {
+                Channel channel = this.channels.get(channelId);
+                if ((channel.getLastReadMessageId() == null || channel.getLastReadMessageId() < message.getId())
+                        && !message.getSender().equals(USession.Companion.activeNow().getUuid())
+                ) {
+                    changeUnreadMessageCount(channel, -1);
+                }
                 for (IMessengerManager iMessengerManager : getCallbacks()) {
                     iMessengerManager.messageDeleted(message);
                 }
             }
         }
-    }
-
-    public void updateMessage(final ClientMessage message, final String newContents) {
-        Message messageCopy = new Message(
-            message.getId(),
-            message.getChannel().getId(),
-            message.getSender(),
-            newContents,
-            true,
-            message.getReplyTo() == null ? null : message.getReplyTo().getMessageId(),
-            Instant.now().toEpochMilli()
-        );
-        upsertMessageToChannel(messageCopy.getChannelId(), messageCopy);
     }
 
     public void deleteMessage(final long channelId, final long messageId) {
@@ -614,6 +638,23 @@ public class ChatManager extends StateCallbackManager<IMessengerManager> impleme
             boolean success = packet instanceof ResponseActionPacket && ((ResponseActionPacket) packet).isSuccessful();
             if (success) {
                 channel.setMuted(muted);
+                if (muted) {
+                    CompletableFuture<String> nameFuture;
+                    if (channel.getType() == ChannelType.DIRECT_MESSAGE) {
+                        nameFuture = channel.getMembers().stream().filter(uuid -> !uuid.equals(UUIDUtil.getClientUUID())).findFirst().map(UuidNameLookup::getName).orElse(CompletableFuture.completedFuture("Unknown"));
+                    } else {
+                        nameFuture = CompletableFuture.completedFuture(channel.getName());
+                    }
+                    nameFuture.whenCompleteAsync((name, throwable) ->
+                        Notifications.INSTANCE.push("", "", notificationBuilder -> {
+                            ExtensionsKt.iconAndMarkdownBody(notificationBuilder,
+                                    EssentialPalette.MUTE_8X9.create(),
+                                    StringsKt.colored(name, EssentialPalette.TEXT_HIGHLIGHT) + " has been muted"
+                            );
+                            return Unit.INSTANCE;
+                        })
+                    );
+                }
             } else {
                 ExtensionsKt.error(Notifications.INSTANCE, "Error", "Failed to mute channel.\nPlease try again.");
             }
@@ -624,21 +665,11 @@ public class ChatManager extends StateCallbackManager<IMessengerManager> impleme
         });
     }
 
-    public void fileReport(long channelId, long messageId, String reason) {
+    public void fileReport(ModalManager modalManager, long channelId, long messageId, UUID sender, String reason) {
         mutedStateUpdateQueue.enqueue(new ClientChatChannelMessageReportPacket(channelId, messageId, reason), response -> {
             Packet packet = response.orElse(null);
             if (packet instanceof ServerChatChannelMessageReportPacket) {
-                Notifications.INSTANCE.push(
-                    "Player Reported",
-                    "Thank you for reporting\nthis player.",
-                    4f,
-                    () -> Unit.INSTANCE,
-                    () -> Unit.INSTANCE,
-                    (builder) -> {
-                        builder.withCustomComponent(Slot.ICON, EssentialPalette.ROUND_WARNING_7X.create());
-                        return Unit.INSTANCE;
-                    }
-                );
+                modalManager.queueModal(new ReportMessageConfirmationModal(modalManager, sender, false));
             } else {
                 ExtensionsKt.error(Notifications.INSTANCE, "Report Failed", "Failed to report player.\nPlease try again.");
             }
@@ -650,6 +681,40 @@ public class ChatManager extends StateCallbackManager<IMessengerManager> impleme
         ListKt.setAll(channelsWithMessagesListState, new ArrayList<>(channelMessages.keySet()));
     }
 
+    public void setLastReadMessage(final long channelId, @Nullable final Long lastReadMessageId) {
+        Channel channel = getChannel(channelId).orElseThrow(() -> new IllegalStateException("Can not find channel for message id: " + lastReadMessageId));
+        if (Objects.equals(channel.getLastReadMessageId(), lastReadMessageId)) {
+            return;
+        }
+        channel.setLastReadMessageId(lastReadMessageId);
+        // Update unread message count in channel
+        Map<Long, Message> messages = getMessages(channel.getId());
+        if (messages != null) {
+            Stream<Message> otherUserMessages = messages.values().stream().filter(m -> !m.getSender().equals(USession.Companion.activeNow().getUuid()));
+            if (lastReadMessageId == null) {
+                channel.setUnreadMessages((int) otherUserMessages.count());
+            } else {
+                channel.setUnreadMessages((int) otherUserMessages.filter(m -> lastReadMessageId < m.getId()).count());
+            }
+        }
+        for (IMessengerManager manager : getCallbacks()) {
+            manager.channelUpdated(channel);
+        }
+        this.connectionManager.call(new ClientChatChannelReadStatePacket(channel.getId(), lastReadMessageId)).fireAndForget();
+    }
+
+    public void changeUnreadMessageCount(Channel channel, int delta) {
+        // Infra does not send anything over 100, so we will treat 100 as infinity which means adding or subtracting doesn't change anything
+        if (channel.getUnreadMessages() >= 100) {
+            return;
+        }
+        channel.setUnreadMessages(channel.getUnreadMessages() + delta);
+        for (IMessengerManager manager : getCallbacks()) {
+            manager.channelUpdated(channel);
+        }
+    }
+
+    @Deprecated
     public void updateReadState(Message message, boolean read) {
         if (message.isRead() == read) return;
         Message messageCopy = new Message(
@@ -659,9 +724,10 @@ public class ChatManager extends StateCallbackManager<IMessengerManager> impleme
             message.getContents(),
             read,
             message.getReplyTargetId(),
-            message.getLastEditTime()
+            message.getLastEditTime(),
+            message.getCreatedAt()
         );
-        upsertMessageToChannel(messageCopy.getChannelId(), messageCopy);
+        upsertMessageToChannel(messageCopy.getChannelId(), messageCopy, false);
 
         for (IMessengerManager iMessengerManager : getCallbacks()) {
             iMessengerManager.messageReadStateUpdated(message, read);
@@ -702,8 +768,12 @@ public class ChatManager extends StateCallbackManager<IMessengerManager> impleme
         }
     }
 
-    public @Nullable Message getMessageById(long messageId) {
-        return messageMap.get(messageId);
+    public @Nullable Message getMessageById(long channelId, long messageId) {
+        ConcurrentMap<Long, Message> messages = channelMessages.get(channelId);
+        if (messages == null) {
+            return null;
+        }
+        return messages.get(messageId);
     }
 
     /**
@@ -714,8 +784,7 @@ public class ChatManager extends StateCallbackManager<IMessengerManager> impleme
         if (messages == null) {
             return null;
         }
-        Optional<Message> min = messages.values().stream().min(Comparator.comparingLong(value -> MessageUtils.INSTANCE.getSentTimeStamp(value.getId())));
-        return min.map(Message::getId).orElse(null);
+        return messages.values().stream().min(Comparator.comparingLong(Message::getId)).map(Message::getId).orElse(null);
     }
 
     /**
@@ -732,7 +801,7 @@ public class ChatManager extends StateCallbackManager<IMessengerManager> impleme
             return;
         }
 
-        Message messageById = getMessageById(ref.getMessageId());
+        Message messageById = getMessageById(ref.getChannelId(), ref.getMessageId());
         if (messageById != null) {
             ref.supplyValue(ClientMessageKt.infraInstanceToClient(messageById));
             return;
@@ -740,20 +809,6 @@ public class ChatManager extends StateCallbackManager<IMessengerManager> impleme
 
         // Request messages until we find the target one
         channelEagerMessageResolverMap.computeIfAbsent(ref.getChannelId(), EagerMessageResolver::new).resolve(ref);
-    }
-
-    public void sendGiftEmbed(UUID receiver, String cosmeticId) {
-        if (receiver.equals(UUIDUtil.getClientUUID())) {
-            return;
-        }
-        Optional<Map.Entry<Long, Channel>> channelEntry = getChannels().entrySet().stream().filter(entry ->
-            entry.getValue().getType() == ChannelType.DIRECT_MESSAGE && entry.getValue().getMembers().contains(receiver)
-        ).findFirst();
-        if (channelEntry.isPresent()) {
-            HttpUrl.Builder urlBuilder = new HttpUrl.Builder();
-            urlBuilder.scheme("https").host("essential.gg").addPathSegment("gift").addPathSegment(cosmeticId);
-            sendMessage(channelEntry.get().getKey(), urlBuilder.build().toString());
-        }
     }
 
     /**

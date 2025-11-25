@@ -16,7 +16,6 @@ import gg.essential.elementa.utils.withAlpha
 import gg.essential.gui.elementa.state.v2.State
 import gg.essential.gui.elementa.state.v2.combinators.map
 import gg.essential.gui.elementa.state.v2.memo
-import gg.essential.gui.elementa.state.v2.stateOf
 import gg.essential.gui.elementa.state.v2.toV2
 import gg.essential.gui.layoutdsl.LayoutScope
 import gg.essential.gui.layoutdsl.Modifier
@@ -29,48 +28,6 @@ import gg.essential.gui.layoutdsl.shadow
 import gg.essential.gui.util.hoverScope
 import gg.essential.universal.UMatrixStack
 import gg.essential.vigilance.utils.onLeftClick
-
-/**
- * A styled button builder for use in various menus.
- *
- * @param style The style for this button, containing the [MenuButton.Style] for the default, hovered & disabled states.
- * @param enableRetexturing Whether this button should be re-textured or not.
- * @param disabled Whether this button is disabled or not. When true, click events will not be propagated.
- * @param content The actual content of the button, text can be styled using [Modifier.textStyle].
- */
-fun LayoutScope.styledButton(
-    modifier: Modifier = Modifier,
-    style: StyledButton.Style = StyledButton.Style.GRAY,
-    enableRetexturing: Boolean = false,
-    disabled: State<Boolean> = stateOf(false),
-    content: LayoutScope.(style: State<MenuButton.Style>) -> Unit
-) {
-    styledButton(
-        modifier,
-        stateOf(style),
-        stateOf(enableRetexturing),
-        disabled,
-        content,
-    )
-}
-
-/**
- * A styled button builder for use in various menus.
- *
- * @param style The style for this button, containing the [MenuButton.Style] for the default, hovered & disabled states.
- * @param enableRetexturing Whether this button should be re-textured or not.
- * @param disabled Whether this button is disabled or not. When true, click events will not be propagated.
- * @param content The actual content of the button, text can be styled using [Modifier.textStyle].
- */
-fun LayoutScope.styledButton(
-    modifier: Modifier = Modifier,
-    style: State<StyledButton.Style>,
-    enableRetexturing: State<Boolean> = stateOf(false),
-    disabled: State<Boolean> = stateOf(false),
-    content: LayoutScope.(style: State<MenuButton.Style>) -> Unit
-) {
-    StyledButton(style, enableRetexturing, disabled, content)(modifier)
-}
 
 /** Used by a [Modifier] in a [styledButton] block in order to style text. */
 fun Modifier.textStyle(style: State<MenuButton.Style>): Modifier {

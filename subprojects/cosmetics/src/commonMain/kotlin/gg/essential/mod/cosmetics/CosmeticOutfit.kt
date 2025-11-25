@@ -12,13 +12,14 @@
 package gg.essential.mod.cosmetics
 
 import gg.essential.cosmetics.SkinId
+import gg.essential.mod.Skin
 import gg.essential.mod.cosmetics.settings.CosmeticSetting
 import gg.essential.model.util.Instant
 
 data class CosmeticOutfit(
     val id: String,
     val name: String,
-    val skin: OutfitSkin?,
+    val skin: Skin?,
     val skinId: SkinId?,
     val equippedCosmetics: Map<CosmeticSlot, String>,
     val cosmeticSettings: Map<String, List<CosmeticSetting>>,

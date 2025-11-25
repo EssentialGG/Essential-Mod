@@ -23,6 +23,8 @@ import org.spongepowered.asm.mixin.gen.Invoker;
 //#if FABRIC
 //$$ @org.spongepowered.asm.mixin.Pseudo
 //$$ @Mixin(targets = {"de.keksuccino.konkrete.events.client.GuiScreenEvent$DrawScreenEvent", "de.keksuccino.fancymenu.events.RenderScreenEvent"}, remap = false)
+//#elseif NEOFORGE
+//$$ @Mixin(value = net.neoforged.neoforge.client.event.ScreenEvent.Render.class, remap = false)
 //#else
 //#if MC>=11900
 //$$ @Mixin(value = net.minecraftforge.client.event.ScreenEvent.Render.class, remap = false)

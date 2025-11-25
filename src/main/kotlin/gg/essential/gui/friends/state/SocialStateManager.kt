@@ -12,13 +12,15 @@
 package gg.essential.gui.friends.state
 
 import gg.essential.elementa.utils.ObservableAddEvent
+import gg.essential.gui.elementa.state.v2.ListState
 import gg.essential.network.connectionmanager.ConnectionManager
+import gg.essential.network.connectionmanager.social.ProfileSuspension
 import gg.essential.util.UUIDUtil
 import gg.essential.util.getOtherUser
 import gg.essential.util.thenAcceptOnMainThread
 import java.util.*
 
-class SocialStateManager(connectionManager: ConnectionManager) {
+class SocialStateManager(connectionManager: ConnectionManager) : SocialStates {
 
     private val messageStateImpl = MessengerStateManagerImpl(connectionManager.chatManager)
     private val relationshipStateImpl = RelationshipStateManagerImpl(connectionManager.relationshipManager)
@@ -29,6 +31,15 @@ class SocialStateManager(connectionManager: ConnectionManager) {
     val relationshipStates: IRelationshipStates = relationshipStateImpl
 
     val statusStates: IStatusStates = statusStateManagerImpl
+
+    override val relationships: IRelationshipStates
+        get() = relationshipStates
+    override val messages: IMessengerStates
+        get() = messengerStates
+    override val activity: IStatusStates
+        get() = statusStates
+
+    override val suspensions: ListState<ProfileSuspension> = connectionManager.profileManager.suspensions
 
     init {
         val observableFriendList = relationshipStates.getObservableFriendList()
@@ -54,5 +65,4 @@ class SocialStateManager(connectionManager: ConnectionManager) {
             }
         }
     }
-
 }

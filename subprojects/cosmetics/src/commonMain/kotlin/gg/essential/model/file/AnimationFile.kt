@@ -15,9 +15,8 @@ import gg.essential.cosmetics.events.AnimationEvent
 import gg.essential.model.Channels
 import gg.essential.model.Keyframe
 import gg.essential.model.Keyframes
-import gg.essential.model.molang.MolangExpression
+import gg.essential.model.molang.Molang
 import gg.essential.model.molang.MolangVec3
-import gg.essential.model.molang.parseMolangExpression
 import gg.essential.model.util.ListOrSingle
 import gg.essential.model.util.TreeMap
 import kotlinx.serialization.KSerializer
@@ -26,7 +25,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonEncoder
@@ -35,6 +33,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.JsonTransformingSerializer
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.serializer
 
@@ -61,7 +61,7 @@ data class AnimationFile(
             val effect: String,
             val locator: String? = null,
             @SerialName("pre_effect_script")
-            val preEffectScript: MolangExpression? = null,
+            val preEffectScript: Molang? = null,
         )
 
         @Serializable
@@ -108,35 +108,48 @@ internal class KeyframesSerializer : KSerializer<Keyframes> {
     private object InnerSerializer : JsonTransformingSerializer<TreeMap<Float, Keyframe>>(serializer()) {
         override fun transformDeserialize(element: JsonElement): JsonElement =
             if (element is JsonObject) element else buildJsonObject { put("0", element) }
+
+        override fun transformSerialize(element: JsonElement): JsonElement =
+            if (element is JsonObject && element.keys == setOf("0")) element["0"]!! else element
     }
 }
 
 internal object KeyframeSerializer : KSerializer<Keyframe> {
     override val descriptor: SerialDescriptor = JsonElement.serializer().descriptor
-    override fun deserialize(decoder: Decoder): Keyframe = parse((decoder as JsonDecoder).decodeJsonElement())
-    override fun serialize(encoder: Encoder, value: Keyframe) = throw UnsupportedOperationException()
 
-    private fun parse(json: JsonElement): Keyframe = with(json) {
-        fun JsonElement.parseMolangVector(): MolangVec3 = if (this is JsonArray) {
-            if (size == 3) {
-                MolangVec3(
-                    (get(0) as JsonPrimitive).parseMolangExpression(),
-                    (get(1) as JsonPrimitive).parseMolangExpression(),
-                    (get(2) as JsonPrimitive).parseMolangExpression()
-                )
-            } else {
-                (get(0) as JsonPrimitive).parseMolangExpression().let { MolangVec3(it, it, it) }
-            }
-        } else {
-            (this as JsonPrimitive).parseMolangExpression().let { MolangVec3(it, it, it) }
-        }
+    override fun deserialize(decoder: Decoder): Keyframe = with((decoder as JsonDecoder).decodeJsonElement()) {
         if (this is JsonObject) {
-            val pre = get("pre")?.parseMolangVector()
-            val post = get("post")!!.parseMolangVector()
+            val pre = get("pre")?.let { decoder.json.decodeFromJsonElement<MolangVec3>(it) }
+            val post = get("post")!!.let { decoder.json.decodeFromJsonElement<MolangVec3>(it) }
             val smooth = get("lerp_mode")?.jsonPrimitive?.contentOrNull == "catmullrom"
             Keyframe(pre ?: post, post, smooth)
         } else {
-            parseMolangVector().let { Keyframe(it, it, false) }
+            decoder.json.decodeFromJsonElement<MolangVec3>(this)
+                .let { Keyframe(it, it, false) }
         }
+    }
+
+    override fun serialize(encoder: Encoder, value: Keyframe) {
+        encoder as JsonEncoder
+        // TODO: Switch to MolangVec3.serializer once we drop support for old versions.
+        //       Cannot use it now because it can output `"x"` which old versions of KeyframeSerializer cannot parse.
+        fun serialize(value: MolangVec3): JsonElement {
+            return if (value.x == value.y && value.y == value.z) {
+                encoder.json.encodeToJsonElement(value.x)
+            } else {
+                encoder.json.encodeToJsonElement(listOf(value.x, value.y, value.z))
+            }
+        }
+        encoder.encodeJsonElement(if (value.pre == value.post && !value.smooth) {
+            serialize(value.pre)
+        } else {
+            JsonObject(buildMap {
+                put("pre", serialize(value.pre))
+                put("post", serialize(value.post))
+                if (value.smooth) {
+                    put("lerp_mode", JsonPrimitive("catmullrom"))
+                }
+            })
+        })
     }
 }

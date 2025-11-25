@@ -12,13 +12,16 @@
 package gg.essential.util
 
 import java.text.DecimalFormat
+import java.text.DecimalFormatSymbols
 import java.text.NumberFormat
 import java.util.*
 
 val USD_CURRENCY: Currency = Currency.getInstance("USD")
 
+val USD_DECIMAL_FORMAT: DecimalFormat = DecimalFormat("0.00", DecimalFormatSymbols.getInstance(Locale.US))
+
 fun Currency.format(price: Double) = when (this) {
-    USD_CURRENCY -> "$" + DecimalFormat("0.00").format(price)
+    USD_CURRENCY -> "$" + USD_DECIMAL_FORMAT.format(price)
     else -> try {
         val format = NumberFormat.getCurrencyInstance()
         format.currency = this

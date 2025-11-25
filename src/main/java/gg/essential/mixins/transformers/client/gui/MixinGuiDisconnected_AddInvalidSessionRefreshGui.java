@@ -17,6 +17,7 @@ import gg.essential.mixins.impl.client.gui.EssentialPostScreenDrawHook;
 import gg.essential.universal.UMatrixStack;
 import gg.essential.util.ServerConnectionUtil;
 import gg.essential.util.ServerDataInfo;
+import gg.essential.util.UDrawContext;
 import kotlin.collections.CollectionsKt;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiDisconnected;
@@ -104,9 +105,9 @@ public abstract class MixinGuiDisconnected_AddInvalidSessionRefreshGui extends G
 
     //#if MC>=12002
     //$$ @Override
-    //$$ public void essential$afterDraw(UMatrixStack matrixStack, int mouseX, int mouseY, float partialTicks) {
+    //$$ public void essential$afterDraw(UDrawContext drawContext, int mouseX, int mouseY, float partialTicks) {
     //$$     if (essentialGui == null) return;
-    //$$     essentialGui.draw(matrixStack);
+    //$$     essentialGui.draw(drawContext);
     //$$ }
     //#else
     //#if MC<=11202
@@ -119,19 +120,21 @@ public abstract class MixinGuiDisconnected_AddInvalidSessionRefreshGui extends G
         GlStateManager.disableLighting();
         GlStateManager.disableDepth();
 
-        essentialGui.draw(new UMatrixStack());
+        essentialGui.draw(new UDrawContext(new UMatrixStack()));
     }
     //#else
     //$$ @Inject(method = "render", at = @At("RETURN"))
     //#if MC>=12000
     //$$ private void renderEssentialGui(DrawContext context, int mouseX, int mouseY, float partialTicks, CallbackInfo ci) {
     //$$     MatrixStack matrixStack = context.getMatrices();
+    //$$     UDrawContext drawContext = new UDrawContext(context, new UMatrixStack(matrixStack));
     //#else
     //$$ private void renderEssentialGui(MatrixStack matrixStack, int mouseX, int mouseY, float partialTicks, CallbackInfo ci) {
+    //$$     UDrawContext drawContext = new UDrawContext(new UMatrixStack(matrixStack));
     //#endif
     //$$     if (essentialGui == null) return;
     //$$
-    //$$     essentialGui.draw(new UMatrixStack(matrixStack));
+    //$$     essentialGui.draw(drawContext);
     //$$ }
     //#endif
     //#endif

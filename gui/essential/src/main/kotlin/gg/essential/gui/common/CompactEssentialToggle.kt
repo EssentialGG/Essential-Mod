@@ -11,141 +11,205 @@
  */
 package gg.essential.gui.common
 
-import gg.essential.elementa.components.UIBlock
-import gg.essential.elementa.components.UIContainer
-import gg.essential.elementa.components.Window
-import gg.essential.elementa.constraints.AspectConstraint
-import gg.essential.elementa.constraints.CenterConstraint
-import gg.essential.elementa.constraints.animation.Animations
-import gg.essential.elementa.dsl.*
-import gg.essential.elementa.state.BasicState
-import gg.essential.elementa.state.State
-import gg.essential.elementa.state.toConstraint
+import gg.essential.elementa.UIComponent
+import gg.essential.elementa.components.UIBlock.Companion.drawBlock
+import gg.essential.elementa.dsl.constrain
+import gg.essential.elementa.dsl.pixels
 import gg.essential.gui.EssentialPalette
+import gg.essential.gui.elementa.state.v2.MutableState
+import gg.essential.gui.elementa.state.v2.ReferenceHolderImpl
+import gg.essential.gui.elementa.state.v2.State
+import gg.essential.gui.elementa.state.v2.animateTransitions
 import gg.essential.gui.elementa.state.v2.combinators.map
-import gg.essential.gui.elementa.state.v2.toV2
-import gg.essential.gui.layoutdsl.*
+import gg.essential.gui.elementa.state.v2.memo
+import gg.essential.gui.elementa.state.v2.stateOf
+import gg.essential.gui.layoutdsl.LayoutScope
+import gg.essential.gui.layoutdsl.Modifier
+import gg.essential.gui.layoutdsl.color
+import gg.essential.gui.layoutdsl.hoverScope
+import gg.essential.gui.layoutdsl.onLeftClick
+import gg.essential.gui.util.hoverScopeV2
+import gg.essential.model.lerp
+import gg.essential.universal.UMatrixStack
 import gg.essential.universal.USound
-import gg.essential.util.centered
-import gg.essential.gui.util.hoveredState
-import gg.essential.gui.util.pollingState
-import gg.essential.gui.util.stateBy
-import gg.essential.vigilance.utils.onLeftClick
+import gg.essential.util.darker
 import java.awt.Color
 
 abstract class EssentialToggle(
-    private val enabled: State<Boolean>,
-    private val boxOffset: Int
-) : UIBlock() {
-    protected val switchBox by UIBlock().constrain {
-        y = CenterConstraint()
-        width = AspectConstraint()
-    } childOf this
+    protected val value: MutableState<Boolean>,
+    protected val enabled: State<Boolean> = stateOf(true),
+) : UIComponent() {
+
+    protected val referenceHolder = ReferenceHolderImpl()
+
+    protected val hovered = hoverScopeV2()
+
+    private val switchState = value.map { if (it) 1f else 0f }.animateTransitions(this, MOVE_ANIMATION_TIME)
+    private val valueColorProgress = value.map { if (it) 1f else 0f }.animateTransitions(this, COLOR_ANIMATION_TIME)
+    private val colorState = memo {
+        val valueFalse = color(hovered(), false)
+        val valueTrue = color(hovered(), true)
+        valueFalse.lerp(valueTrue, valueColorProgress())
+    }
 
     init {
-        onLeftClick {
-            USound.playButtonPress()
-            enabled.set { !it }
-        }
-
-        enabled.onSetValueAndNow {
-            val xConstraint = boxOffset.pixel(alignOpposite = it)
-            // Null during init
-            if (Window.ofOrNull(this@EssentialToggle) != null) {
-                switchBox.animate {
-                    setXAnimation(Animations.OUT_EXP, 0.25f, xConstraint)
-                }
-            } else {
-                switchBox.setX(xConstraint)
+        Modifier.hoverScope().color(colorState).onLeftClick { click ->
+            if (enabled.getUntracked()) {
+                USound.playButtonPress()
+                value.set { !it }
             }
-        }
+            click.stopPropagation()
+        }.applyToComponent(this)
+    }
+
+    override fun draw(matrixStack: UMatrixStack) {
+        beforeDraw(matrixStack)
+
+        val x = getLeft().toDouble()
+        val y = getTop().toDouble()
+        val width = getWidth().toDouble()
+        val height = getHeight().toDouble()
+        val switchPos = switchState.getUntracked() * (width * 0.5)
+
+        matrixStack.push()
+        matrixStack.translate(1f, 1f, 0f)
+        drawInner(matrixStack, EssentialPalette.BLACK, x, y, width, height, switchPos)
+        matrixStack.pop()
+
+        drawInner(matrixStack, getColor(), x, y, width, height, switchPos)
+
+        drawIndicator(matrixStack, x + switchPos, y, switchState)
+
+        super.draw(matrixStack)
+    }
+
+    private fun drawInner(matrixStack: UMatrixStack, color: Color, x: Double, y: Double, width: Double, height: Double,
+                          switchPos: Double) {
+        drawBlock(matrixStack, color, x, y, x + width, y + 1)
+        drawBlock(matrixStack, color, x, y + height - 1, x + width, y + height)
+        drawBlock(matrixStack, color, x, y + 1, x + 1, y + height - 1)
+        drawBlock(matrixStack, color, x + width - 1, y + 1, x + width, y + height - 1)
+
+        drawBlock(matrixStack, color, x + switchPos, y + 1, x + (width * 0.5) + switchPos, y + height - 1)
+    }
+
+    protected abstract fun drawIndicator(matrixStack: UMatrixStack, x: Double, y: Double, switchState: State<Float>)
+
+    protected abstract fun color(hovered: Boolean, value: Boolean): Color
+
+    companion object {
+
+        private const val MOVE_ANIMATION_TIME = 0.25f
+        private const val COLOR_ANIMATION_TIME = 0.15f
     }
 }
 
 class FullEssentialToggle(
-    enabled: State<Boolean>,
-    backgroundColor: Color,
-) : EssentialToggle(enabled, 1) {
-    // This component is used in Vigilance, and we use the property here
-    // to avoid a divergence in the toggle implementations
-    private val showToggleIndicators = pollingState {
-        System.getProperty("essential.hideSwitchIndicators") != "true"
-    }
+    value: MutableState<Boolean>,
+    enabled: State<Boolean> = stateOf(true)
+) : EssentialToggle(value, enabled) {
 
-    private val accentColor = enabled.map {
-            if (it) {
-                EssentialPalette.ACCENT_BLUE
-            } else {
-                EssentialPalette.TEXT
-            }
-        }
-
-    private val onIndicator by UIContainer().constrain {
-        height = 100.percent
-        width = 50.percent
-    }.addChild {
-        EssentialPalette.TOGGLE_ON.withColor(backgroundColor).create().centered()
-    }.bindParent(this, showToggleIndicators and enabled, index = 0)
-
-    private val offIndicator by UIContainer().constrain {
-        x = 0.pixels(alignOpposite = true)
-        height = 100.percent
-        width = 50.percent
-    }.addChild {
-        EssentialPalette.TOGGLE_OFF
-            .create()
-            .constrain {
-                color = EssentialPalette.TEXT_MID_GRAY.toConstraint()
-            }
-            .centered()
-    }.bindParent(this, showToggleIndicators and !enabled, index = 0)
+    private val onIndicator = EssentialPalette.TOGGLE_ON.create()
+    private val offIndicator = EssentialPalette.TOGGLE_OFF.create()
 
     init {
         constrain {
             width = 20.pixels
             height = 11.pixels
         }
+    }
 
-        setColor(accentColor.toConstraint())
-
-        switchBox.constrain {
-            height = 100.percent - 2.pixels
-            color = hoveredState().map { hovered ->
-                    if (hovered) {
-                        EssentialPalette.BUTTON
-                    } else {
-                        backgroundColor
-                    }
-                }.toConstraint()
+    override fun drawIndicator(matrixStack: UMatrixStack, x: Double, y: Double, switchState: State<Float>) {
+        if (switchState.getUntracked() > 0.5f) {
+            onIndicator.drawImage(matrixStack, x + 4.5, y + 3, 1.0, 5.0, toggleIndicatorColor(hovered.getUntracked(), true))
+        } else {
+            offIndicator.drawImage(matrixStack, x + 3, y + 3, 4.0, 5.0, toggleIndicatorColor(hovered.getUntracked(), false))
         }
+    }
 
+    override fun color(hovered: Boolean, value: Boolean): Color {
+        val enabled = enabled.getUntracked()
+        return if (enabled && hovered) {
+            if (value) {
+                EssentialPalette.TOGGLE_ON_BACKGROUND_HOVERED
+            } else {
+                EssentialPalette.TOGGLE_OFF_BACKGROUND_HOVERED
+            }
+        } else {
+            if (enabled) {
+                if (value) {
+                    EssentialPalette.TOGGLE_ON_BACKGROUND
+                } else {
+                    EssentialPalette.TOGGLE_OFF_BACKGROUND
+                }
+            } else {
+                if (value) {
+                    EssentialPalette.BLUE_BUTTON
+                } else {
+                    EssentialPalette.GRAY_BUTTON_HOVER
+                }
+            }
+        }
+    }
+
+    private fun toggleIndicatorColor(hovered: Boolean, value: Boolean): Color {
+        return if (value) {
+            EssentialPalette.BLACK
+        } else {
+            if (!enabled.getUntracked()) {
+                EssentialPalette.GRAY_OUTLINE_BUTTON
+            } else if (hovered) {
+                EssentialPalette.TOGGLE_OFF_BACKGROUND
+            } else {
+                EssentialPalette.TOGGLE_OFF_FOREGROUND
+            }
+        }
+    }
+}
+
+class CompactEssentialToggle(
+    value: MutableState<Boolean>,
+    enabled: State<Boolean> = stateOf(true),
+    private val offColor: Color = EssentialPalette.TEXT_MID_GRAY,
+    private val onColor: Color = EssentialPalette.GREEN
+) : EssentialToggle(value, enabled) {
+
+    init {
+        constrain {
+            width = 10.pixels
+            height = 6.pixels
+        }
+    }
+
+    override fun drawIndicator(matrixStack: UMatrixStack, x: Double, y: Double, switchState: State<Float>) {
+        // noop
+    }
+
+    override fun color(hovered: Boolean, value: Boolean): Color {
+        val enabled = enabled.getUntracked()
+        return if (enabled && hovered) {
+            if (value) {
+                onColor.brighter()
+            } else {
+                offColor.brighter()
+            }
+        } else {
+            if (value) {
+                onColor
+            } else {
+                offColor
+            }.darker(if(enabled) 0f else 0.3f)
+        }
     }
 }
 
 fun LayoutScope.compactFullEssentialToggle(
-    enabled: State<Boolean>,
+    value: MutableState<Boolean>,
     modifier: Modifier = Modifier,
-    offColor: State<Color> = BasicState(EssentialPalette.TEXT_MID_GRAY),
-    onColor: State<Color> = BasicState(EssentialPalette.GREEN),
-    shadowColor: State<Color?> = BasicState(EssentialPalette.BLACK),
-) {
-    val color: State<Color> = stateBy { if (enabled()) onColor() else offColor() }
-    val coloredModifier = Modifier.color(color).hoverColor(color.map { it.brighter() }).then(shadowColor.map { if (it != null) Modifier.shadow(it) else Modifier })
-
-    column(Modifier.width(10f).height(6f).then(modifier)) {
-        box(coloredModifier.fillWidth().height(1f))
-        row(Modifier.fillWidth().fillRemainingHeight()) {
-            box(coloredModifier.width(1f).fillHeight())
-            row(Modifier.fillRemainingWidth().fillHeight(), Arrangement.SpaceBetween) {
-                box(coloredModifier.fillHeight().animateWidth(enabled.toV2().map {{ if (it) 50.percent else 0.percent }}, 0.25f))
-                box(coloredModifier.fillHeight().animateWidth(enabled.toV2().map {{ if (it) 0.percent else 50.percent }}, 0.25f))
-            }
-            box(coloredModifier.width(1f).fillHeight())
-        }
-        box(coloredModifier.fillWidth().height(1f))
-    }.onLeftClick { click ->
-        USound.playButtonPress()
-        enabled.set { !it }
-        click.stopPropagation()
-    }
+    enabled: State<Boolean> = stateOf(true),
+    offColor: Color = EssentialPalette.TEXT_MID_GRAY,
+    onColor: Color = EssentialPalette.GREEN
+): EssentialToggle {
+    return CompactEssentialToggle(value, enabled, offColor, onColor) (modifier)
 }
+

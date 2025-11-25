@@ -26,6 +26,12 @@ import net.minecraft.util.ResourceLocation;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
+//#if MC>=12109
+//$$ import net.minecraft.client.model.Model;
+//$$ import net.minecraft.client.render.command.ModelCommandRenderer;
+//$$ import net.minecraft.client.render.command.OrderedRenderCommandQueue;
+//#endif
+
 //#if MC>=12102
 //$$ import gg.essential.mixins.impl.client.model.PlayerEntityRenderStateExt;
 //$$ import net.minecraft.client.render.entity.model.BipedEntityModel;
@@ -42,7 +48,10 @@ import org.spongepowered.asm.mixin.injection.At;
 @Mixin(LayerCape.class)
 public abstract class Mixin_Emissive_Cape {
 
-    //#if MC>=12102
+    //#if MC>=12109
+    //$$ private static final String RENDER_LAYER = "render(Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/command/OrderedRenderCommandQueue;ILnet/minecraft/client/render/entity/state/PlayerEntityRenderState;FF)V";
+    //$$ private static final String RENDER_CAPE = "Lnet/minecraft/client/render/command/OrderedRenderCommandQueue;submitModel(Lnet/minecraft/client/model/Model;Ljava/lang/Object;Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/RenderLayer;IIILnet/minecraft/client/render/command/ModelCommandRenderer$CrumblingOverlayCommand;)V";
+    //#elseif MC>=12102
     //$$ private static final String RENDER_LAYER = "render(Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;ILnet/minecraft/client/render/entity/state/PlayerEntityRenderState;FF)V";
     //$$ private static final String RENDER_CAPE = "Lnet/minecraft/client/render/entity/model/BipedEntityModel;render(Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumer;II)V";
     //#elseif MC>=11600
@@ -54,40 +63,68 @@ public abstract class Mixin_Emissive_Cape {
     //#endif
 
     @WrapOperation(method = RENDER_LAYER, at = @At(value = "INVOKE", target = RENDER_CAPE))
-    private void renderWithEmissiveLayer(
-        //#if MC>=12102
+    private <S> void renderWithEmissiveLayer(
+        //#if MC>=12109
+        //$$ OrderedRenderCommandQueue queue,
+        //$$ Model<? super S> model,
+        //$$ S state,
+        //#elseif MC>=12102
         //$$ BipedEntityModel model,
         //#else
         ModelPlayer model,
         //#endif
         //#if MC>=11400
         //$$ MatrixStack matrixStack,
+        //#if MC>=12109
+        //$$ RenderLayer renderLayer,
+        //#else
         //$$ IVertexBuilder vertexConsumer,
+        //#endif
         //$$ int light,
         //$$ int overlay,
+        //#if MC>=12109
+        //$$ int outlineColor,
+        //$$ ModelCommandRenderer.CrumblingOverlayCommand crumblingOverlay,
+        //#endif
         //#else
         float scale,
         //#endif
-        Operation<Void> original,
+        Operation<Void> original
+        //#if MC<12109
         //#if MC>=11400
-        //$$ @Local(argsOnly = true) IRenderTypeBuffer buffer,
+        //$$ , @Local(argsOnly = true) IRenderTypeBuffer buffer
         //#endif
         //#if MC>=12102
-        //$$ @Local(argsOnly = true) PlayerEntityRenderState state
+        //$$ , @Local(argsOnly = true) PlayerEntityRenderState state
         //#else
-        @Local(argsOnly = true) AbstractClientPlayer player
+        , @Local(argsOnly = true) AbstractClientPlayer player
+        //#endif
         //#endif
     ) {
         // Regular cape
         original.call(
+            //#if MC>=12109
+            //$$ queue,
+            //$$ model,
+            //$$ state,
+            //#else
             model,
+            //#endif
             //#if MC>=11400
             //$$ matrixStack,
+            //#if MC>=12109
+            //$$ renderLayer,
+            //#else
             //$$ vertexConsumer,
+            //#endif
             //$$ light,
             //$$ overlay
             //#else
             scale
+            //#endif
+            //#if MC>=12109
+            //$$ , outlineColor
+            //$$ , crumblingOverlay
             //#endif
         );
 
@@ -102,7 +139,20 @@ public abstract class Mixin_Emissive_Cape {
             return;
         }
 
-        //#if MC>=11400
+        //#if MC>=12109
+        //$$ // Note: Cannot just use `original.call` because that expects an **Ordered**RenderCommandQueue while
+        //$$ //       `getBatchingQueue` only returns a RenderCommandQueue.
+        //$$ queue.getBatchingQueue(1).submitModel(
+        //$$     model,
+        //$$     state,
+        //$$     matrixStack,
+        //$$     MinecraftRenderBackend.INSTANCE.getEmissiveLayer(emissiveTexture),
+        //$$     light,
+        //$$     overlay,
+        //$$     outlineColor,
+        //$$     crumblingOverlay
+        //$$ );
+        //#elseif MC>=11400
         //$$ original.call(
         //$$     model,
         //$$     matrixStack,

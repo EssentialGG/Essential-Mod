@@ -14,6 +14,7 @@ package gg.essential.gui.notification
 import gg.essential.api.gui.NotificationType
 import gg.essential.api.gui.Slot
 import gg.essential.elementa.UIComponent
+import gg.essential.elementa.components.UIContainer
 import gg.essential.elementa.components.Window
 import gg.essential.elementa.constraints.PaddingConstraint
 import gg.essential.elementa.dsl.width
@@ -42,6 +43,7 @@ import gg.essential.gui.layoutdsl.row
 import gg.essential.gui.layoutdsl.shadow
 import gg.essential.gui.layoutdsl.spacer
 import gg.essential.gui.layoutdsl.text
+import gg.essential.gui.layoutdsl.then
 import gg.essential.gui.layoutdsl.width
 import gg.essential.gui.layoutdsl.wrappedText
 import gg.essential.universal.UMatrixStack
@@ -57,10 +59,18 @@ fun LayoutScope.notificationContent(
     trimTitle: Boolean,
     trimMessage: Boolean,
     components: Map<Slot, UIComponent> = mapOf(),
+    persistent: Boolean,
 ) {
-    // To prevent consumers from (intentionally or accidentally) relying on drawing out-of-bounds we'll apply
-    // a scissor effect to all customizable slots
-    val customSlotModifier = Modifier.effect { ScissorEffect() }
+    val customSlotModifier = Modifier.then {
+        val target = this@then
+        val bounds = object : UIContainer() {
+            override fun getLeft(): Float = target.getLeft()
+            override fun getTop(): Float = target.getTop()
+            override fun getWidth(): Float = target.getWidth() + 1 /* for shadows */
+            override fun getHeight(): Float = target.getHeight() + 1 /* for shadows */
+        }
+        Modifier.effect { ScissorEffect(bounds) }.applyToComponent(target)
+    }
 
     val iconComponent = components[Slot.ICON] ?: EssentialPalette.ROUND_WARNING_7X.create().takeIf { type == NotificationType.ERROR || type == NotificationType.WARNING }
     val icon = iconComponent?.let { component -> fun LayoutScope.() {
@@ -149,9 +159,13 @@ fun LayoutScope.notificationContent(
         }
     }
 
-    fun LayoutScope.actions() {
+    fun LayoutScope.actions(narrowLayout: Boolean) {
         if (actionComponent != null || smallPreviewComponent != null) {
             actionColumnComponent = column(Modifier.alignVertical(Alignment.End), Arrangement.spacedBy(5f), Alignment.End) {
+                // Prevents overlap with close button
+                if (narrowLayout && persistent) {
+                    spacer(height = 8f)
+                }
                 smallPreview()
                 action()
             }
@@ -177,7 +191,7 @@ fun LayoutScope.notificationContent(
                         }
                     }
 
-                    actions()
+                    actions(false)
                 }
             }
         }
@@ -201,7 +215,7 @@ fun LayoutScope.notificationContent(
                 }
             }
 
-            actions()
+            actions(true)
         }
     }
 

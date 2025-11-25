@@ -12,8 +12,9 @@
 import gg.essential.gradle.util.KotlinVersion
 
 plugins {
-    kotlin("multiplatform")
+    kotlin("jvm")
     kotlin("plugin.serialization")
+    `java-library`
 }
 
 repositories {
@@ -21,9 +22,8 @@ repositories {
 }
 
 kotlin {
-    jvm()
-
-    sourceSets["commonMain"].dependencies {
+    // Common dependencies
+    dependencies {
         val kotlin = KotlinVersion.minimal
         implementation(kotlin("stdlib", kotlin.stdlib))
         implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${kotlin.coroutines}")
@@ -32,9 +32,21 @@ kotlin {
         api("dev.folomeev.kotgl:kotgl-matrix:0.0.1-beta")
     }
 
-    sourceSets.jvmMain.dependencies {
+    // JVM dependencies
+    dependencies {
         api(libs.slf4j.api)
+        api(project(":feature-flags"))
+        api("com.squareup.okhttp3:okhttp:3.9.0")
     }
 
     kotlin.jvmToolchain(8)
+}
+
+// Using src dirs matching what kotlin-multiplatform would do because we ideally want to be using that,
+// but have moved away from it for the time being because it was too unreliable.
+sourceSets.main {
+    java.srcDir("src/commonMain/java")
+    java.srcDir("src/jvmMain/java")
+    kotlin.srcDir("src/commonMain/kotlin")
+    kotlin.srcDir("src/jvmMain/kotlin")
 }

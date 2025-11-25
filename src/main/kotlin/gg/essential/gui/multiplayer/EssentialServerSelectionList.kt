@@ -27,6 +27,7 @@ import gg.essential.connectionmanager.common.model.serverdiscovery.Server
 import gg.essential.mixins.ext.client.gui.SelectionListWithDividers
 import gg.essential.mixins.ext.client.gui.essential
 import gg.essential.mixins.ext.client.gui.setImpressionConsumer
+import gg.essential.sps.SpsAddress
 import gg.essential.universal.UMinecraft
 import gg.essential.util.MinecraftUtils
 import gg.essential.util.UUIDUtil
@@ -94,13 +95,13 @@ class EssentialServerSelectionList(
 
         // Add all the SPS sessions which we have access to
         for (session in spsManager.remoteSessions) {
-            val address = spsManager.getSpsAddress(session.hostUUID)
+            val address = SpsAddress(session.hostUUID).toString()
             val server = ServerData("Loading username…", address, mcServerType).apply {
                 ext.isTrusted = false
             }
             server.resourceMode = ServerData.ServerResourceMode.PROMPT
             UUIDUtil.getName(session.hostUUID).thenAcceptAsync({
-                server.serverName = if (it.endsWith("s", true)) "$it'" else "$it's"
+                server.serverName = (if (it.endsWith("s", true)) "$it'" else "$it's") + " world"
             }, UMinecraft.getMinecraft().executor)
             entries[address] = server
         }
@@ -127,7 +128,7 @@ class EssentialServerSelectionList(
         // Now that we've got a list of server addresses, we need to deduplicate them and determine a name for each.
         for (address in addresses) {
             // We only show SPS sessions which we have access to, and already do so in a dedicated loop above
-            if (spsManager.isSpsAddress(address)) continue
+            if (SpsAddress.parse(address) != null) continue
 
             val server = knownServers[address]
                 ?: connectionManager.knownServersManager.findServerByAddress(address)?.toServerData(knownServers)

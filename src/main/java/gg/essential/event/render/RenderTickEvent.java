@@ -12,6 +12,8 @@
 package gg.essential.event.render;
 
 import gg.essential.universal.UMatrixStack;
+import gg.essential.util.UDrawContext;
+import org.jetbrains.annotations.Nullable;
 
 public final class RenderTickEvent {
 
@@ -19,15 +21,20 @@ public final class RenderTickEvent {
     private final boolean loadingScreen;
 
     private final UMatrixStack matrixStack;
+    private final UDrawContext drawContext;
     private final float partialTicksMenu;
     private final float partialTicksInGame;
 
-    public RenderTickEvent(boolean pre, boolean loadingScreen, UMatrixStack matrixStack, float partialTicksMenu, float partialTicksInGame) {
+    public RenderTickEvent(boolean pre, boolean loadingScreen, UDrawContext drawContext, UMatrixStack matrixStack, float partialTicksMenu, float partialTicksInGame) {
         this.pre = pre;
         this.loadingScreen = loadingScreen;
         this.matrixStack = matrixStack;
+        this.drawContext = drawContext;
         this.partialTicksMenu = partialTicksMenu;
         this.partialTicksInGame = partialTicksInGame;
+
+        // TODO maybe split into separate events? or move post event to where it doesn't require the draw context?
+        if (!pre && drawContext == null) throw new IllegalArgumentException("Post event requires draw context");
     }
 
     public boolean isPre() {
@@ -36,6 +43,11 @@ public final class RenderTickEvent {
 
     public boolean isLoadingScreen() {
         return loadingScreen;
+    }
+
+    @Nullable // null for pre, non-null for post
+    public UDrawContext getDrawContext() {
+        return drawContext;
     }
 
     public UMatrixStack getMatrixStack() {
@@ -48,5 +60,8 @@ public final class RenderTickEvent {
 
     public float getPartialTicksInGame() {
         return partialTicksInGame;
+    }
+
+    public static class Final {
     }
 }

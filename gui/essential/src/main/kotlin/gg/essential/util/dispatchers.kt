@@ -17,7 +17,3 @@ import kotlinx.coroutines.Dispatchers
 @Suppress("unused") // receiver is specified to mirror builtin dispatchers
 val Dispatchers.Client
     get() = platform.clientThreadDispatcher
-
-@Suppress("unused") // receiver is specified to mirror builtin dispatchers
-val Dispatchers.Render
-    get() = platform.renderThreadDispatcher

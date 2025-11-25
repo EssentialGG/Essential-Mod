@@ -16,6 +16,7 @@ import dev.folomeev.kotgl.matrix.vectors.vec3
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
@@ -23,17 +24,18 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.decodeFromJsonElement
 
 @Serializable(with = MolangVec3Serializer::class)
-data class MolangVec3(val x: MolangExpression, val y: MolangExpression, val z: MolangExpression) {
+data class MolangVec3(val x: Molang, val y: Molang, val z: Molang) {
     fun eval(context: MolangContext): Vec3 =
         vec3(x.eval(context), y.eval(context), z.eval(context))
 
     companion object {
-        val ZERO = MolangVec3(MolangExpression.ZERO, MolangExpression.ZERO, MolangExpression.ZERO)
-        val UNIT_X = MolangVec3(MolangExpression.ONE, MolangExpression.ZERO, MolangExpression.ZERO)
-        val UNIT_Y = MolangVec3(MolangExpression.ZERO, MolangExpression.ONE, MolangExpression.ZERO)
-        val UNIT_Z = MolangVec3(MolangExpression.ZERO, MolangExpression.ZERO, MolangExpression.ONE)
+        val ZERO = MolangVec3(Molang.ZERO, Molang.ZERO, Molang.ZERO)
+        val UNIT_X = MolangVec3(Molang.ONE, Molang.ZERO, Molang.ZERO)
+        val UNIT_Y = MolangVec3(Molang.ZERO, Molang.ONE, Molang.ZERO)
+        val UNIT_Z = MolangVec3(Molang.ZERO, Molang.ZERO, Molang.ONE)
     }
 }
 
@@ -41,23 +43,36 @@ data class MolangVec3(val x: MolangExpression, val y: MolangExpression, val z: M
 //   java.lang.IllegalAccessError: tried to access class gg.essential.model.molang.MolangVec3Serializer from class
 //   gg.essential.model.file.ParticleEffectComponents$ParticleMotionParametric$$serializer
 internal object MolangVec3Serializer : KSerializer<MolangVec3> {
-    override val descriptor: SerialDescriptor = JsonElement.serializer().descriptor
-    override fun deserialize(decoder: Decoder): MolangVec3 = parse((decoder as JsonDecoder).decodeJsonElement())
-    override fun serialize(encoder: Encoder, value: MolangVec3) = throw UnsupportedOperationException()
+    private val listSerializer = ListSerializer(Molang.serializer())
 
-    private fun parse(json: JsonElement): MolangVec3 = when (json) {
+    override val descriptor: SerialDescriptor = JsonElement.serializer().descriptor
+
+    override fun deserialize(decoder: Decoder): MolangVec3 = when (val json = (decoder as JsonDecoder).decodeJsonElement()) {
         is JsonArray -> {
-            val first = (json[0] as JsonPrimitive).parseMolangExpression()
-            val second = (json.getOrNull(1) as JsonPrimitive?)?.parseMolangExpression() ?: first
-            val third = (json.getOrNull(2) as JsonPrimitive?)?.parseMolangExpression() ?: second
+            val list = decoder.json.decodeFromJsonElement(listSerializer, json)
+            val first = list.first()
+            val second = list.getOrNull(1) ?: first
+            val third = list.getOrNull(2) ?: second
             MolangVec3(first, second, third)
         }
         is JsonPrimitive -> when (json.content) {
             "x" -> MolangVec3.UNIT_X
             "y" -> MolangVec3.UNIT_Y
             "z" -> MolangVec3.UNIT_Z
-            else -> json.parseMolangExpression().let { MolangVec3(it, it, it) }
+            else -> decoder.json.decodeFromJsonElement<Molang>(json)
+                .let { MolangVec3(it, it, it) }
         }
         else -> throw SerializationException("Expected array or primitive, got $json")
+    }
+
+    override fun serialize(encoder: Encoder, value: MolangVec3) {
+        when {
+            value == MolangVec3.UNIT_X -> encoder.encodeString("x")
+            value == MolangVec3.UNIT_Y -> encoder.encodeString("y")
+            value == MolangVec3.UNIT_Z -> encoder.encodeString("z")
+            value.x == value.y && value.y == value.z ->
+                encoder.encodeSerializableValue(Molang.serializer(), value.x)
+            else -> encoder.encodeSerializableValue(listSerializer, listOf(value.x, value.y, value.z))
+        }
     }
 }

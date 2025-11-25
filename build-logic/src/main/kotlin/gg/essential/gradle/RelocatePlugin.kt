@@ -41,7 +41,7 @@ open class RelocatePlugin : Plugin<Project> {
     }
 }
 
-open class RelocateTask : ShadowJar() {
+abstract class RelocateTask : ShadowJar() {
     @get:Internal
     internal val mappings = mutableMapOf<String, String>()
 
@@ -115,11 +115,11 @@ private fun Project.createRelocateTask(): TaskProvider<RelocateTask> {
 private fun Project.createAbiValidationTasks(relocateTask: TaskProvider<RelocateTask>) {
     fun KotlinApiBuildTask.configureAbi() {
         // Should maybe move our impl into a dedicated package? (but not before `next` merge)
-        ignoredClasses += listOf(
+        ignoredClasses.addAll(listOf(
             "gg.essential.Essential",
             "gg.essential.DI",
-        )
-        ignoredPackages += listOf(
+        ))
+        ignoredPackages.addAll(listOf(
             "gg.essential.asm",
             "gg.essential.clipboard",
             "gg.essential.commands",
@@ -135,6 +135,7 @@ private fun Project.createAbiValidationTasks(relocateTask: TaskProvider<Relocate
             "gg.essential.image",
             "gg.essential.key",
             "gg.essential.main",
+            "gg.essential.minecraftauth",
             "gg.essential.mixins",
             "gg.essential.mod",
             "gg.essential.model",
@@ -159,13 +160,13 @@ private fun Project.createAbiValidationTasks(relocateTask: TaskProvider<Relocate
             "gg.essential.serverdiscovery",
             "gg.essential.upnp",
             "gg.essential.forge",
-        )
+        ))
 
         // These are our internal dependencies as declared in the relocatedJar task and as the name implies, we don't
         // care about their public API.
         for ((src, dst) in relocateTask.get().mappings) {
-            ignoredPackages += src
-            ignoredPackages += dst
+            ignoredPackages.addAll(src)
+            ignoredPackages.addAll(dst)
         }
     }
 
@@ -175,7 +176,7 @@ private fun Project.createAbiValidationTasks(relocateTask: TaskProvider<Relocate
         dependsOn(jarTask)
         inputClassesDirs = zipTree(jarTask.archiveFile)
         inputDependencies = zipTree(jarTask.archiveFile)
-        outputApiDir = buildDir.resolve("abiDev")
+        outputApiFile.set(layout.buildDirectory.file("dev.api"))
     }
 
     val relocatedAbiBuild by tasks.registering(KotlinApiBuildTask::class) {
@@ -184,14 +185,14 @@ private fun Project.createAbiValidationTasks(relocateTask: TaskProvider<Relocate
         dependsOn(jarTask)
         inputClassesDirs = zipTree(jarTask.archiveFile)
         inputDependencies = zipTree(jarTask.archiveFile)
-        outputApiDir = buildDir.resolve("abiRelocated")
+        outputApiFile.set(layout.buildDirectory.file("relocated.api"))
     }
 
     val relocatedAbiCheck by tasks.registering(KotlinApiCompareTask::class) {
         dependsOn(devAbiBuild)
         dependsOn(relocatedAbiBuild)
-        projectApiDir = devAbiBuild.get().outputApiDir
-        apiBuildDir = relocatedAbiBuild.get().outputApiDir
+        projectApiFile.set(devAbiBuild.get().outputApiFile)
+        generatedApiFile.set(relocatedAbiBuild.get().outputApiFile)
     }
     tasks.named("check").configure {
         dependsOn(relocatedAbiCheck)

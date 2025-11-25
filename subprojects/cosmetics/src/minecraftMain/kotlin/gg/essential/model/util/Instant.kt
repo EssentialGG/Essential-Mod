@@ -13,6 +13,9 @@ package gg.essential.model.util
 
 import java.time.Instant
 
+// Ideally we'd be using kotlin-multiplatform, but we have moved away from it for the time being because it was too
+// unreliable.
+/*
 actual typealias Instant = Instant
 
 actual fun now(): Instant = Instant.now()
@@ -21,4 +24,14 @@ actual fun instant(epochMillis: Long): Instant = Instant.ofEpochMilli(epochMilli
 actual fun instantFromIso8601(str: String): Instant =
     Instant.parse(str)
 actual fun instantToIso8601(instant: Instant): String =
+    instant.toString()
+ */
+typealias Instant = Instant
+
+fun now(): Instant = Instant.now()
+fun instant(epochMillis: Long): Instant = Instant.ofEpochMilli(epochMillis)
+
+fun instantFromIso8601(str: String): Instant =
+    Instant.parse(str)
+fun instantToIso8601(instant: Instant): String =
     instant.toString()

@@ -205,7 +205,9 @@ private class MarkdownRendererImpl(
     }
 
     override fun visit(link: Link) {
-        style.linkLocation = link.destination
+        if (config.urlConfig.enabled) {
+            style.linkLocation = link.destination
+        }
         super.visit(link)
         style.linkLocation = null
     }

@@ -173,6 +173,14 @@ data class Vector3(
         return this
     }
 
+    fun clamp(min: Vector3, max: Vector3): Vector3 {
+        this.x = kotlin.math.max(min.x, kotlin.math.min(max.x, this.x))
+        this.y = kotlin.math.max(min.y, kotlin.math.min(max.y, this.y))
+        this.z = kotlin.math.max(min.z, kotlin.math.min(max.z, this.z))
+
+        return this
+    }
+
     fun floor(): Vector3 {
         this.x = kotlin.math.floor(this.x)
         this.y = kotlin.math.floor(this.y)
@@ -284,6 +292,23 @@ data class Vector3(
         return this.sub(v1.copy(normal).multiplyScalar(2 * this.dot(normal)))
     }
 
+    /**
+     * Computes distance of Vector3 vector to v.
+     */
+    fun distanceTo(v: Vector3): Float {
+        return sqrt(this.distanceToSquared(v))
+    }
+
+    /**
+     * Computes squared distance of Vector3 vector to v.
+     */
+    fun distanceToSquared(v: Vector3): Float {
+        val dx = this.x - v.x
+        val dy = this.y - v.y
+        val dz = this.z - v.z
+        return dx * dx + dy * dy + dz * dz
+    }
+
 
     operator fun plus(b: Vector3): Vector3 {
         return copy().add(b)
@@ -296,6 +321,8 @@ data class Vector3(
 
     companion object {
 
+        @JvmField
+        val ZERO = Vector3(0f, 0f, 0f)
         @JvmField
         val X = Vector3(1f, 0f, 0f)
         @JvmField

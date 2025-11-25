@@ -23,6 +23,7 @@ import gg.essential.gui.elementa.state.v2.awaitValue
 import gg.essential.gui.elementa.state.v2.mutableStateOf
 import gg.essential.gui.menu.AccountManager.Companion.refreshCurrentSession
 import gg.essential.network.CMConnection
+import gg.essential.network.connectionmanager.Connection.KnownCloseReason
 import gg.essential.network.connectionmanager.ConnectionManager.Status
 import gg.essential.util.Client
 import gg.essential.util.ExponentialBackoff
@@ -48,14 +49,14 @@ import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import java.io.Closeable
-import java.time.Duration as JavaDuration
 import java.time.Instant
+import java.util.*
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
-import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.toKotlinDuration
+import java.time.Duration as JavaDuration
 
 abstract class ConnectionManagerKt : CMConnection {
     @Suppress("LeakingThis")
@@ -69,8 +70,15 @@ abstract class ConnectionManagerKt : CMConnection {
     val outdated: Boolean
         get() = connectionStatus.get() == Status.OUTDATED
 
+    protected val mutableConnectionUriState = mutableStateOf<String?>(null)
+    val connectionUriState: State<String?> = mutableConnectionUriState
     @JvmField
     protected var connection: Connection? = null
+
+    protected abstract val previouslyConnectedProtocol: Int
+
+    override val usingProtocol: Int
+        get() = connection?.usingProtocol ?: previouslyConnectedProtocol
 
     private val disconnectRequests = Channel<CloseReason>(1, BufferOverflow.DROP_LATEST)
 
@@ -111,6 +119,7 @@ abstract class ConnectionManagerKt : CMConnection {
         val connectBackoff = ExponentialBackoff(2.seconds, 1.minutes, 2.0)
         val unexpectedCloseBackoff = ExponentialBackoff(10.seconds, 2.minutes, 2.0)
 
+        var awaitSessionChange = false
         while (true) {
             updateStatus(null)
 
@@ -191,7 +200,7 @@ abstract class ConnectionManagerKt : CMConnection {
             var fastUnexpectedClose = false
             val wrapper = ConnectionWrapper()
             try {
-                when (val result = wrapper.connect(userName, sharedSecret)) {
+                when (val result = wrapper.connect(uuid, userName, sharedSecret)) {
                     ConnectResult.Outdated -> {
                         LOGGER.error("Client version is no longer supported. Will no longer try to connect.")
                         updateStatus(Status.OUTDATED)
@@ -202,6 +211,12 @@ abstract class ConnectionManagerKt : CMConnection {
                         LOGGER.warn("Failed to connect ({}), re-trying in {}", result.info, delay)
                         updateStatus(Status.GENERAL_FAILURE)
                         delay(delay.inWholeMilliseconds)
+                        continue
+                    }
+                    is ConnectResult.Suspended -> {
+                        handleSuspension(result.info)
+                        // If the account in use changes, we can try to connect again
+                        USession.active.await { it != session }
                         continue
                     }
                     ConnectResult.Connected -> {}
@@ -226,9 +241,14 @@ abstract class ConnectionManagerKt : CMConnection {
 
                         select {
                             wrapper.onClose { info ->
-                                val duration = JavaDuration.between(connectedAt, Instant.now()).toKotlinDuration()
-                                fastUnexpectedClose = duration < 2.minutes
-                                LOGGER.warn("Connection closed unexpectedly ({}) after {}", info, duration)
+                                if (info.knownReason == KnownCloseReason.SUSPENDED) {
+                                    handleSuspension(info)
+                                    awaitSessionChange = true
+                                } else {
+                                    val duration = JavaDuration.between(connectedAt, Instant.now()).toKotlinDuration()
+                                    fastUnexpectedClose = duration < 2.minutes
+                                    LOGGER.warn("Connection closed unexpectedly ({}) after {}", info, duration)
+                                }
                             }
                             async { USession.active.await { it.uuid != session.uuid } }.onAwait { newSession ->
                                 val duration = JavaDuration.between(connectedAt, Instant.now()).toKotlinDuration()
@@ -265,6 +285,11 @@ abstract class ConnectionManagerKt : CMConnection {
             } else {
                 unexpectedCloseBackoff.reset()
             }
+
+            if (awaitSessionChange) {
+                USession.active.await { it != session }
+                awaitSessionChange = false
+            }
         }
     }
 
@@ -274,10 +299,19 @@ abstract class ConnectionManagerKt : CMConnection {
         }
     }
 
+    private suspend fun handleSuspension(result: CloseInfo) {
+        LOGGER.error("User is permanently suspended. Will no longer try to connect for this session.")
+        updateStatus(Status.USER_SUSPENDED)
+        withContext(Dispatchers.Client) {
+            java.suspensionManager.setPermanentlySuspended(result.reason)
+        }
+    }
+
     private sealed interface ConnectResult {
         object Connected : ConnectResult
         object Outdated : ConnectResult
         data class Failed(val info: CloseInfo) : ConnectResult
+        data class Suspended(val info: CloseInfo) : ConnectResult
     }
 
     private class ConnectionWrapper : Connection.Callbacks, Closeable {
@@ -303,16 +337,18 @@ abstract class ConnectionManagerKt : CMConnection {
             closeChannel.trySendBlocking(info)
         }
 
-        suspend fun connect(userName: String, sharedSecret: ByteArray): ConnectResult {
+        suspend fun connect(uuid: UUID, userName: String, sharedSecret: ByteArray): ConnectResult {
             withContext(Dispatchers.IO) {
-                connection.setupAndConnect(userName, sharedSecret)
+                connection.setupAndConnect(uuid, userName, sharedSecret)
             }
             return select {
                 openChannel.onReceive { ConnectResult.Connected }
                 closeChannel.onReceive { info ->
-                    when {
-                        info.outdated -> ConnectResult.Outdated
-                        else -> ConnectResult.Failed(info)
+                    when (info.knownReason) {
+                        KnownCloseReason.OUTDATED -> ConnectResult.Outdated
+                        KnownCloseReason.SUSPENDED -> ConnectResult.Suspended(info)
+                        null -> ConnectResult.Failed(info)
+                        else -> throw AssertionError() // FIXME: Workaround for compiler bug fixed in Kotlin 2.0
                     }
                 }
             }
@@ -323,7 +359,12 @@ abstract class ConnectionManagerKt : CMConnection {
         }
     }
 
-    data class CloseInfo(val code: Int, val reason: String, val remote: Boolean, val outdated: Boolean)
+    data class CloseInfo(
+        val code: Int,
+        val reason: String,
+        val remote: Boolean,
+        val knownReason: KnownCloseReason?,
+    )
 
     companion object {
         val LOGGER: Logger = LogManager.getLogger("Essential - Connection")

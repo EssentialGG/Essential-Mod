@@ -45,8 +45,8 @@ import java.util.Base64
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.PriorityBlockingQueue
-import java.util.concurrent.SynchronousQueue
 import java.util.concurrent.ThreadFactory
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
@@ -54,12 +54,14 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
 class AssetLoader(private val cachePath: Path) {
-    private val logger = LoggerFactory.getLogger(AssetLoader::class.java)
+    companion object {
+        private val logger = LoggerFactory.getLogger(AssetLoader::class.java)
+    }
 
     private val pool = ThreadPoolExecutor(
         0, Int.MAX_VALUE,
         10L, TimeUnit.SECONDS,
-        SynchronousQueue(),
+        LinkedBlockingQueue(),
         AtomicInteger().let { threadId ->
             ThreadFactory { Thread(it, "Essential Asset Loader " + threadId.incrementAndGet()) }
         },
@@ -133,6 +135,17 @@ class AssetLoader(private val cachePath: Path) {
                 }
             } else {
                 CompletableFuture.completedFuture(emptyList())
+            }
+        }
+
+        /**
+         * The [parsed] value or `null` if it failed to load due to an exception.
+         * The exception is logged.
+         */
+        val parsedOrNull: CompletableFuture<T?> by lazy {
+            parsed.exceptionally { t ->
+                logger.error("Failed to load $type from ${info.url}", t)
+                null
             }
         }
     }

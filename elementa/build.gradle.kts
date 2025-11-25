@@ -25,10 +25,10 @@ tasks.create<SyncToExternalRepoTask>("syncCommitsToElementa") {
     replacements.set(listOf(
         "elementa/statev2" to "unstable/statev2",
         "elementa/layoutdsl" to "unstable/layoutdsl",
-        "gg/essential/gui/elementa" to "gg/essential/elementa",
-        "gg.essential.gui.elementa" to "gg.essential.elementa",
-        "gg/essential/gui" to "gg/essential/elementa",
-        "gg.essential.gui" to "gg.essential.elementa",
+        "gg/essential/gui/elementa" to "gg/essential/elementa/unstable",
+        "gg.essential.gui.elementa" to "gg.essential.elementa.unstable",
+        "gg/essential/gui" to "gg/essential/elementa/unstable",
+        "gg.essential.gui" to "gg.essential.elementa.unstable",
         // remove accessed via reflection annotation
         "  @AccessedViaReflection(\"DelegatingStateBase\")" to "",
         "import gg.essential.config.AccessedViaReflection" to ""

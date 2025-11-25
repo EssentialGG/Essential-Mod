@@ -15,10 +15,13 @@ import com.sparkuniverse.toolbox.chat.enums.ChannelType
 import com.sparkuniverse.toolbox.chat.model.Channel
 import com.sparkuniverse.toolbox.chat.model.Message
 import gg.essential.Essential
+import gg.essential.connectionmanager.common.packet.Packet
 import gg.essential.elementa.utils.ObservableList
 import gg.essential.gui.elementa.state.v2.ListState
 import gg.essential.gui.elementa.state.v2.MutableListState
+import gg.essential.gui.elementa.state.v2.MutableState
 import gg.essential.gui.elementa.state.v2.Observer
+import gg.essential.gui.elementa.state.v2.State
 import gg.essential.gui.elementa.state.v2.add
 import gg.essential.gui.elementa.state.v2.clear
 import gg.essential.gui.elementa.state.v2.combinators.map
@@ -29,13 +32,11 @@ import gg.essential.gui.elementa.state.v2.removeAll
 import gg.essential.gui.elementa.state.v2.set
 import gg.essential.gui.elementa.state.v2.toListState
 import gg.essential.gui.friends.message.v2.ClientMessage
-import gg.essential.gui.elementa.state.v2.MutableState
-import gg.essential.gui.elementa.state.v2.State
-import gg.essential.gui.friends.message.v2.getInfraInstance
 import gg.essential.gui.friends.message.v2.infraInstanceToClient
 import gg.essential.network.connectionmanager.chat.ChatManager
 import gg.essential.universal.UMinecraft
 import gg.essential.util.*
+import gg.essential.util.GuiEssentialPlatform.Companion.platform
 import java.util.*
 import java.util.concurrent.CompletableFuture
 
@@ -45,7 +46,8 @@ class MessengerStateManagerImpl(private val chatManager: ChatManager) : IMesseng
 
     /** IMessengerStates Fields*/
     private val channelStates = mutableMapOf<Long, ChannelStates>()
-    private val messageUnreadMap = mutableMapOf<Message, MutableState<Boolean>>()
+    @Deprecated("Not used in protocol 9 or later")
+    private val messageUnreadMap = mutableMapOf<Pair<Long, Long>, MutableState<Boolean>>()
     private val observableMessageList = mutableMapOf<Long, Pair<MutableListState<ClientMessage>, ListState<ClientMessage>>>()
 
     /** IMessengerActions Fields **/
@@ -75,7 +77,7 @@ class MessengerStateManagerImpl(private val chatManager: ChatManager) : IMesseng
         return getOrCreateChannelStates(channelId).mutedState
     }
 
-    override fun getLatestMessage(channelId: Long): State<Message?> {
+    override fun getLatestMessage(channelId: Long): State<ClientMessage?> {
         return getOrCreateChannelStates(channelId).latestMessage
     }
 
@@ -117,14 +119,24 @@ class MessengerStateManagerImpl(private val chatManager: ChatManager) : IMesseng
         return observableChannelList
     }
 
-    private fun getUnreadMessageStates(message: Message): State<Boolean> {
-        return messageUnreadMap.computeIfAbsent(message) {
-            mutableStateOf(!message.isRead)
+    @Deprecated("Not used in protocol 9 or later")
+    private fun getUnreadMessageStates(channelId: Long, messageId: Long): State<Boolean> {
+        return messageUnreadMap.computeIfAbsent(Pair(channelId, messageId)) {
+            mutableStateOf(chatManager.getMessageById(channelId, messageId)?.isRead?.not() ?: false)
         }
     }
 
-    override fun getUnreadMessageState(message: Message): State<Boolean> {
-        return getUnreadMessageStates(message)
+    @Deprecated("Not used in protocol 9 or later")
+    override fun getUnreadMessageState(channelId: Long, messageId: Long): State<Boolean> {
+        return getUnreadMessageStates(channelId, messageId)
+    }
+
+    override fun getLastReadMessageId(channelId: Long): State<Long?> {
+        return getOrCreateChannelStates(channelId).lastReadMessageId
+    }
+
+    override fun setLastReadMessage(channelId: Long, messageId: Long?) {
+        chatManager.setLastReadMessage(channelId, messageId)
     }
 
     override fun getTitle(channelId: Long): State<String> {
@@ -147,11 +159,16 @@ class MessengerStateManagerImpl(private val chatManager: ChatManager) : IMesseng
         val channel = getChannel(channelId)
         return ChannelStates(
             channel,
-            memo { getMessageListState(channelId)().count { getUnreadMessageState(it.getInfraInstance())() } },
+            if (platform.cmConnection.usingProtocol >= 9) {
+                mutableStateOf(channel.unreadMessages)
+            } else {
+                memo { getMessageListState(channelId)().count { getUnreadMessageState(it)() } }
+            },
             mutableStateOf(channel.isMuted),
             mutableStateOf("Loading..."),
-            getMessageListState(channelId).map { list -> list.maxByOrNull { it.id }?.getInfraInstance() },
-            ObservableList(channel.members.toMutableList())
+            getMessageListState(channelId).map { list -> list.maxByOrNull { it.id } },
+            ObservableList(channel.members.toMutableList()),
+            mutableStateOf(channel.lastReadMessageId)
         ).apply {
             updateChannelStates(channel, this)
         }
@@ -160,6 +177,10 @@ class MessengerStateManagerImpl(private val chatManager: ChatManager) : IMesseng
     private fun updateChannelStates(channel: Channel, states: ChannelStates) {
         states.apply {
             internalMutedState.set(channel.isMuted)
+            if (platform.cmConnection.usingProtocol >= 9) {
+                if (numUnreadMessages is MutableState) numUnreadMessages.set(channel.unreadMessages)
+                lastReadMessageId.set(channel.lastReadMessageId)
+            }
 
             if (channel.isAnnouncement()) {
                 states.title.set("Announcements")
@@ -188,10 +209,18 @@ class MessengerStateManagerImpl(private val chatManager: ChatManager) : IMesseng
         }
     }
 
+    override fun getMessagesRaw(channelId: Long): Map<Long, Message>? {
+        return chatManager.getMessages(channelId)
+    }
+
+    override fun retrieveMessageHistoryRaw(channelId: Long, before: Long?, after: Long?, messageLimit: Int, callback: ((Optional<Packet>) -> Unit)?) {
+        return chatManager.retrieveMessageHistory(channelId, before, after, messageLimit, callback)
+    }
 
     /** IMessengerActions **/
-
-    override fun setUnreadState(message: Message, unread: Boolean) {
+    @Deprecated("Not used in protocol 9 or later")
+    override fun setUnreadState(channelId: Long, messageId: Long, unread: Boolean) {
+        val message = chatManager.getMessageById(channelId, messageId) ?: return
         chatManager.updateReadState(message, !unread)
     }
 
@@ -223,8 +252,16 @@ class MessengerStateManagerImpl(private val chatManager: ChatManager) : IMesseng
         return false
     }
 
-    override fun deleteMessage(message: Message) {
-        chatManager.deleteMessage(message.channelId, message.id)
+    override fun sendMessage(channelId: Long, message: String, replyTo: Long?, callback: ((Optional<Packet>) -> Unit)?) {
+        chatManager.sendMessage(channelId, message, replyTo, callback)
+    }
+
+    override fun editMessage(channelId: Long, messageId: Long, content: String, callback: (Boolean) -> Unit) {
+        chatManager.editMessage(channelId, messageId, content, callback)
+    }
+
+    override fun deleteMessage(channelId: Long, messageId: Long) {
+        chatManager.deleteMessage(channelId, messageId)
     }
 
     override fun leaveGroup(channelId: Long) {
@@ -260,7 +297,7 @@ class MessengerStateManagerImpl(private val chatManager: ChatManager) : IMesseng
     override fun messageDeleted(message: Message) {
         val channelId = chatManager.mergeAnnouncementChannel(message.channelId)
         observableMessageList[channelId]?.first?.removeAll { it.id == message.id }
-        messageUnreadMap.remove(message)
+        messageUnreadMap.remove(Pair(message.channelId, message.id))
         val channelState = channelStates[channelId] ?: return
         updateChannelStates(getChannel(channelId), channelState)
 
@@ -281,16 +318,21 @@ class MessengerStateManagerImpl(private val chatManager: ChatManager) : IMesseng
             }
         }
         val states = channelStates[channel.id] ?: return
-        if (message.sender == UUIDUtil.getClientUUID() && !message.isRead) {
-            // Will call updateChannelStates so no need to do it twice
-            setUnreadState(message, false)
-        } else {
+        if (platform.cmConnection.usingProtocol >= 9) {
             updateChannelStates(channel, states)
+        } else {
+            if (message.sender == UUIDUtil.getClientUUID() && !message.isRead) {
+                // Will call updateChannelStates so no need to do it twice
+                setUnreadState(message, false)
+            } else {
+                updateChannelStates(channel, states)
+            }
         }
     }
 
+    @Deprecated("Not used in protocol 9 or later")
     override fun messageReadStateUpdated(message: Message, read: Boolean) {
-        messageUnreadMap[message]?.set(!read)
+        messageUnreadMap[Pair(message.channelId, message.id)]?.set(!read)
         chatManager.getChannel(chatManager.mergeAnnouncementChannel(message.channelId)).ifPresent {
             channelUpdated(it)
         }
@@ -340,8 +382,9 @@ class MessengerStateManagerImpl(private val chatManager: ChatManager) : IMesseng
         val numUnreadMessages: State<Int>,
         val internalMutedState: MutableState<Boolean>,
         val title: MutableState<String>,
-        val latestMessage: State<Message?>,
-        val members: ObservableList<UUID>
+        val latestMessage: State<ClientMessage?>,
+        val members: ObservableList<UUID>,
+        val lastReadMessageId: MutableState<Long?>,
     ) {
         val mutedState: MutableState<Boolean> = object : MutableState<Boolean> {
             override fun Observer.get(): Boolean = internalMutedState()

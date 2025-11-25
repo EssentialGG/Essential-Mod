@@ -46,7 +46,6 @@ class EssentialUIText @JvmOverloads constructor(
 ) : UIText(text, shadow, shadowColor) {
 
     private val truncatedState = BasicState(false)
-    private var truncated = false
     private val fullText = BasicState(text)
     private val actualTextWidth = BasicState(constraints.getWidth())
 
@@ -71,15 +70,6 @@ class EssentialUIText @JvmOverloads constructor(
         setColor(EssentialPalette.TEXT_HIGHLIGHT)
     }
 
-    override fun animationFrame() {
-        super.animationFrame()
-        if (truncatedState.get() != truncated) {
-            Window.enqueueRenderOperation {
-                truncatedState.set(truncated)
-            }
-        }
-    }
-
     override fun getWidth(): Float {
         return constraints.getWidth()
     }
@@ -88,26 +78,41 @@ class EssentialUIText @JvmOverloads constructor(
         val textScale = getTextScale()
         val constrainedWidth = constraints.getWidth()
 
+        val renderedTruncated: Boolean
         if (truncateIfTooSmall && getTextWidth() * textScale > constrainedWidth) {
             val fontProvider = getFontProvider()
             val oldWidth = constraints.width
             val oldX = constraints.x
             val text = getText()
-            var truncated = text.split("\n").first().trim()
+            val line = text.split("\n").first().trim()
             val suffix = "..."
 
-            while ((truncated + suffix).width(textScale, fontProvider) > constrainedWidth) {
-                if (truncated.isEmpty()) {
-                    break
+            fun truncate(endIndex: Int /* exclusive */): String {
+                return when {
+                    endIndex <= 0 -> suffix
+                    endIndex > line.lastIndex -> line + suffix
+                    else -> {
+                        // If this would split a color code in the middle, truncate the color char as well
+                        if (line[endIndex - 1] == ChatColor.COLOR_CHAR && line[endIndex].isValidFormatCode()) {
+                            return truncate(endIndex - 1)
+                        }
+                        line.substring(0, endIndex) + suffix
+                    }
                 }
-                // If we have a color code at the end, drop the color char as well, so we don't end up with just '§' at the end of the string
-                val maybeColor = truncated.takeLast(2)
-                val dropColor = maybeColor.length == 2 && maybeColor[0] == ChatColor.COLOR_CHAR
-                    && ChatColor.values().firstOrNull { it.char == maybeColor[1] } != null
-                truncated = truncated.dropLast(if (dropColor) 2 else 1).trimEnd()
             }
 
-            truncated += suffix
+            var low = 0
+            var high = line.lastIndex
+            while (low <= high) {
+                val mid = (low + high).ushr(1)
+                val tooLong = truncate(mid).width(textScale, fontProvider) > constrainedWidth
+                if (tooLong) {
+                    high = mid - 1
+                } else {
+                    low = mid + 1
+                }
+            }
+            val truncated = truncate(low - 1)
 
             // The truncated text can have a width that is slightly less than this component.
             // This difference would ordinarily cause the text to render an incorrect scale,
@@ -121,17 +126,25 @@ class EssentialUIText @JvmOverloads constructor(
             if (centerTruncatedText) setX(oldX)
             setText(text)
             setWidth(oldWidth)
-            this.truncated = true
+            renderedTruncated = true
             fullText.set(text)
         } else {
             actualTextWidth.set(constraints.getWidth())
             super.draw(matrixStack)
-            this.truncated = false
+            renderedTruncated = false
+        }
+
+        if (truncatedState.get() != renderedTruncated) {
+            Window.enqueueRenderOperation {
+                truncatedState.set(renderedTruncated)
+            }
         }
     }
 
 
 }
+
+private fun Char.isValidFormatCode() = ChatColor.entries.any { it.char == this }
 
 private abstract class FontProviderDelegate(delegate: FontProvider) : FontProvider by delegate
 

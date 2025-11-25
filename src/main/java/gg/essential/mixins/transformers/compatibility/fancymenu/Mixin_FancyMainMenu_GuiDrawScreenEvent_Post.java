@@ -14,6 +14,7 @@ package gg.essential.mixins.transformers.compatibility.fancymenu;
 import gg.essential.Essential;
 import gg.essential.event.gui.GuiDrawScreenEvent;
 import gg.essential.universal.UMatrixStack;
+import gg.essential.util.UDrawContext;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.Unique;
@@ -47,11 +48,11 @@ public class Mixin_FancyMainMenu_GuiDrawScreenEvent_Post {
         Essential.EVENT_BUS.post(new GuiDrawScreenEvent(
             event.invokeGetGui(),
             //#if MC>=12000
-            //$$ new UMatrixStack(event.invokeGetDrawContext().getMatrices()),
+            //$$ new UDrawContext(event.invokeGetDrawContext(), new UMatrixStack(event.invokeGetDrawContext().getMatrices())),
             //#elseif MC>=11600
-            //$$ new UMatrixStack(event.invokeGetMatrixStack()),
+            //$$ new UDrawContext(new UMatrixStack(event.invokeGetMatrixStack())),
             //#else
-            new UMatrixStack(),
+            new UDrawContext(new UMatrixStack()),
             //#endif
             event.invokeGetMouseX(),
             event.invokeGetMouseY(),

@@ -23,6 +23,10 @@ import org.spongepowered.asm.mixin.injection.At;
 
 import java.io.File;
 
+//#if MC>=12006
+//$$ import java.util.Optional;
+//#endif
+
 /**
  * NOTE: This mixin only affects Forge. It is disabled from the {@link gg.essential.mixins.Plugin} on Fabric.
  * <p>
@@ -36,20 +40,38 @@ import java.io.File;
  */
 @Mixin(SaveHandler.class)
 public class Mixin_PreventExtraPlayerLoadEvent {
+    //#if NEOFORGE && MC>=12005
+    //$$ // Event is now fired from inside `Optional.map`
+    //#else
     @SuppressWarnings({"unused"})
     @WrapWithCondition(
+        //#if MC>=12006
+        //$$ method = "load(Lnet/minecraft/world/entity/player/Player;Ljava/lang/String;)Ljava/util/Optional;",
+        //#else
         method = "readPlayerData(Lnet/minecraft/entity/player/EntityPlayer;)Lnet/minecraft/nbt/NBTTagCompound;",
+        //#endif
         at = @At(
             value = "INVOKE",
+            //#if NEOFORGE
+            //$$ target = "Lnet/neoforged/neoforge/event/EventHooks;firePlayerLoadingEvent(Lnet/minecraft/world/entity/player/Player;Ljava/io/File;Ljava/lang/String;)V"
+            //#else
             target = "Lnet/minecraftforge/event/ForgeEventFactory;firePlayerLoadingEvent(Lnet/minecraft/entity/player/EntityPlayer;Ljava/io/File;Ljava/lang/String;)V"
+            //#endif
         )
     )
+    //#if MC>=12006
+    //$$ private boolean essential$preventExtraPlayerLoadEvent(PlayerEntity player, File path, String uuid, @Local Optional<NbtCompound> nbt) {
+    //$$     boolean loadFailed = !nbt.isPresent();
+    //#else
     private boolean essential$preventExtraPlayerLoadEvent(EntityPlayer player, File path, String uuid, @Local NBTTagCompound nbt) {
+        boolean loadFailed = nbt == null;
+    //#endif
         // We want to suppress the event when our load fails, but leave it unaltered for the vanilla code paths.
-        if (PlayerListHook.suppressForgeEventIfLoadFails && nbt == null) {
+        if (PlayerListHook.suppressForgeEventIfLoadFails && loadFailed) {
             return false;
         } else {
             return true;
         }
     }
+    //#endif
 }

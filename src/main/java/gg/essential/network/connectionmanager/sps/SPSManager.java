@@ -21,6 +21,8 @@ import gg.essential.connectionmanager.common.packet.telemetry.ClientTelemetryPac
 import gg.essential.connectionmanager.common.packet.upnp.*;
 import gg.essential.data.SPSData;
 import gg.essential.event.network.server.ServerLeaveEvent;
+import gg.essential.event.network.server.ServerTickEvent;
+import gg.essential.event.render.RenderTickEvent;
 import gg.essential.event.sps.PlayerJoinSessionEvent;
 import gg.essential.event.sps.PlayerLeaveSessionEvent;
 import gg.essential.event.sps.SPSStartEvent;
@@ -39,8 +41,10 @@ import gg.essential.network.connectionmanager.handler.upnp.ServerUPnPSessionRemo
 import gg.essential.network.connectionmanager.queue.PacketQueue;
 import gg.essential.network.connectionmanager.queue.SequentialPacketQueue;
 import gg.essential.sps.ResourcePackSharingHttpServer;
+import gg.essential.sps.TPSSessionMonitor;
+import gg.essential.sps.WindowTitleManager;
+import gg.essential.sps.SpsAddress;
 import gg.essential.universal.UMinecraft;
-import gg.essential.universal.wrappers.message.UTextComponent;
 import gg.essential.upnp.UPnPPrivacy;
 import gg.essential.upnp.model.UPnPSession;
 import gg.essential.util.*;
@@ -48,7 +52,6 @@ import kotlin.collections.CollectionsKt;
 import kotlin.collections.SetsKt;
 import me.kbrewster.eventbus.Subscribe;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.integrated.IntegratedServer;
 import net.minecraft.server.management.PlayerList;
@@ -73,16 +76,20 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+//#if MC>=12109
+//$$ import net.minecraft.server.PlayerConfigEntry;
+//#endif
+
 //#if MC>11202
 //$$ import net.minecraft.world.World;
 //$$ import net.minecraft.world.storage.FolderName;
 //$$ import net.minecraft.world.storage.IServerWorldInfo;
 //#endif
 
-//#if MC<=11202
-import net.minecraft.client.renderer.OpenGlHelper;
+//#if MC>=11200
+import static gg.essential.util.HelpersKt.textTranslatable;
 //#else
-//$$ import com.mojang.blaze3d.platform.PlatformDescriptors;
+//$$ import net.minecraft.client.resources.I18n;
 //#endif
 
 import static gg.essential.util.ExtensionsKt.getExecutor;
@@ -91,19 +98,6 @@ import static gg.essential.util.ExtensionsKt.getExecutor;
  * SinglePlayer Sharing Manager
  */
 public class SPSManager extends StateCallbackManager<IStatusManager> implements NetworkedManager {
-
-    /**
-     * We give each player a dedicated, fake SPS server address in the form of `UUID.TLD`.
-     * This value defines the `.TLD` part. The `UUID` is just the player's UUID (with dashes).
-     * The address is only resolved to the real SPS session IP+port (or ICE) when opening the actual TCP connection.
-     * <p>
-     * This allows us to mask the real address in their activity info as well as keep it consistent
-     * even if the IP changes which is very useful for mods which store data per server (e.g. minimap).
-     * The consistency in the activity info also allows us to easily identify and filter friends from the multiplayer
-     * menu who are playing in a SPS session so we do not show the server twice / at all if we are not invited (i.e.
-     * it is easy to identify if they are playing via SPS vs regular servers).
-     */
-    public static final String SPS_SERVER_TLD = ".essential-sps";
 
     @NotNull
     private final ConnectionManager connectionManager;
@@ -122,6 +116,7 @@ public class SPSManager extends StateCallbackManager<IStatusManager> implements 
     private GameType currentGameMode;
     private boolean allowCheats;
     private EnumDifficulty difficulty;
+    private boolean difficultyLocked;
     @Nullable
     private String serverStatusResponse;
 
@@ -136,6 +131,8 @@ public class SPSManager extends StateCallbackManager<IStatusManager> implements 
     private String resourcePackChecksum = null;
 
     private Instant sessionStartTime = Instant.now();
+
+    private TPSSessionMonitor tpsSessionMonitor = null;
 
     /**
      * A random ID for each session, used for telemetry purposes.
@@ -161,34 +158,12 @@ public class SPSManager extends StateCallbackManager<IStatusManager> implements 
         Runtime.getRuntime().addShutdownHook(new Thread(this::closeLocalSession)); // cleaning up UPnP if we can
     }
 
-    @NotNull
-    public String getSpsAddress(@NotNull UUID hostUUID) {
-        return hostUUID.toString() + SPS_SERVER_TLD;
-    }
-
     public GameType getCurrentGameMode() {
         return currentGameMode;
     }
 
     public boolean isAllowCheats() {
         return allowCheats;
-    }
-
-    public boolean isSpsAddress(String address) {
-        return address.endsWith(SPS_SERVER_TLD);
-    }
-
-    @Nullable
-    public UUID getHostFromSpsAddress(@NotNull String address) {
-        if (!address.endsWith(SPS_SERVER_TLD)) {
-            return null;
-        }
-        address = address.substring(0, address.length() - SPS_SERVER_TLD.length());
-        try {
-            return UUID.fromString(address);
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
     }
 
     @Nullable
@@ -307,6 +282,10 @@ public class SPSManager extends StateCallbackManager<IStatusManager> implements 
         return difficulty;
     }
 
+    public boolean isDifficultyLocked() {
+        return difficultyLocked;
+    }
+
     public Instant getSessionStartTime() {
         return sessionStartTime;
     }
@@ -340,8 +319,13 @@ public class SPSManager extends StateCallbackManager<IStatusManager> implements 
 
         this.allowCheats = worldInfo.areCommandsAllowed();
         this.difficulty = worldInfo.getDifficulty();
+        this.difficultyLocked = worldInfo.isDifficultyLocked();
 
+        //#if MC>=12109
+        //$$ server.setUseAllowlist(true);
+        //#else
         server.getPlayerList().setWhiteListEnabled(true);
+        //#endif
 
         updateOppedPlayers(new HashSet<>(), false);
 
@@ -383,12 +367,16 @@ public class SPSManager extends StateCallbackManager<IStatusManager> implements 
             connectionManager.getIceManager().setVoicePort(voicePort);
         }
 
-        String address = getSpsAddress(UUIDUtil.getClientUUID());
+        String address = new SpsAddress(UUIDUtil.getClientUUID()).toString();
 
         this.updateLocalSession(address, 0);
 
         Essential.EVENT_BUS.post(new SPSStartEvent(address));
         EssentialCommandRegistry.INSTANCE.registerSPSHostCommands();
+
+        WindowTitleManager.INSTANCE.updateTitle();
+
+        tpsSessionMonitor = new TPSSessionMonitor();
     }
 
     public synchronized void updateLocalSession(@NotNull String ip, int port) {
@@ -442,20 +430,61 @@ public class SPSManager extends StateCallbackManager<IStatusManager> implements 
 
         ResourcePackSharingHttpServer.INSTANCE.stopServer();
 
+        resourcePackUrl = null;
+        resourcePackChecksum = null;
+        shareResourcePack = false;
+        tpsSessionMonitor = null;
+
         ExtensionsKt.getExecutor(Minecraft.getMinecraft()).execute(EssentialCommandRegistry.INSTANCE::unregisterSPSHostCommands);
 
         this.updateQueue.enqueue(new ClientUPnPSessionClosePacket());
+
+        ExtensionsKt.getExecutor(Minecraft.getMinecraft()).execute(WindowTitleManager.INSTANCE::updateTitle);
+    }
+
+    @Subscribe
+    private void checkIfClosedByThirdParty(RenderTickEvent event) {
+        if (localSession == null) return;
+
+        IntegratedServer server = Minecraft.getMinecraft().getIntegratedServer();
+        if (server == null || !server.getPublic()) {
+            closeLocalSession();
+        }
+    }
+
+    private static String cpuInfo() {
+        //#if MC>=12105
+        //$$ try {
+        //$$     oshi.hardware.CentralProcessor processor = new oshi.SystemInfo().getHardware().getProcessor();
+        //$$     (processor.getLogicalProcessorCount() + "x " + processor.getProcessorIdentifier().getName()).replaceAll("\\s+", " ");
+        //$$     return "${}x ${processor.processorIdentifier.name}";
+        //$$ } catch (Throwable e) {
+        //$$     return "<unknown>";
+        //$$ }
+        //#elseif MC>=11600
+        //$$ return com.mojang.blaze3d.platform.PlatformDescriptors.getCpuInfo();
+        //#else
+        return net.minecraft.client.renderer.OpenGlHelper.getCpu();
+        //#endif
     }
 
     private void sendSessionTelemetry(IntegratedServer server, UPnPSession oldSession) {
         File worldDirectory = ExtensionsKt.getWorldDirectory(server).toFile();
 
+        float averageTPS;
+        float minTPS;
+        float maxTPS;
+        if (tpsSessionMonitor != null) {
+            averageTPS = tpsSessionMonitor.getAverageTPS();
+            minTPS = tpsSessionMonitor.getMinTPS();
+            maxTPS = tpsSessionMonitor.getMaxTPS();
+        } else {
+            averageTPS = 0f;
+            minTPS = 0f;
+            maxTPS = 0f;
+        }
         HashMap<String, Object> metadata = new HashMap<String, Object>() {{
-            //#if MC<=11202
-            put("userCPU", OpenGlHelper.getCpu());
-            //#else
-            //$$ put("userCPU", PlatformDescriptors.getCpuInfo());
-            //#endif
+            put("userCPU", cpuInfo());
             put("worldNameHash", DigestUtils.sha256Hex(UUIDUtil.getClientUUID() + worldDirectory.getName()));
             put("inviteCount", oldSession.getInvites().size());
             put("shareRP", shareResourcePack);
@@ -464,6 +493,9 @@ public class SPSManager extends StateCallbackManager<IStatusManager> implements 
             put("sessionDurationSeconds", TimeUnit.MILLISECONDS.toSeconds(Duration.between(sessionStartTime, Instant.now()).toMillis()));
             put("sessionId", sessionId);
             put("initiatedFrom", localSessionSource);
+            put("averageTPS", averageTPS);
+            put("minTPS", minTPS);
+            put("maxTPS", maxTPS);
         }};
 
         // Fork so calculating the world size doesn't block the main thread
@@ -473,7 +505,7 @@ public class SPSManager extends StateCallbackManager<IStatusManager> implements 
             metadata.put("worldSizeMb", worldSizeBytes / 1_000_000);
 
             // Return to main thread because enqueue is not thread safe
-            ExtensionsKt.getExecutor(Minecraft.getMinecraft()).execute(() -> connectionManager.getTelemetryManager().enqueue(new ClientTelemetryPacket("SPS_SESSION_3", metadata)));
+            ExtensionsKt.getExecutor(Minecraft.getMinecraft()).execute(() -> connectionManager.getTelemetryManager().enqueue(new ClientTelemetryPacket("SPS_SESSION_4", metadata)));
         });
     }
 
@@ -527,18 +559,28 @@ public class SPSManager extends StateCallbackManager<IStatusManager> implements 
         getExecutor(server).execute(() -> {
             UserListWhitelist whitelist = server.getPlayerList().getWhitelistedPlayers();
             for (String userName : whitelist.getKeys()) {
-                //#if MC>=11701
+                //#if MC>=12109
+                //$$ GameProfile profile = server.getApiServices().nameToIdCache().findByName(userName).map(it -> new GameProfile(it.id(), it.name())).orElse(null);
+                //#elseif MC>=11701
                 //$$ GameProfile profile = server.getUserCache().findByName(userName).orElse(null);
                 //#else
                 GameProfile profile = server.getPlayerProfileCache().getGameProfileForUsername(userName);
                 //#endif
                 if (profile != null && !invited.contains(profile.getId())) {
+                    //#if MC>=12109
+                    //$$ whitelist.remove(new PlayerConfigEntry(profile));
+                    //#else
                     whitelist.removeEntry(profile);
+                    //#endif
                 }
             }
             for (UUID uuid : invited) {
                 String userName = UUIDUtil.getName(uuid).join();
+                //#if MC>=12109
+                //$$ PlayerConfigEntry profile = new PlayerConfigEntry(uuid, userName);
+                //#else
                 GameProfile profile = new GameProfile(uuid, userName);
+                //#endif
                 //noinspection ConstantConditions forge is stupid
                 if (whitelist.getEntry(profile) == null) {
                     whitelist.addEntry(new UserListWhitelistEntry(profile));
@@ -549,10 +591,7 @@ public class SPSManager extends StateCallbackManager<IStatusManager> implements 
             for (EntityPlayerMP entity : ((LanConnectionsAccessor) server.getPlayerList()).getPlayerEntityList()) {
                 if (!invited.contains(entity.getUniqueID()) && !UUIDUtil.getClientUUID().equals(entity.getUniqueID())) {
                     //#if MC>11200
-                    entity.connection.disconnect(
-                        new UTextComponent(I18n.format("multiplayer.disconnect.server_shutdown"))
-                            .getComponent() // need the MC one cause it cannot serialize the universal one
-                    );
+                    entity.connection.disconnect(textTranslatable("multiplayer.disconnect.server_shutdown"));
                     //#else
                     //$$ entity.playerNetServerHandler.kickPlayerFromServer(
                     //$$     I18n.format("multiplayer.disconnect.server_shutdown")
@@ -596,7 +635,7 @@ public class SPSManager extends StateCallbackManager<IStatusManager> implements 
         this.remoteSessions.clear();
     }
 
-    public void updateWorldSettings(boolean cheats, @NotNull GameType gameType, @NotNull EnumDifficulty difficulty) {
+    public void updateWorldSettings(boolean cheats, @NotNull GameType gameType, @NotNull EnumDifficulty difficulty, boolean difficultyLocked) {
         final IntegratedServer integratedServer = UMinecraft.getMinecraft().getIntegratedServer();
         if (integratedServer != null) {
             getExecutor(integratedServer).execute(() -> {
@@ -621,6 +660,7 @@ public class SPSManager extends StateCallbackManager<IStatusManager> implements 
         this.allowCheats = cheats;
         this.currentGameMode = gameType;
         this.difficulty = difficulty;
+        this.difficultyLocked = difficultyLocked;
 
         persistSettings();
     }
@@ -631,6 +671,7 @@ public class SPSManager extends StateCallbackManager<IStatusManager> implements 
             SPSData.SPSSettings spsSettings = new SPSData.SPSSettings(
                     this.currentGameMode,
                     this.difficulty,
+                    this.difficultyLocked,
                     this.allowCheats,
                     this.getInvitedUsers(),
                     this.shareResourcePack,
@@ -716,7 +757,12 @@ public class SPSManager extends StateCallbackManager<IStatusManager> implements 
             final PlayerList playerList = integratedServer.getPlayerList();
             final UserListOps opList = playerList.getOppedPlayers();
 
-            List<GameProfile> allProfiles = Arrays.stream(opList.getKeys()).map(username -> integratedServer.getPlayerProfileCache().getGameProfileForUsername(username))
+            List<GameProfile> allProfiles = Arrays.stream(opList.getKeys())
+                //#if MC>=12109
+                //$$ .map(username -> integratedServer.getApiServices().nameToIdCache().findByName(username).map(it -> new GameProfile(it.id(), it.name())))
+                //#else
+                .map(username -> integratedServer.getPlayerProfileCache().getGameProfileForUsername(username))
+                //#endif
                     //#if MC>=11700
                     //$$ .filter(Optional::isPresent).map(Optional::get)
                     //#endif
@@ -725,14 +771,22 @@ public class SPSManager extends StateCallbackManager<IStatusManager> implements 
             // Remove all players that are no longer op
             for (GameProfile profile : allProfiles) {
                 if (!immutableOppedPlayers.contains(profile.getId())) {
+                    //#if MC>=12109
+                    //$$ playerList.removeFromOperators(new PlayerConfigEntry(profile));
+                    //#else
                     playerList.removeOp(profile);
+                    //#endif
                 }
             }
 
             // Op all new players
             for (UUID oppedPlayer : immutableOppedPlayers) {
 
+                //#if MC>=12109
+                //$$ PlayerConfigEntry gameProfile = new PlayerConfigEntry(oppedPlayer, UUIDUtil.getName(oppedPlayer).join());
+                //#else
                 GameProfile gameProfile = new GameProfile(oppedPlayer, UUIDUtil.getName(oppedPlayer).join());
+                //#endif
 
                 if (opList.getEntry(gameProfile) == null) {
                     playerList.addOp(gameProfile);
@@ -774,6 +828,13 @@ public class SPSManager extends StateCallbackManager<IStatusManager> implements 
         }
     }
 
+    @Subscribe
+    public void onServerTick(ServerTickEvent event) {
+        if (tpsSessionMonitor != null) {
+            tpsSessionMonitor.tick();
+        }
+    }
+
     public boolean isShareResourcePack() {
         return shareResourcePack;
     }
@@ -800,7 +861,7 @@ public class SPSManager extends StateCallbackManager<IStatusManager> implements 
                 // side, but this one feels most appropriate given it also matches the meaning of the url.
                 // The resource pack hash is included because MC caches resource packs by url and we don't want it to
                 // have re-download the whole thing every time when merely switching between two packs.
-                String url = "http://" + UUIDUtil.getClientUUID() + SPS_SERVER_TLD + "/" + packInfo.getChecksum();
+                String url = "http://" + new SpsAddress(UUIDUtil.getClientUUID()) + "/" + packInfo.getChecksum();
                 setServerResourcePack(url, packInfo.getChecksum());
             }
         }

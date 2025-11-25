@@ -17,6 +17,7 @@ import com.mojang.blaze3d.matrix.MatrixStack;
 import gg.essential.Essential;
 import gg.essential.event.gui.GuiDrawScreenEvent;
 import gg.essential.universal.UMatrixStack;
+import gg.essential.util.UDrawContext;
 import net.minecraft.client.gui.ResourceLoadProgressGui;
 import net.minecraft.client.gui.screen.Screen;
 import org.spongepowered.asm.mixin.Mixin;
@@ -28,7 +29,9 @@ import org.spongepowered.asm.mixin.injection.At;
 
 @Mixin(ResourceLoadProgressGui.class)
 public abstract class Mixin_GuiDrawScreenEvent_Priority_LoadingScreen {
-    //#if MC>=12000
+    //#if MC>=12106
+    //$$ private static final String SCREEN_RENDER = "Lnet/minecraft/client/gui/screen/Screen;renderWithTooltip(Lnet/minecraft/client/gui/DrawContext;IIF)V";
+    //#elseif MC>=12000
     //$$ private static final String SCREEN_RENDER = "Lnet/minecraft/client/gui/screen/Screen;render(Lnet/minecraft/client/gui/DrawContext;IIF)V";
     //#else
     private static final String SCREEN_RENDER = "Lnet/minecraft/client/gui/screen/Screen;render(Lcom/mojang/blaze3d/matrix/MatrixStack;IIF)V";
@@ -48,12 +51,12 @@ public abstract class Mixin_GuiDrawScreenEvent_Priority_LoadingScreen {
         Operation<Void> original
     ) {
         //#if MC>=12000
-        //$$ UMatrixStack matrixStack = new UMatrixStack(context.getMatrices());
+        //$$ UDrawContext drawContext = new UDrawContext(context, new UMatrixStack(context.getMatrices()));
         //#else
-        UMatrixStack matrixStack = new UMatrixStack(vMatrixStack);
+        UDrawContext drawContext = new UDrawContext(new UMatrixStack(vMatrixStack));
         //#endif
 
-        GuiDrawScreenEvent.Priority preEvent = new GuiDrawScreenEvent.Priority(screen, matrixStack, mouseX, mouseY, partialTicks, false);
+        GuiDrawScreenEvent.Priority preEvent = new GuiDrawScreenEvent.Priority(screen, drawContext, mouseX, mouseY, partialTicks, false);
         Essential.EVENT_BUS.post(preEvent);
 
         if (preEvent.getMouseX() != preEvent.getOriginalMouseX()) {
@@ -75,6 +78,6 @@ public abstract class Mixin_GuiDrawScreenEvent_Priority_LoadingScreen {
             partialTicks
         );
 
-        Essential.EVENT_BUS.post(new GuiDrawScreenEvent.Priority(screen, matrixStack, mouseX, mouseY, partialTicks, true));
+        Essential.EVENT_BUS.post(new GuiDrawScreenEvent.Priority(screen, drawContext, mouseX, mouseY, partialTicks, true));
     }
 }

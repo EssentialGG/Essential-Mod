@@ -26,7 +26,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class Mixin_GuiClickEvent_Priority  {
 
     @Inject(method = { "lambda$mouseButtonCallback$0", "func_198033_b", "lambda$onPress$0", "m_168084_", "method_1611" }, at = @At("HEAD"), cancellable = true, remap = false)
-    //#if MC>=11700 && FORGE==0
+    //#if MC>=11700 && FORGE==0 || MC>=12006
     //$$ static
     //#endif
     private void onMouseClicked(

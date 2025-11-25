@@ -14,8 +14,10 @@ package gg.essential.mixins.transformers.client.gui;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.llamalad7.mixinextras.sugar.ref.LocalIntRef;
 import gg.essential.event.gui.GuiDrawScreenEvent;
+import gg.essential.mixins.impl.client.gui.EssentialGuiScreenBeforeClose;
 import gg.essential.mixins.impl.client.gui.EssentialPostScreenDrawHook;
 import gg.essential.universal.UMatrixStack;
+import gg.essential.util.UDrawContext;
 import net.minecraft.client.gui.GuiScreen;
 import gg.essential.mixins.impl.client.gui.GuiScreenHook;
 import org.spongepowered.asm.mixin.Mixin;
@@ -32,7 +34,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 //#endif
 
 @Mixin(GuiScreen.class)
-public class MixinGuiScreen implements EssentialPostScreenDrawHook {
+public class MixinGuiScreen implements EssentialPostScreenDrawHook, EssentialGuiScreenBeforeClose {
     private final GuiScreenHook guiScreenHook = new GuiScreenHook((GuiScreen) (Object) this);
 
     //#if MC>=11400
@@ -55,16 +57,19 @@ public class MixinGuiScreen implements EssentialPostScreenDrawHook {
     //$$ private void drawScreen(DrawContext context, int mouseX, int mouseY, float partialTicks, CallbackInfo ci,
     //$$                         @Local(ordinal = 0, argsOnly = true) LocalIntRef mouseXRef, @Local(ordinal = 1, argsOnly = true) LocalIntRef mouseYRef) {
     //$$     UMatrixStack matrixStack = new UMatrixStack(context.getMatrices());
+    //$$     UDrawContext drawContext = new UDrawContext(context, matrixStack);
     //#elseif MC>=11400
     //$$ private void drawScreen(MatrixStack vMatrixStack, int mouseX, int mouseY, float partialTicks, CallbackInfo ci,
     //$$                         @Local(ordinal = 0, argsOnly = true) LocalIntRef mouseXRef, @Local(ordinal = 1, argsOnly = true) LocalIntRef mouseYRef) {
     //$$     UMatrixStack matrixStack = new UMatrixStack(vMatrixStack);
+    //$$     UDrawContext drawContext = new UDrawContext(matrixStack);
     //#else
     protected void drawScreen(int mouseX, int mouseY, float partialTicks, CallbackInfo ci,
                               @Local(ordinal = 0, argsOnly = true) LocalIntRef mouseXRef, @Local(ordinal = 1, argsOnly = true) LocalIntRef mouseYRef) {
         UMatrixStack matrixStack = new UMatrixStack();
+        UDrawContext drawContext = new UDrawContext(matrixStack);
     //#endif
-        GuiDrawScreenEvent event = guiScreenHook.drawScreen(matrixStack, mouseX, mouseY, partialTicks, false);
+        GuiDrawScreenEvent event = guiScreenHook.drawScreen(drawContext, mouseX, mouseY, partialTicks, false);
 
         // Overwrite the mouse X/Y if it was changed during the event (but don't mess with it if we don't need to)
         if (event.getMouseX() != event.getOriginalMouseX()) {
@@ -79,18 +84,30 @@ public class MixinGuiScreen implements EssentialPostScreenDrawHook {
     //#if MC>=12000
     //$$ private void drawScreenPost(DrawContext context, int mouseX, int mouseY, float partialTicks, CallbackInfo ci) {
     //$$     UMatrixStack matrixStack = new UMatrixStack(context.getMatrices());
+    //$$     UDrawContext drawContext = new UDrawContext(context, matrixStack);
     //#elseif MC>=11400
     //$$ private void drawScreenPost(MatrixStack vMatrixStack, int mouseX, int mouseY, float partialTicks, CallbackInfo ci) {
     //$$     UMatrixStack matrixStack = new UMatrixStack(vMatrixStack);
+    //$$     UDrawContext drawContext = new UDrawContext(matrixStack);
     //#else
     protected void drawScreenPost(int mouseX, int mouseY, float partialTicks, CallbackInfo ci) {
         UMatrixStack matrixStack = new UMatrixStack();
+        UDrawContext drawContext = new UDrawContext(matrixStack);
     //#endif
-        guiScreenHook.drawScreen(matrixStack, mouseX, mouseY, partialTicks, true);
-        essential$afterDraw(matrixStack, mouseX, mouseY, partialTicks);
+        guiScreenHook.drawScreen(drawContext, mouseX, mouseY, partialTicks, true);
+        essential$afterDraw(drawContext, mouseX, mouseY, partialTicks);
     }
 
     @Override
-    public void essential$afterDraw(UMatrixStack matrixStack, int mouseX, int mouseY, float partialTicks) {
+    public void essential$afterDraw(UDrawContext drawContext, int mouseX, int mouseY, float partialTicks) {
+    }
+
+    @Inject(method = "onGuiClosed", at = @At("HEAD"))
+    protected void onGuiClosed(final CallbackInfo ci) {
+        essential$beforeClose();
+    }
+
+    @Override
+    public void essential$beforeClose() {
     }
 }

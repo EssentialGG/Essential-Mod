@@ -13,14 +13,15 @@ package gg.essential.gui.screenshot.providers
 
 import gg.essential.Essential
 import gg.essential.gui.screenshot.ScreenshotId
+import gg.essential.gui.screenshot.downsampling.ErrorImage
 import gg.essential.gui.screenshot.downsampling.PixelBuffer
 import gg.essential.gui.screenshot.image.PixelBufferTexture
 import gg.essential.universal.UMinecraft
 import gg.essential.util.RefCounted
+import gg.essential.util.UIdentifier
 import gg.essential.util.executor
-import gg.essential.util.identifier
+import gg.essential.util.toMC
 import net.minecraft.client.Minecraft
-import net.minecraft.util.ResourceLocation
 import org.lwjgl.opengl.GL11
 
 import java.util.concurrent.Executors
@@ -47,22 +48,22 @@ class MinecraftWindowedTextureProvider(
 ) : WindowedTextureProvider {
 
     //No auto expire rule here, we will be manually maintaining the contents of the cache
-    private val loaded = mutableMapOf<ScreenshotId, ResourceLocation>()
+    private val loaded = mutableMapOf<ScreenshotId, RegisteredTexture>()
 
-    private val loading = mutableMapOf<ScreenshotId, ResourceLocation>()
+    private val loading = mutableMapOf<ScreenshotId, RegisteredTexture>()
 
     override var items: List<ScreenshotId> by sourceProvider::items
 
     private var textureManager: AsyncTextureManager? = null
 
-    override fun provide(windows: List<WindowedProvider.Window>, optional: Set<ScreenshotId>): Map<ScreenshotId, ResourceLocation> {
+    override fun provide(windows: List<WindowedProvider.Window>, optional: Set<ScreenshotId>): Map<ScreenshotId, RegisteredTexture> {
         // Avoid creating a new texture manager only to delete it later
         if (windows.isEmpty() && textureManager == null) {
             return emptyMap()
         }
         val textureManager = textureManager ?: AsyncTextureManager().also { textureManager = it }
 
-        val processed = mutableMapOf<ScreenshotId, ResourceLocation>()
+        val processed = mutableMapOf<ScreenshotId, RegisteredTexture>()
 
         val requestedPaths = windows.flatMapTo(mutableSetOf()) { window ->
             window.range.asSequence().map { items[it] }.filterNot { it in optional }
@@ -122,22 +123,22 @@ class MinecraftWindowedTextureProvider(
         }
     }
 
-    private fun AsyncTextureManager.createResource(path: ScreenshotId, image: PixelBuffer): ResourceLocation {
+    private fun AsyncTextureManager.createResource(path: ScreenshotId, image: PixelBuffer) {
         val nextResourceLocation = nextResourceLocation()
-        loading[path] = nextResourceLocation
+        val texture = PixelBufferTexture(nextResourceLocation.toString(), image)
+        loading[path] = RegisteredTexture(nextResourceLocation, image.getWidth(), image.getHeight(), image is ErrorImage)
         image.retain()
         upload(path) {
-            val texture = PixelBufferTexture(image)
+            texture.upload(image)
             image.release()
             texture to nextResourceLocation
         }
-        return nextResourceLocation
     }
 
 
-    private fun onRemoval(location: ResourceLocation) {
+    private fun onRemoval(texture: RegisteredTexture) {
         UMinecraft.getMinecraft().executor.execute {
-            Minecraft.getMinecraft().textureManager.deleteTexture(location)
+            Minecraft.getMinecraft().textureManager.deleteTexture(texture.identifier.toMC())
         }
     }
 
@@ -148,8 +149,8 @@ class MinecraftWindowedTextureProvider(
         private var nextUniqueId = 0
 
         @Synchronized
-        private fun nextResourceLocation(): ResourceLocation {
-            return identifier("essential", "screenshots/${nextUniqueId++}")
+        private fun nextResourceLocation(): UIdentifier {
+            return UIdentifier("essential", "screenshots/${nextUniqueId++}")
         }
     }
 }
@@ -359,13 +360,13 @@ class AsyncTextureManager {
      * Set of screenshot paths that have been uploaded since
      * the last call to [getFinished]
      */
-    private val complete = mutableMapOf<ScreenshotId, ResourceLocation>()
+    private val complete = mutableMapOf<ScreenshotId, UIdentifier>()
 
     /**
      * Schedules the [texture] function to be called on a worker thread.
      * The texture object is then loaded by the Minecraft texture manager on the main thread
      */
-    fun upload(path: ScreenshotId, texture: () -> Pair<PixelBufferTexture, ResourceLocation>) {
+    fun upload(path: ScreenshotId, texture: () -> Pair<PixelBufferTexture, UIdentifier>) {
         uploadBackend.submit {
             val (pixelBufferTexture, resourceLocation) = texture()
 
@@ -373,7 +374,7 @@ class AsyncTextureManager {
 
             UMinecraft.getMinecraft().executor.execute {
                 Minecraft.getMinecraft().textureManager.loadTexture(
-                    resourceLocation,
+                    resourceLocation.toMC(),
                     pixelBufferTexture
                 )
                 synchronized(complete) {
@@ -404,7 +405,7 @@ class AsyncTextureManager {
                 // and then we can clean up any unclaimed results
                 synchronized(complete) {
                     complete.forEach { (_, resourceLocation) ->
-                        Minecraft.getMinecraft().textureManager.deleteTexture(resourceLocation)
+                        Minecraft.getMinecraft().textureManager.deleteTexture(resourceLocation.toMC())
                     }
                     complete.clear()
                 }

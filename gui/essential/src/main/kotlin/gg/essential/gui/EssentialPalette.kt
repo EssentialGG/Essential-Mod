@@ -16,9 +16,11 @@ import gg.essential.elementa.components.UIImage
 import gg.essential.elementa.state.BasicState
 import gg.essential.elementa.state.State
 import gg.essential.elementa.utils.withAlpha
+import gg.essential.gui.friends.message.v2.SendState
 import gg.essential.gui.image.ImageFactory
 import gg.essential.gui.image.ImageGeneratorSettings
 import gg.essential.gui.image.ResourceImageFactory
+import gg.essential.util.UIdentifier
 import java.awt.Color
 import java.awt.image.BufferedImage
 import java.util.concurrent.CompletableFuture
@@ -265,6 +267,12 @@ object EssentialPalette {
     @JvmField
     val CART_ACTIVE_HOVER: Color = Color(0x4BA4FF)
 
+    @JvmField
+    val SEARCHBAR_BACKGROUND: Color = Color(0x444444)
+
+    @JvmField
+    val SEARCHBAR_BLUE_OUTLINE: Color = Color(0x2D4670)
+
     /** Accent/Blue */
     @JvmField
     val FEATURED_BLUE: Color = Color(0x0A82FD)
@@ -297,6 +305,21 @@ object EssentialPalette {
 
     @JvmField
     val TEXT_TRANSPARENT_SHADOW: Color = Color(0, 0, 0, 127)
+
+    @JvmField
+    val TOGGLE_OFF_BACKGROUND: Color = Color(0x999999)
+
+    @JvmField
+    val TOGGLE_OFF_BACKGROUND_HOVERED: Color = Color(0xBFBFBF)
+
+    @JvmField
+    val TOGGLE_OFF_FOREGROUND: Color = Color(0x757575)
+
+    @JvmField
+    val TOGGLE_ON_BACKGROUND: Color = Color(0x0A82FD)
+
+    @JvmField
+    val TOGGLE_ON_BACKGROUND_HOVERED: Color = Color(0x4BA4FF)
 
     /** Accent/Blue */
     @JvmField
@@ -452,6 +475,9 @@ object EssentialPalette {
     val BONUS_COINS_COLOR: Color = Color(0xFDC80A)
 
     @JvmField
+    val PURCHASE_CONFIRMATION_MODAL_SECONDARY: Color = Color(0x232323)
+
+    @JvmField
     val MODAL_TITLE_BLUE: Color = Color(0x0A82FD)
 
     @JvmField
@@ -473,9 +499,11 @@ object EssentialPalette {
     @JvmField
     val CHECKBOX_OUTLINE: Color = Color(0x757575)
 
-    fun getMessageColor(hovered: State<Boolean>, sentByClient: Boolean): State<Color> {
+    fun getMessageColor(hovered: State<Boolean>, sentByClient: Boolean, sendState: SendState): State<Color> {
         return hovered.map {
-            if (it) {
+            if (sendState is SendState.Blocked) {
+                COMPONENT_BACKGROUND
+            } else if (it) {
                 if (sentByClient) {
                     MESSAGE_SENT_BACKGROUND_HOVER
                 } else {
@@ -709,6 +737,9 @@ object EssentialPalette {
 
     @JvmField
     val NOTICE_11X: ImageFactory = ResourceImageFactory("/assets/essential/textures/notice_11x11.png")
+
+    @JvmField
+    val ARROW_UP_DOWN_5X7: ImageFactory = ResourceImageFactory("/assets/essential/textures/menu/arrow_up_down.png")
 
     @JvmField
     val ARROW_UP_7X5: ImageFactory = ResourceImageFactory("/assets/essential/textures/menu/arrow_up.png")
@@ -980,6 +1011,9 @@ object EssentialPalette {
     val RENAME_10X5: ImageFactory = ResourceImageFactory("/assets/essential/textures/optionmenu/rename.png")
 
     @JvmField
+    val RENAME_8X5: ImageFactory = ResourceImageFactory("/assets/essential/textures/optionmenu/rename_8x5.png")
+
+    @JvmField
     val REPORT_10X7: ImageFactory = ResourceImageFactory("/assets/essential/textures/optionmenu/report.png")
 
     @JvmField
@@ -1031,10 +1065,22 @@ object EssentialPalette {
     val DOWNLOAD_7X8: ImageFactory = ResourceImageFactory("/assets/essential/textures/download_7x8.png")
 
     @JvmField
+    val DOWNLOAD_7X8_ID: UIdentifier = UIdentifier("essential", "textures/download_7x8.png")
+
+    @JvmField
     val COIN_7X: ImageFactory = ResourceImageFactory("/assets/essential/textures/coin/coin_icon.png")
 
     @JvmField
     val COIN_BUNDLE_0_999: ImageFactory = ResourceImageFactory("/assets/essential/textures/coin/coin_bundle_0_999.png")
+
+    @JvmField
+    val HOST_5X: ImageFactory = ResourceImageFactory("/assets/essential/textures/host_5x.png")
+
+    @JvmField
+    val SMILEY_8X: ImageFactory = ResourceImageFactory("/assets/essential/textures/account/smiley_8x8.png")
+
+    @JvmField
+    val SIGN_OUT_8X7: ImageFactory = ResourceImageFactory("/assets/essential/textures/account/sign_out_8x7.png")
 
     @LoadsResources("/assets/essential/textures/friends/group_[a-z]+.png")
     private fun createGroupIconFactory(name: String): ImageFactory =

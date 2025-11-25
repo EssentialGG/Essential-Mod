@@ -12,6 +12,7 @@
 package gg.essential.gui.common
 
 import gg.essential.elementa.UIComponent
+import gg.essential.elementa.components.UIContainer
 import gg.essential.elementa.components.Window
 import gg.essential.elementa.constraints.*
 import gg.essential.elementa.dsl.*
@@ -31,7 +32,15 @@ import gg.essential.gui.common.shadow.EssentialUIText
 import gg.essential.gui.common.shadow.ShadowIcon
 import gg.essential.gui.elementa.state.v2.combinators.map
 import gg.essential.gui.elementa.state.v2.combinators.zip
+import gg.essential.gui.elementa.state.v2.mutableStateOf
+import gg.essential.gui.elementa.state.v2.stateOf
 import gg.essential.gui.image.ImageFactory
+import gg.essential.gui.layoutdsl.LayoutScope
+import gg.essential.gui.layoutdsl.Modifier
+import gg.essential.gui.layoutdsl.childBasedSize
+import gg.essential.gui.layoutdsl.layoutAsBox
+import gg.essential.gui.util.Tag
+import gg.essential.gui.util.getTag
 import gg.essential.universal.UGraphics
 import gg.essential.universal.UMatrixStack
 import gg.essential.universal.USound
@@ -45,8 +54,9 @@ import gg.essential.util.image.bitmap.bitmapState
 import gg.essential.util.image.bitmap.bitmapStateIf
 import gg.essential.util.image.bitmap.cropped
 import gg.essential.gui.util.pollingState
+import gg.essential.universal.render.URenderPipeline
+import gg.essential.universal.vertex.UBufferBuilder
 import gg.essential.vigilance.utils.onLeftClick
-import org.lwjgl.opengl.GL11
 import java.awt.Color
 
 /**
@@ -80,7 +90,7 @@ class MenuButton @JvmOverloads constructor(
 
     val hoveredStyleOverrides = BasicState(false) // For manually activating hovered style
     private val tooltipHover = hoveredState()
-    private val styleHover = hoveredState(layoutSafe = false) or hoveredStyleOverrides
+    val styleHover = hoveredState() or hoveredStyleOverrides
     private val collapsed = BasicState(false).map { it }
     private val enabledState = BasicState(true).map { it }
     private var collapsedWidth = 0f
@@ -96,14 +106,14 @@ class MenuButton @JvmOverloads constructor(
         if (collapsed) collapsedText else regularText
     }
     private val availableLabelWidth = pollingState(91f) {
-        getWidth() - (shadowIcon?.getWidth()?.plus(12f) ?: 9f)
+        getWidth() - (icon?.getWidth()?.plus(12f) ?: 9f)
     }
     private val labelState = textState.zip(availableLabelWidth).map { (text, width) ->
         truncateLabel(text ?: "", width)
     }
     val isTruncated = textState.zip(labelState).map { (text, label) -> text != label }
 
-    private val styleState =
+    val styleState =
         styleHover.zip(enabledState).zip(this.defaultStyle.zip(this.hoverStyle.zip(this.disabledStyle))).map { (hoveredEnabled, styles) ->
             val (hovered, enabled) = hoveredEnabled
             val (standardStyle, hoveredDisableStyles) = styles
@@ -118,7 +128,7 @@ class MenuButton @JvmOverloads constructor(
 
     private val iconVisible = BasicState(false).map { it }
 
-    private var shadowIcon: ShadowIcon? = null
+    private var icon: UIComponent? = null
     private var tooltip: Tooltip? = null
     private var originalWidth = constraints.width
     private var originalHeight = constraints.height
@@ -130,6 +140,8 @@ class MenuButton @JvmOverloads constructor(
 
     // For accessing enabled state value
     val enabled by ReadOnlyState(enabledState)
+
+    var drawsBackground = mutableStateOf(stateOf(true))
 
     @JvmOverloads
     constructor(
@@ -257,7 +269,7 @@ class MenuButton @JvmOverloads constructor(
         yOffset: Float = 0f,
         visibleState: State<Boolean> = BasicState(true),
     ) = apply {
-        shadowIcon = ShadowIcon(icon, BasicState(true), color, styleState.map { it.textShadow }).constrain {
+        this.icon = ShadowIcon(icon, BasicState(true), color, styleState.map { it.textShadow }).constrain {
             iconWidth?.let { width = it.pixels }
             iconHeight?.let { height = it.pixels }
         }.bindConstraints(labelState) {
@@ -266,6 +278,28 @@ class MenuButton @JvmOverloads constructor(
         }.bindParent(this, visibleState, index = if (rightAligned) 1 else 0)
 
         iconVisible.rebind(visibleState)
+    }
+
+    /**
+     * Sets the icon that is visible on the button.
+     *
+     * @param iconLayout    The icon layout.
+     * @param rightAligned  True if the icon should be aligned to the right of the button, false otherwise.
+     * @param xOffset       The additional offset to apply to the X constraint.
+     * @param yOffset       The additional offset to apply to the Y constraint.
+     */
+    fun setIcon(
+        iconLayout: LayoutScope.() -> Unit,
+        rightAligned: Boolean = false,
+        xOffset: Float = 0f,
+        yOffset: Float = 0f,
+    ) = apply {
+        this@MenuButton.icon = UIContainer().layoutAsBox(Modifier.childBasedSize()) {
+            iconLayout.invoke(this)
+        }.bindConstraints(labelState) {
+            x = if (it.isNotEmpty()) 5.pixels(alignOpposite = rightAligned) + xOffset.pixels else CenterConstraint()
+            y = if (it.isNotEmpty()) (1.pixels(alignOpposite = true) boundTo label) + yOffset.pixels else CenterConstraint()
+        }.bindParent(this@MenuButton, true.state(), index = if (rightAligned) 1 else 0)
     }
 
     /**
@@ -294,7 +328,7 @@ class MenuButton @JvmOverloads constructor(
     ) = apply {
         tooltip = EssentialTooltip(
             this,
-            position = EssentialTooltip.Position.ABOVE,
+            position = if (above) EssentialTooltip.Position.ABOVE else EssentialTooltip.Position.BELOW,
             notchSize = notchSize
         ).constrain {
             x = (if (followCursorX) {
@@ -370,8 +404,8 @@ class MenuButton @JvmOverloads constructor(
         beforeDraw(matrixStack)
 
         val style = styleState.get()
-        if (style.buttonColor.alpha != 0) {
-            if (shouldBeRetextured ?: (Window.of(this) == platform.pauseMenuDisplayWindow)) {
+        if (drawsBackground.getUntracked().getUntracked() && style.buttonColor.alpha != 0) {
+            if (shouldBeRetextured ?: (Window.of(this).getTag<WindowSupportsButtonRetexturingMarker>() != null)) {
                 val hovered = styleHover.get()
                 val (type, texture) = ButtonTextures.currentTexture(hovered)
 
@@ -382,6 +416,7 @@ class MenuButton @JvmOverloads constructor(
                     // enabled, which is handled in `drawTexturedButton`.
                     // - DARK_GRAY is our default button state.
                     // - GRAY is our default hover state.
+                    // This check is mirrored in [MenuButtonProxy.requiresTinting()], be sure to replicate changes there
                     val isDefaultOrHoveredBaseColor = style.buttonColor == (if (hovered) GRAY else DARK_GRAY).buttonColor
 
                     drawTexturedButton(
@@ -422,7 +457,27 @@ class MenuButton @JvmOverloads constructor(
         )
     }
 
+    object WindowSupportsButtonRetexturingMarker : Tag
+
     companion object {
+        private val PIPELINE = URenderPipeline.builderWithDefaultShader(
+            "essential:menu_button",
+            UGraphics.DrawMode.QUADS,
+            UGraphics.CommonVertexFormats.POSITION_COLOR,
+        ).apply {
+            blendState = BlendState.ALPHA
+            depthTest = URenderPipeline.DepthTest.Always
+        }.build()
+
+        private val PIPELINE_TEXTURED = URenderPipeline.builderWithDefaultShader(
+            "essential:menu_button_textured",
+            UGraphics.DrawMode.QUADS,
+            UGraphics.CommonVertexFormats.POSITION_TEXTURE_COLOR,
+        ).apply {
+            blendState = BlendState.ALPHA
+            depthTest = URenderPipeline.DepthTest.Always
+        }.build()
+
         fun drawButton(
             matrixStack: UMatrixStack,
             left: Double,
@@ -438,49 +493,38 @@ class MenuButton @JvmOverloads constructor(
             hasLeft: Boolean,
             hasRight: Boolean,
         ) {
-            val prevBlendState = BlendState.active()
-            BlendState.NORMAL.activate()
-
-            UGraphics.enableDepth()
-            UGraphics.depthFunc(GL11.GL_ALWAYS)
-
-            UGraphics.getFromTessellator().apply {
+            UBufferBuilder.create(UGraphics.DrawMode.QUADS, UGraphics.CommonVertexFormats.POSITION_COLOR).apply {
                 // Base
-                beginWithDefaultShader(UGraphics.DrawMode.QUADS, UGraphics.CommonVertexFormats.POSITION_COLOR)
                 pos(matrixStack, left, top, 0.0).color(baseColor).endVertex()
                 pos(matrixStack, left, bottom, 0.0).color(baseColor).endVertex()
                 pos(matrixStack, right, bottom, 0.0).color(baseColor).endVertex()
                 pos(matrixStack, right, top, 0.0).color(baseColor).endVertex()
-                drawDirect()
 
-                // Highlights
-                beginWithDefaultShader(UGraphics.DrawMode.TRIANGLE_FAN, UGraphics.CommonVertexFormats.POSITION_COLOR)
+                // Highlight left
                 pos(matrixStack, left, top, 0.0).color(highlightColor).endVertex()
                 pos(matrixStack, left, bottom, 0.0).color(highlightColor).endVertex()
                 pos(matrixStack, left + 1.0, bottom, 0.0).color(highlightColor).endVertex()
+                pos(matrixStack, left + 1.0, top, 0.0).color(highlightColor).endVertex()
+                // Highlight top
+                pos(matrixStack, left + 1.0, top, 0.0).color(highlightColor).endVertex()
                 pos(matrixStack, left + 1.0, top + 1.0, 0.0).color(highlightColor).endVertex()
                 pos(matrixStack, right, top + 1.0, 0.0).color(highlightColor).endVertex()
                 pos(matrixStack, right, top, 0.0).color(highlightColor).endVertex()
-                drawDirect()
 
-                // Shadows
-                beginWithDefaultShader(UGraphics.DrawMode.TRIANGLE_FAN, UGraphics.CommonVertexFormats.POSITION_COLOR)
+                // Shadow right
                 pos(matrixStack, right, bottom, 0.0).color(shadowColor).endVertex()
                 pos(matrixStack, right, top, 0.0).color(shadowColor).endVertex()
                 pos(matrixStack, right - 1.0, top, 0.0).color(shadowColor).endVertex()
+                pos(matrixStack, right - 1.0, bottom, 0.0).color(shadowColor).endVertex()
+                // Shadow bottom
+                pos(matrixStack, right - 1.0, bottom, 0.0).color(shadowColor).endVertex()
                 pos(matrixStack, right - 1.0, bottom - 2.0, 0.0).color(shadowColor).endVertex()
                 pos(matrixStack, left, bottom - 2.0, 0.0).color(shadowColor).endVertex()
                 pos(matrixStack, left, bottom, 0.0).color(shadowColor).endVertex()
-                drawDirect()
 
                 // Outline
                 drawOutline(matrixStack, left, top, right, bottom, outlineColor, hasTop, hasBottom, hasLeft, hasRight)
-            }
-
-            UGraphics.disableDepth()
-            UGraphics.depthFunc(GL11.GL_LEQUAL)
-
-            prevBlendState.activate()
+            }.build()?.drawAndClose(PIPELINE)
         }
 
         fun drawTexturedButton(
@@ -494,25 +538,17 @@ class MenuButton @JvmOverloads constructor(
             isEssentialButtonTexture: Boolean,
             image: Bitmap,
         ) {
-            val prevBlendState = BlendState.active()
-            BlendState.NORMAL.activate()
-
-            UGraphics.enableDepth()
-            UGraphics.depthFunc(GL11.GL_ALWAYS)
-
             val alwaysTint = if (isEssentialButtonTexture) false else platform.config.shouldDarkenRetexturedButtons
             val shouldTint = !isDefaultOrHoveredBaseColor || alwaysTint
             val texture = ButtonTextureProvider.provide(image, baseColor.takeIf { shouldTint })
 
-            UGraphics.bindTexture(0, texture.dynamicGlId)
+            val textureId = texture.dynamicGlId
             UGraphics.color4f(1f, 1f, 1f, 1f)
 
-            UGraphics.getFromTessellator().apply {
+            UBufferBuilder.create(UGraphics.DrawMode.QUADS, UGraphics.CommonVertexFormats.POSITION_TEXTURE_COLOR).apply {
                 val width = right - left
                 val buttonMidPoint = left + (width / 2)
                 val textureMidpoint = (width / 2) / 200
-
-                beginWithDefaultShader(UGraphics.DrawMode.QUADS, UGraphics.CommonVertexFormats.POSITION_TEXTURE_COLOR)
 
                 fun drawHalf(first: Boolean) {
                     // WARNING: Awesome ascii art ahead
@@ -556,17 +592,12 @@ class MenuButton @JvmOverloads constructor(
                 // We draw the texture in two halves, just like the vanilla button
                 drawHalf(true)
                 drawHalf(false)
-
-                drawDirect()
+            }.build()?.drawAndClose(PIPELINE_TEXTURED) {
+                texture(0, textureId)
             }
-
-            UGraphics.disableDepth()
-            UGraphics.depthFunc(GL11.GL_LEQUAL)
-
-            prevBlendState.activate()
         }
 
-        private fun UGraphics.drawOutline(
+        private fun UBufferBuilder.drawOutline(
             matrixStack: UMatrixStack,
             left: Double,
             top: Double,
@@ -579,36 +610,28 @@ class MenuButton @JvmOverloads constructor(
             hasRight: Boolean,
         ) {
             if (hasTop) {
-                beginWithDefaultShader(UGraphics.DrawMode.QUADS, UGraphics.CommonVertexFormats.POSITION_COLOR)
                 pos(matrixStack, left - if (hasLeft) 1.0 else 0.0, top - 1.0, 0.0).color(outlineColor).endVertex()
                 pos(matrixStack, left - if (hasLeft) 1.0 else 0.0, top, 0.0).color(outlineColor).endVertex()
                 pos(matrixStack, right + if (hasRight) 1.0 else 0.0, top, 0.0).color(outlineColor).endVertex()
                 pos(matrixStack, right + if (hasRight) 1.0 else 0.0, top - 1.0, 0.0).color(outlineColor).endVertex()
-                drawDirect()
             }
             if (hasBottom) {
-                beginWithDefaultShader(UGraphics.DrawMode.QUADS, UGraphics.CommonVertexFormats.POSITION_COLOR)
                 pos(matrixStack, left - if (hasLeft) 1.0 else 0.0, bottom, 0.0).color(outlineColor).endVertex()
                 pos(matrixStack, left - if (hasLeft) 1.0 else 0.0, bottom + 1.0, 0.0).color(outlineColor).endVertex()
                 pos(matrixStack, right + if (hasRight) 1.0 else 0.0, bottom + 1.0, 0.0).color(outlineColor).endVertex()
                 pos(matrixStack, right + if (hasRight) 1.0 else 0.0, bottom, 0.0).color(outlineColor).endVertex()
-                drawDirect()
             }
             if (hasLeft) {
-                beginWithDefaultShader(UGraphics.DrawMode.QUADS, UGraphics.CommonVertexFormats.POSITION_COLOR)
                 pos(matrixStack, left - 1.0, top, 0.0).color(outlineColor).endVertex()
                 pos(matrixStack, left - 1.0, bottom, 0.0).color(outlineColor).endVertex()
                 pos(matrixStack, left, bottom, 0.0).color(outlineColor).endVertex()
                 pos(matrixStack, left, top, 0.0).color(outlineColor).endVertex()
-                drawDirect()
             }
             if (hasRight) {
-                beginWithDefaultShader(UGraphics.DrawMode.QUADS, UGraphics.CommonVertexFormats.POSITION_COLOR)
                 pos(matrixStack, right, top, 0.0).color(outlineColor).endVertex()
                 pos(matrixStack, right, bottom, 0.0).color(outlineColor).endVertex()
                 pos(matrixStack, right + 1.0, bottom, 0.0).color(outlineColor).endVertex()
                 pos(matrixStack, right + 1.0, top, 0.0).color(outlineColor).endVertex()
-                drawDirect()
             }
         }
 

@@ -14,6 +14,7 @@ package gg.essential.mixins.transformers.events;
 import gg.essential.Essential;
 import gg.essential.event.render.RenderTickEvent;
 import gg.essential.universal.UMatrixStack;
+import gg.essential.util.UDrawContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.Timer;
 import org.spongepowered.asm.mixin.Final;
@@ -58,6 +59,7 @@ public class Mixin_RenderTickEvent {
     @Unique
     private void fireTickEvent(boolean pre) {
         UMatrixStack matrixStack = new UMatrixStack();
+        UDrawContext drawContext = pre ? null : new UDrawContext(matrixStack);
         //#if MC>=11200
         float partialTicksMenu = this.timer.renderPartialTicks;
         float partialTicksInGame = this.isGamePaused ? this.renderPartialTicksPaused : partialTicksMenu;
@@ -65,7 +67,7 @@ public class Mixin_RenderTickEvent {
         //$$ float partialTicksMenu = this.timer.renderPartialTicks;
         //$$ float partialTicksInGame = partialTicksMenu;
         //#endif
-        Essential.EVENT_BUS.post(new RenderTickEvent(pre, false, matrixStack, partialTicksMenu, partialTicksInGame));
+        Essential.EVENT_BUS.post(new RenderTickEvent(pre, false, drawContext, matrixStack, partialTicksMenu, partialTicksInGame));
     }
 
 }

@@ -47,12 +47,12 @@ data class PerspectiveCamera(val camera: Vec3, val target: Vec3, val fov: Float)
             return when (slot) {
                 CosmeticSlot.CAPE -> Vector3(-30.3, 38.5, 46.6) to Vector3(0.0, 14.9, 0.0)
                 CosmeticSlot.BACK -> Vector3(-50.3, 48.5, 60.6) to Vector3(0.0, 16.9, 0.0)
-                CosmeticSlot.HAT -> Vector3(34.6, 50.5, -40) to Vector3(0, 30, 0)
+                CosmeticSlot.HAT, CosmeticSlot.PET -> Vector3(34.6, 50.5, -40) to Vector3(0, 30, 0)
                 CosmeticSlot.WINGS -> Vector3(0, 20, 138) to Vector3(0, 20, 0)
                 CosmeticSlot.FACE, CosmeticSlot.HEAD -> Vector3(29.7, 44, -34.3) to Vector3(0, 26, 0)
                 CosmeticSlot.SHOULDERS -> Vector3(32.3, 37, -36.8) to Vector3(2.6, 24, -2.5)
                 CosmeticSlot.ARMS -> Vector3(32.3, 34.9, -36.8) to Vector3(2.6, 16.9, -2.5)
-                CosmeticSlot.PANTS -> Vector3(34, 29.1, -38.4) to Vector3(4.3, 11.1, -4.1)
+                CosmeticSlot.PANTS, CosmeticSlot.SKIRT -> Vector3(34, 29.1, -38.4) to Vector3(4.3, 11.1, -4.1)
                 CosmeticSlot.SHOES -> Vector3(30.5, 12.4, -29.4) to Vector3(4.2, 4.8, -3.8)
                 CosmeticSlot.SUITS -> Vector3(73.3, 20.7, -81.3) to Vector3(3.7, 19.2, -2.8)
                 CosmeticSlot.EFFECT -> Vector3(73.3, 20.7, -81.3) to Vector3(3.7, 18.2, -2.8)
@@ -61,7 +61,7 @@ data class PerspectiveCamera(val camera: Vec3, val target: Vec3, val fov: Float)
                 CosmeticSlot.ICON -> Vector3(34.6, 50.5, -40) to Vector3(0, 30, 0)
                 CosmeticSlot.TOP -> Vector3(34.7, 36.2, -39.5) to Vector3(2.6, 17.0, -2.5)
                 CosmeticSlot.ACCESSORY -> Vector3(34.7, 36.2, -39.5) to Vector3(2.6, 17.0, -2.5)
-                CosmeticSlot.FULL_BODY, CosmeticSlot.PET -> Vector3(73.3, 20.7, -81.3) to Vector3(3.7, 18.2, -2.8)
+                CosmeticSlot.FULL_BODY -> Vector3(73.3, 20.7, -81.3) to Vector3(3.7, 18.2, -2.8)
 
                 // These have a camera config but no cosmetics yet
                 // CosmeticSlot.RIDEABLE -> Vector3(73.3, 20.7, -81.3) to Vector3(3.7, 19.2, -2.8),

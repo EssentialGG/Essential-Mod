@@ -17,6 +17,7 @@ import gg.essential.api.gui.EssentialComponentFactory
 import gg.essential.api.gui.IconButtonBuilder
 import gg.essential.api.profile.wrapped
 import gg.essential.elementa.UIComponent
+import gg.essential.elementa.components.inspector.Inspector
 import gg.essential.gui.common.EmulatedUI3DPlayer
 import gg.essential.gui.common.IconButton
 import gg.essential.gui.common.modal.CancelableInputModal
@@ -67,5 +68,9 @@ object ComponentFactory : EssentialComponentFactory {
             builder.textShadowState,
             builder.tooltipBelowComponent,
         )
+    }
+
+    init {
+        Inspector.registerComponentFactory(ComponentFactory::class.java)
     }
 }

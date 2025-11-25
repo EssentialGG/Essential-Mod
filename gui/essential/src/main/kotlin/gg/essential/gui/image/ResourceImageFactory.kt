@@ -13,6 +13,7 @@ package gg.essential.gui.image
 
 import gg.essential.config.LoadsResources
 import gg.essential.elementa.components.UIImage
+import gg.essential.elementa.components.inspector.Inspector
 import gg.essential.elementa.utils.ResourceCache
 import java.util.*
 
@@ -60,5 +61,8 @@ class ResourceImageFactory @LoadsResources("%resource%") constructor(
 
         private val cache: ResourceCache = ResourceCache(Int.MAX_VALUE)
 
+        init {
+            Inspector.registerComponentFactory(ResourceImageFactory::class.java)
+        }
     }
 }

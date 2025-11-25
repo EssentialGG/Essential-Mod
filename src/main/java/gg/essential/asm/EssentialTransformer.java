@@ -18,5 +18,7 @@ import java.util.Set;
 public interface EssentialTransformer {
     Set<String> getTargets();
 
-    void transform(ClassNode classNode);
+    void preApply(ClassNode classNode);
+
+    void postApply(ClassNode classNode);
 }

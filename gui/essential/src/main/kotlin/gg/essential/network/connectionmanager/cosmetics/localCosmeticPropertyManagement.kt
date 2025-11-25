@@ -13,6 +13,8 @@ package gg.essential.network.connectionmanager.cosmetics
 
 import gg.essential.mod.cosmetics.settings.CosmeticProperty
 import gg.essential.mod.cosmetics.settings.CosmeticPropertyType
+import gg.essential.mod.cosmetics.settings.CosmeticSetting
+import gg.essential.mod.cosmetics.settings.CosmeticSettingType
 
 fun List<CosmeticProperty>.removeSingletonPropertyType(type: CosmeticPropertyType?): List<CosmeticProperty> {
     return if (type?.singleton == true) {
@@ -22,3 +24,10 @@ fun List<CosmeticProperty>.removeSingletonPropertyType(type: CosmeticPropertyTyp
     }
 }
 
+fun List<CosmeticSetting>.removeSingletonSettingType(type: CosmeticSettingType?): List<CosmeticSetting> {
+    return if (type?.singleton == true) {
+        filter { it.type != type }
+    } else {
+        this
+    }
+}

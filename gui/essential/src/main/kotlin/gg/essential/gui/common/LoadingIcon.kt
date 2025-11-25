@@ -13,7 +13,6 @@ package gg.essential.gui.common
 
 import gg.essential.elementa.UIComponent
 import gg.essential.elementa.components.UIBlock
-import gg.essential.elementa.components.Window
 import gg.essential.elementa.constraints.CenterConstraint
 import gg.essential.elementa.dsl.pixels
 import gg.essential.universal.UMatrixStack
@@ -28,12 +27,8 @@ class LoadingIcon(val scale: Double) : UIComponent() {
         setY(CenterConstraint())
         setWidth((7 * scale).pixels)
         setHeight((7 * scale).pixels)
-    }
 
-    override fun animationFrame() {
-        super.animationFrame()
-
-        time += 1f / Window.of(this).animationFPS
+        addUpdateFunc { dt, _ -> time += dt }
     }
 
     override fun draw(matrixStack: UMatrixStack) {

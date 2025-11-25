@@ -25,6 +25,11 @@ value class Light(val value: UInt) {
     override fun toString(): String =
         "Light(block=$blockLight,sky=$skyLight)"
 
+    fun withMinimumLight(minimum: Int): Light = Light(
+        blockLight = (blockLight.toInt().coerceAtLeast(minimum).toUShort()),
+        skyLight = (skyLight.toInt().coerceAtLeast(minimum).toUShort())
+    )
+
     companion object {
         /** Completely dark. */
         val MIN_VALUE = Light(0u, 0u)

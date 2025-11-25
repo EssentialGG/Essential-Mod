@@ -14,7 +14,7 @@ package gg.essential.model
 import gg.essential.mod.EssentialAsset
 import kotlin.random.Random
 
-class SoundEffect(
+data class SoundEffect(
     val name: String,
     val category: SoundCategory,
     // Note: Min distance is not currently implemented. Minecraft uses a fixed 0 for all sounds.
@@ -23,7 +23,7 @@ class SoundEffect(
     val fixedPosition: Boolean,
     val sounds: List<Entry>,
 ) {
-    class Entry(
+    data class Entry(
         val asset: EssentialAsset,
         val stream: Boolean = false,
         val interruptible: Boolean = false,

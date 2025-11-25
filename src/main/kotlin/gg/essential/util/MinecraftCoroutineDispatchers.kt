@@ -14,19 +14,6 @@ package gg.essential.util
 import kotlinx.coroutines.asCoroutineDispatcher
 import net.minecraft.client.Minecraft
 
-//#if MC>=11400
-//$$ import com.mojang.blaze3d.systems.RenderSystem
-//$$ import java.util.concurrent.Executor
-//#endif
-
 object MinecraftCoroutineDispatchers {
     val clientThread by lazy { Minecraft.getMinecraft().executor.asCoroutineDispatcher() }
-
-    //#if MC>=11400
-    //$$ val renderThread by lazy {
-    //$$     Executor { RenderSystem.recordRenderCall(it::run) }.asCoroutineDispatcher()
-    //$$ }
-    //#else
-    val renderThread by lazy { clientThread }
-    //#endif
 }

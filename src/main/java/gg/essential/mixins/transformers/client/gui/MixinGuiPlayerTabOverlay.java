@@ -14,6 +14,7 @@ package gg.essential.mixins.transformers.client.gui;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.sugar.Local;
 import gg.essential.universal.UMatrixStack;
+import gg.essential.util.UDrawContext;
 import net.minecraft.client.gui.GuiPlayerTabOverlay;
 import net.minecraft.client.network.NetworkPlayerInfo;
 import gg.essential.handlers.OnlineIndicator;
@@ -55,15 +56,13 @@ public class MixinGuiPlayerTabOverlay {
     }
 
     //#if MC>=12000
+    //#if MC>=12106
+    //$$ @ModifyArg(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/DrawContext;drawTextWithShadow(Lnet/minecraft/client/font/TextRenderer;Lnet/minecraft/text/Text;III)V"), index = 2)
+    //#else
     //$$ @ModifyArg(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/DrawContext;drawTextWithShadow(Lnet/minecraft/client/font/TextRenderer;Lnet/minecraft/text/Text;III)I"), index = 2)
+    //#endif
     //$$ private int essential$shiftNameTextAndRenderIcon(TextRenderer textRenderer, Text text, int x, int y, int color, @Local(argsOnly = true) DrawContext context, @Local PlayerListEntry networkPlayerInfo) {
-    //$$     UMatrixStack matrixStack = new UMatrixStack(context.getMatrices());
-        //#if MC>=12102
-        //$$ // FIXME 1.21.2 should not just blindly cast to Immediate, MC now does the draw call for us, needs refactoring
-        //$$ context.draw(provider -> OnlineIndicator.drawTabIndicatorOuter(matrixStack, (VertexConsumerProvider.Immediate) provider, networkPlayerInfo, x, y));
-        //#else
-        //$$ VertexConsumerProvider.Immediate provider = context.getVertexConsumers();
-        //#endif
+    //$$     UDrawContext drawContext = new UDrawContext(context, new UMatrixStack(context.getMatrices()));
     //#else
     @ModifyArg(
         method = "renderPlayerlist",
@@ -81,24 +80,14 @@ public class MixinGuiPlayerTabOverlay {
     )
     //#if MC>=11600
     //$$ private float essential$shiftNameTextAndRenderIcon(MatrixStack stack, ITextComponent text, float x, float y, int color, @Local NetworkPlayerInfo networkPlayerInfo) {
-    //$$     IRenderTypeBuffer.Impl provider = Minecraft.getInstance().getRenderTypeBuffers().getBufferSource();
-    //$$     UMatrixStack matrixStack = new UMatrixStack(stack);
+    //$$     UDrawContext drawContext = new UDrawContext(new UMatrixStack(stack));
     //#else
     private float essential$shiftNameTextAndRenderIcon(String text, float x, float y, int color, @Local NetworkPlayerInfo networkPlayerInfo) {
-        UMatrixStack matrixStack = new UMatrixStack();
+        UDrawContext drawContext = new UDrawContext(new UMatrixStack());
     //#endif
     //#endif
 
-        //#if MC<12102
-        OnlineIndicator.drawTabIndicatorOuter(
-            matrixStack,
-            //#if MC>=11600
-            //$$ provider,
-            //#endif
-            networkPlayerInfo,
-            (int) x, (int) y
-        );
-        //#endif
+        OnlineIndicator.drawTabIndicatorOuter(drawContext, networkPlayerInfo, (int) x, (int) y);
 
         return x;
     }

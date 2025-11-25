@@ -13,10 +13,6 @@ import essential.*
 import gg.essential.gradle.util.*
 import net.fabricmc.loom.task.RemapJarTask
 
-buildscript {
-    dependencies.constraints.classpath("com.github.replaymod:remap:63aef8561!!")
-}
-
 plugins {
     id("base")
     id("essential.utils")

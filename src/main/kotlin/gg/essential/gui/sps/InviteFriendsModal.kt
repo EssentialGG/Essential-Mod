@@ -20,7 +20,7 @@ import gg.essential.elementa.dsl.*
 import gg.essential.elementa.state.BasicState
 import gg.essential.elementa.state.State
 import gg.essential.event.essential.InitMainMenuEvent
-import gg.essential.event.network.server.SingleplayerJoinEvent
+import gg.essential.event.render.RenderTickEvent
 import gg.essential.gui.EssentialPalette
 import gg.essential.gui.common.*
 import gg.essential.gui.common.modal.ConfirmDenyModal
@@ -35,8 +35,7 @@ import gg.essential.gui.modals.select.SelectModal
 import gg.essential.gui.modals.select.offlinePlayers
 import gg.essential.gui.modals.select.onlinePlayers
 import gg.essential.gui.modals.select.selectModal
-import gg.essential.gui.notification.Notifications
-import gg.essential.gui.notification.iconAndMarkdownBody
+import gg.essential.gui.notification.sendOutgoingSpsInviteNotification
 import gg.essential.gui.overlay.ModalManager
 import gg.essential.handlers.PauseMenuDisplay
 import gg.essential.network.connectionmanager.sps.SPSSessionSource
@@ -73,8 +72,11 @@ object InviteFriendsModal {
         callbackAfterOpen: () -> Unit = {},
     ): ConfirmDenyModal {
 
-        val spsManager = Essential.getInstance().connectionManager.spsManager
-        val integratedServer = getMinecraft().integratedServer.takeIf { getMinecraft().isIntegratedServerRunning }
+        val connectionManager = Essential.getInstance().connectionManager
+        val spsManager = connectionManager.spsManager
+        val integratedServer =
+            if (worldSummary != null) null
+            else getMinecraft().integratedServer.takeIf { getMinecraft().isIntegratedServerRunning }
         val worldPath = integratedServer?.worldDirectory ?: worldSummary!!.worldDirectory
         //#if MC>=11602
         //$$ val info = integratedServer?.getWorld(World.OVERWORLD)?.worldInfo as IServerWorldInfo?
@@ -89,7 +91,7 @@ object InviteFriendsModal {
         )
 
         return ConfirmDenyModal(modalManager, false).configure {
-            titleText = "Basic World Settings"
+            titleText = "Configure world settings"
             titleTextColor = EssentialPalette.TEXT_HIGHLIGHT
             spacer.setHeight(14.pixels)
             if (worldSummary != null) {
@@ -170,7 +172,6 @@ object InviteFriendsModal {
                 height = ChildBasedSizeConstraint()
             } childOf customContent
 
-            val oldDropdowns = mutableListOf<OldEssentialDropDown>()
             val dropdowns = mutableListOf<EssentialDropDown<*>>()
 
             val gamemodes = GameType.values()
@@ -191,7 +192,7 @@ object InviteFriendsModal {
 
             WorldSetting("Game Mode", gamemodeDropdown) childOf settings
 
-            if (info?.isDifficultyLocked != true) {
+            if (!(info?.isDifficultyLocked ?: spsSettings.difficultyLocked)) {
                 //#if MC>=11400
                 //$$ val difficulties = Difficulty.values().associateWith { I18n.format("options.difficulty.${it.name.lowercase()}") }
                 //#else
@@ -215,20 +216,15 @@ object InviteFriendsModal {
             val cheatsState = BasicState(spsSettings.cheats)
             cheatsState.onSetValue { spsSettings = spsSettings.copy(cheats = it) }
             WorldSetting(
-                "Cheats", FullEssentialToggle(
-                    cheatsState,
-                    EssentialPalette.GUI_BACKGROUND,
-                )
+                "Cheats",
+                FullEssentialToggle(cheatsState.toV2())
             ) childOf settings
 
             val shareRP = BasicState(spsSettings.shareResourcePack)
             shareRP.onSetValue { spsSettings = spsSettings.copy(shareResourcePack = it) }
             WorldSetting(
                 "Share RP",
-                FullEssentialToggle(
-                    shareRP,
-                    EssentialPalette.GUI_BACKGROUND,
-                ),
+                FullEssentialToggle(shareRP.toV2()),
                 BasicState("Share your equipped Resource Pack")
             ) childOf settings
 
@@ -242,7 +238,7 @@ object InviteFriendsModal {
 
     private fun updateSpsSettings(spsSettings: SPSData.SPSSettings) {
         val spsManager = Essential.getInstance().connectionManager.spsManager
-        spsManager.updateWorldSettings(spsSettings.cheats, spsSettings.gameType, spsSettings.difficulty)
+        spsManager.updateWorldSettings(spsSettings.cheats, spsSettings.gameType, spsSettings.difficulty, spsSettings.difficultyLocked)
         spsManager.updateOppedPlayers(spsSettings.oppedPlayers)
         spsManager.isShareResourcePack = spsSettings.shareResourcePack
     }
@@ -279,7 +275,7 @@ object InviteFriendsModal {
                         callbackAfterOpen = onComplete,
                     ))
                 } else {
-                    PauseMenuDisplay.showInviteOrHostModal(
+                    PauseMenuDisplay.showInviteOrHostModalInternal(
                         source,
                         previousModal = this,
                         worldSummary = worldSummary,
@@ -345,7 +341,11 @@ object InviteFriendsModal {
             return true
         }
 
-        return selectModal(modalManager, "Invite Friends") {
+        val isServer = getMinecraft().currentServerData != null
+        val title = if (isServer) "Invite friends to server" else "Invite friends to world"
+        val modalSimpleName = "InviteFriends" +
+                if (isServer) "ToServer" else "ToWorld"
+        return selectModal(modalManager, title, modalSimpleName) {
             fun LayoutScope.customPlayerEntry(selected: MutableState<Boolean>, uuid: UUID) {
                 val onlineState = connectionManager.spsManager.getOnlineState(uuid)
                 val reInviteEnabled = getReInviteEnabledState(uuid)
@@ -425,10 +425,6 @@ object InviteFriendsModal {
                 }
             }
 
-            if (justStarted) {
-                fadeTime = 0f
-            }
-
             selectTooltip = "Invite"
             deselectTooltip = "Cancel"
 
@@ -436,9 +432,6 @@ object InviteFriendsModal {
             requiresButtonPress = false
         }.onPrimaryAction { newInvites ->
             if (worldSummary != null) {
-                // We need an SPS session running before updating invites and invoking callback, so we do that in the SinglePlayerJoinEvent
-                Essential.EVENT_BUS.register(PostSingleplayerOpenHandler(newInvites, onComplete))
-
                 //#if MC>=12004
                 //$$ getMinecraft().createIntegratedServerLoader().start(worldSummary.name) { GuiUtil.openScreen { TitleScreen() } }
                 //#elseif MC>=11900
@@ -448,6 +441,9 @@ object InviteFriendsModal {
                 //#else
                 getMinecraft().launchIntegratedServer(worldSummary.fileName, worldSummary.displayName, null)
                 //#endif
+
+                // We need an SPS session running before updating invites and invoking callback, so we do that in the SinglePlayerJoinEvent
+                Essential.EVENT_BUS.register(PostSingleplayerOpenHandler(newInvites, onComplete))
             } else {
                 if (MinecraftUtils.isHostingSPS()) {
                     // Invite existing invited players that weren't already re-invited
@@ -470,11 +466,7 @@ object InviteFriendsModal {
     }
 
     fun sendInviteNotification(uuid: UUID) {
-        UUIDUtil.getName(uuid).thenAcceptOnMainThread { username ->
-            Notifications.push("", "") {
-                iconAndMarkdownBody(EssentialPalette.ENVELOPE_9X7.create(), "${username.colored(EssentialPalette.TEXT_HIGHLIGHT)} invited")
-            }
-        }
+        UUIDUtil.getName(uuid).thenAcceptOnMainThread { sendOutgoingSpsInviteNotification(it) }
     }
 
     private class WorldSetting(text: String, component: UIComponent, tooltip: State<String>? = null) : UIContainer() {
@@ -510,7 +502,12 @@ object InviteFriendsModal {
 
     class PostSingleplayerOpenHandler(private val currentInvites: Set<UUID>, private val callback: () -> Unit) {
         @Subscribe
-        private fun onSingleplayerJoinEvent(event: SingleplayerJoinEvent) {
+        private fun checkIfWorldHasLoaded(event: RenderTickEvent) {
+            //#if MC<11600
+            @Suppress("SENSELESS_COMPARISON") // Forge applies an inappropriate NonNullByDefault
+            //#endif
+            if (getMinecraft().world == null) return // not yet
+
             Essential.EVENT_BUS.unregister(this)
 
             val spsManager = Essential.getInstance().connectionManager.spsManager
@@ -528,7 +525,9 @@ object InviteFriendsModal {
                 getMinecraft().integratedServer?.let { integratedServer ->
                     if (getMinecraft().isIntegratedServerRunning && integratedServer.isServerStopped) {
                         Essential.EVENT_BUS.unregister(this)
-                        //#if MC>=11602
+                        //#if MC>=12106
+                        //$$ getMinecraft().disconnectWithProgressScreen()
+                        //#elseif MC>=11602
                         //$$ getMinecraft().unloadWorld()
                         //#else
                         getMinecraft().loadWorld(null as WorldClient?)

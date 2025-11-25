@@ -23,7 +23,7 @@ data class CosmeticBundle(
     val tier: CosmeticTier,
     val discountPercent: Float,
     val rotateOnPreview: Boolean = false,
-    var skin: Skin,
+    var skin: Skin? = null,
     val cosmetics: Map<CosmeticSlot, CosmeticId>,
     val settings: Map<CosmeticId, List<CosmeticSetting>>,
 ) {

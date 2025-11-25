@@ -14,6 +14,7 @@ package gg.essential.model
 import dev.folomeev.kotgl.matrix.vectors.Vec2
 import dev.folomeev.kotgl.matrix.vectors.Vec3
 import dev.folomeev.kotgl.matrix.vectors.dot
+import dev.folomeev.kotgl.matrix.vectors.mutables.MutableVec3
 import dev.folomeev.kotgl.matrix.vectors.mutables.cross
 import dev.folomeev.kotgl.matrix.vectors.mutables.crossSelf
 import dev.folomeev.kotgl.matrix.vectors.mutables.div
@@ -37,6 +38,7 @@ import dev.folomeev.kotgl.matrix.vectors.vecUnitX
 import dev.folomeev.kotgl.matrix.vectors.vecUnitY
 import dev.folomeev.kotgl.matrix.vectors.vecUnitZ
 import dev.folomeev.kotgl.matrix.vectors.vecZero
+import gg.essential.model.backend.RenderBackend
 import gg.essential.model.collision.CollisionProvider
 import gg.essential.model.file.ParticleEffectComponents
 import gg.essential.model.file.ParticleEffectComponents.ParticleAppearanceBillboard.Direction.Custom
@@ -44,11 +46,11 @@ import gg.essential.model.file.ParticleEffectComponents.ParticleAppearanceBillbo
 import gg.essential.model.file.ParticleEffectComponents.ParticleAppearanceBillboard.FacingCameraMode.*
 import gg.essential.model.file.ParticlesFile
 import gg.essential.model.molang.MolangContext
-import gg.essential.model.molang.MolangExpression
 import gg.essential.model.molang.MolangQuery
 import gg.essential.model.util.Color
 import gg.essential.model.light.Light
 import gg.essential.model.light.LightProvider
+import gg.essential.model.molang.Molang
 import gg.essential.model.molang.MolangQueryEntity
 import gg.essential.model.molang.MolangQueryTime
 import gg.essential.model.molang.Variables
@@ -108,7 +110,7 @@ class ParticleSystem(
             particles.add(particle)
 
             val effect = particle.emitter.effect
-            val renderPass = effect.renderPass
+            val renderPass = particle.renderPass
             if (renderPass != null) {
                 if (effect.components.particleAppearanceBillboard != null) {
                     billboardRenderPasses.getOrPut(renderPass, ::mutableSetOf).add(particle)
@@ -120,7 +122,7 @@ class ParticleSystem(
             val particle = particles.set(index, null) ?: throw IndexOutOfBoundsException()
 
             val effect = particle.emitter.effect
-            val renderPass = effect.renderPass
+            val renderPass = particle.renderPass
             if (renderPass != null) {
                 if (effect.components.particleAppearanceBillboard != null) {
                     val renderPassSet = billboardRenderPasses.getValue(renderPass)
@@ -137,13 +139,15 @@ class ParticleSystem(
 
     fun spawn(event: ModelAnimationState.ParticleEvent) {
         val universe = universes.getOrPut(event.timeSource) { Universe(event.timeSource) }
+        val (position, rotation) = event.locator.positionAndRotation // more performant to get together
         val emitter = Emitter(
             this,
             universe,
             event.effect,
+            event.textureSource,
             event.sourceEntity,
-            event.locator.position,
-            event.locator.rotation,
+            position,
+            rotation,
             vec3(),
             event.locator,
             vec3(),
@@ -248,34 +252,357 @@ class ParticleSystem(
         particleVertexConsumerProvider: VertexConsumerProvider,
         cameraUuid: UUID,
         cameraFirstPerson: Boolean,
+        hideParticlesInFirstPerson: Boolean,
+        onlyRenderFromSource: UUID? = null,
     ) {
         val cameraFacing = vec3(0f, 0f, -1f).rotateBy(cameraRot)
-        for ((renderPass, particles) in billboardRenderPasses.entries.sortedBy { it.key.material.needsSorting }) {
-            particleVertexConsumerProvider.provide(renderPass) { vertexConsumer ->
-                if (renderPass.material.needsSorting) {
-                    for (particle in particles) {
-                        particle.prepareBillboard(cameraPos, cameraRot)
+        for ((renderPass, allParticles) in billboardRenderPasses.entries.sortedBy { it.key.material.needsSorting }) {
 
-                        val billboardNormal = mutableVec3(0f, 0f, -1f).rotateSelfBy(particle.billboardRotation)
-                        particle.distance = cameraPos.minus(particle.billboardPosition).dot(billboardNormal)
-                    }
-                    for (particle in particles.sortedByDescending { it.distance }) {
-                        particle.renderBillboard(matrixStack, vertexConsumer, cameraFacing, cameraUuid, cameraFirstPerson)
-                    }
-                } else {
+            // filter out unwanted particles prior to depth sorting calculations
+            val particles = if (onlyRenderFromSource != null) {
+                val particlesFromSource = allParticles.filter { it.emitter.sourceEntity.uuid == onlyRenderFromSource }
+                if (particlesFromSource.isEmpty()) continue
+                particlesFromSource
+            } else {
+                allParticles // never empty
+            }
+
+            particleVertexConsumerProvider.provide(renderPass) { vertexConsumer ->
+                if (!renderPass.material.needsSorting) {
                     for (particle in particles) {
                         particle.prepareBillboard(cameraPos, cameraRot)
-                        particle.renderBillboard(matrixStack, vertexConsumer, cameraFacing, cameraUuid, cameraFirstPerson)
+                        particle.renderBillboard(matrixStack, vertexConsumer, cameraFacing, cameraUuid, cameraFirstPerson, hideParticlesInFirstPerson)
                     }
+                    return@provide
+                }
+
+                // prepare billboards for sorting
+                // also checks if all billboards align, which allows for a much simpler sorting method
+                var allAligned = true
+                var firstNormal: Vec3? = null
+                for (particle in particles) {
+                    particle.prepareBillboard(cameraPos, cameraRot)
+
+                    particle.normal = mutableVec3(0f, 0f, -1f).rotateSelfBy(particle.billboardRotation)
+
+                    // check if all billboards are aligned to the same normal, because that allows for much simpler sorting
+                    if (allAligned) {
+                        if (firstNormal == null) {
+                            firstNormal = particle.normal
+                        } else if (firstNormal != particle.normal) {
+                            allAligned = false
+                        }
+                    }
+
+                    particle.distance = cameraPos.minus(particle.billboardPosition).dot(particle.normal)
+                }
+
+                if (allAligned) {
+                    // we can use a much simpler sorting when all billboards face the camera, as their distance will
+                    // account for all possible overlaps
+                    for (particle in particles.sortedByDescending { it.distance }) {
+                        particle.renderBillboard(matrixStack, vertexConsumer, cameraFacing, cameraUuid, cameraFirstPerson, hideParticlesInFirstPerson)
+                    }
+                    return@provide
+                }
+
+                // more complex translucency sorting is required
+                for (p in translucencySortBillboardParticles(cameraFacing, cameraPos, cameraRot, particles)) {
+                    p.renderBillboard(matrixStack, vertexConsumer, cameraFacing, cameraUuid, cameraFirstPerson, hideParticlesInFirstPerson)
                 }
             }
         }
     }
 
+    /**
+     * Sorts the given set of particles in back to front order relative to the camera.
+     * Input particles are already confirmed to not all be camera aligned, so we must account for billboards being
+     * arbitrarily rotated in 3d space with possible intersecting depths and screenspace overlaps.
+     *
+     * This does have limitations, most notably with intersecting particles, which can not ever be corrected by sorting alone.
+     *
+     * Additionally, topologically dependant cycles (e.g. A > B > C > A) can not be sorted correctly within their own loop,
+     * so in these cases the cycle is broken by using a fallback sorting value (distance from camera), any surrounding
+     * particles to the cycle will still sort properly.
+     * */
+    private fun translucencySortBillboardParticles(
+        cameraFacing: Vec3,
+        cameraPos: Vec3,
+        cameraRot: Quaternion,
+        particles: Collection<Particle>
+    ): List<Particle> {
+
+        // setup for screen space func
+        val cameraUp = mutableVec3(0f, 1f, 0f).rotateSelfBy(cameraRot)
+        val cameraRight = mutableVec3(1f, 0f, 0f).rotateSelfBy(cameraRot)
+
+        fun MutableVec3.projectToScreenSpaceSelf(): MutableVec3 {
+            val rel = minus(cameraPos)
+
+            // view space co-ordinates
+            val xView = rel.dot(cameraRight)
+            val yView  = rel.dot(cameraUp)
+            val zView  = rel.dot(cameraFacing) // depth along [cameraFacing]
+
+            // NOTE: if we ever run into issues here with an orthographic projection third party mod we can fall back to
+            // just using view space via:  if (isOrthographic) return apply { x = xView; y = yView; z = zView }
+
+            // behind camera, projection won't work properly
+            // this solution may mess with AABB bounds, but most likely the entire quad falls behind the camera and will get culled
+            if (zView <= 0f) return apply { x = 0f; y = 0f; z = zView }
+
+            // screen space co-ordinates
+            // values don't need to be normalized since we are only using them for relative comparisons
+            val xScreen = xView / zView
+            val yScreen = yView / zView
+
+            return apply { x = xScreen; y = yScreen; z = zView }
+        }
+
+        class Billboard(
+            val index: Int,
+            val particle: Particle
+        ) {
+
+            // values used by the sorting algorithms to follow
+            var lowLink = 0
+            var sortIndex = -1
+            var onStack = false
+
+            /** List of other billboard id's topologically dependent on this one */
+            private var dependantsArray: IntArray? = null
+            private var dependantsSize = 0
+
+            fun forEachDependant(action: (Int) -> Unit) { for (i in 0 until dependantsSize) action(dependantsArray!![i]) }
+
+            fun setBehind(other: Billboard) {
+                // add other to the dependants list, we use an IntArray to reduce autoboxing so need to manage size manually
+                if (dependantsArray == null) {
+                    dependantsArray = IntArray(4)
+                } else if (dependantsArray!!.size <= dependantsSize) {
+                    // doubling size each time should reduce the amount of reallocations exponentially
+                    val newArray = IntArray(dependantsSize * 2)
+                    dependantsArray?.let { System.arraycopy(it, 0, newArray, 0, it.size) }
+                    dependantsArray = newArray
+                }
+                dependantsArray!![dependantsSize++] = other.index
+            }
+
+            private fun pos(x: Float, y: Float): Vec3 = mutableVec3(x, y, 0f)
+                .rotateSelfBy(particle.billboardRotation)
+                .plusSelf(particle.billboardPosition)
+                .projectToScreenSpaceSelf()
+
+            private val vert0 = pos(-particle.billboardSize.x, -particle.billboardSize.y)
+            private val vert1 = pos(-particle.billboardSize.x, particle.billboardSize.y)
+            private val vert2 = pos(particle.billboardSize.x, particle.billboardSize.y)
+            private val vert3 = pos(particle.billboardSize.x, -particle.billboardSize.y)
+
+            // particle worldNormal and the distance aligned to it, functions as a shortcut / pre-calculated plane depth check
+            // when both compared particles are aligned to the same worldNormal
+            val worldNormal get() = particle.normal
+            val alignedDistance get() = particle.distance
+
+            // depth range from camera
+            private var minZ = Float.POSITIVE_INFINITY
+            private var maxZ = Float.NEGATIVE_INFINITY
+            val fallbackSortZ get() = minZ + maxZ
+
+            // AABB for quick overlap checks, x is also used for implementing an interval tree when building the DG
+            var minX = Float.POSITIVE_INFINITY
+            var maxX = Float.NEGATIVE_INFINITY
+            private var minY = Float.POSITIVE_INFINITY
+            private var maxY = Float.NEGATIVE_INFINITY
+
+            init {
+                // init all bounds together in one pass
+                for (v in arrayOf(vert0, vert1, vert2, vert3)) {
+                    if (v.x < minX) minX = v.x
+                    if (v.x > maxX) maxX = v.x
+                    if (v.y < minY) minY = v.y
+                    if (v.y > maxY) maxY = v.y
+                    if (v.z < minZ) minZ = v.z
+                    if (v.z > maxZ) maxZ = v.z
+                }
+            }
+
+            val isFullyBehindCamera get() = maxZ < 0f
+            fun isFullyBehind(other: Billboard): Boolean = minZ > other.maxZ
+
+            // the actual geometry may not overlap, but we are simplifying for performance
+            fun overlapsVerticallyWith(other: Billboard): Boolean = maxY > other.minY && minY < other.maxY
+
+            val depthFactor = particle.billboardPosition.minus(cameraPos).dot(particle.normal)
+
+            fun centerOfOverlap(other: Billboard): Vec2 {
+                val overlapMinX = maxOf(minX, other.minX)
+                val overlapMaxX = minOf(maxX, other.maxX)
+                val overlapMinY = maxOf(minY, other.minY)
+                val overlapMaxY = minOf(maxY, other.maxY)
+                return vec2((overlapMinX + overlapMaxX) * 0.5f, (overlapMinY + overlapMaxY) * 0.5f)
+            }
+        }
+
+
+        // build initial list of billboards, skipping any that are fully behind the camera.
+        // Billboard.index refers to the index in this list.
+        // this is also the first of many pre-sized arrays to follow to reduce allocations per frame
+        val billboards = ArrayList<Billboard>(particles.size)
+        particles.forEach { particle ->
+            val bb = Billboard(billboards.size, particle)
+            if (!bb.isFullyBehindCamera) {
+                billboards.add(bb)
+            }
+        }
+
+        if (billboards.size < 2) return billboards.map { it.particle } // nothing left to sort in front of camera
+
+        // build a directed graph (DG) of the billboard's ordering relationships https://en.wikipedia.org/wiki/Directed_graph
+        // relationship data is stored in the billboards themselves and formatted for use with Tarjan's strongly connected
+        // components algorithm, and it's follow-up depth first search, further below
+
+        // sort along the x-axis so we can implement a 1 dimensional interval tree style check for overlaps.
+        // x-axis is more likely to split up particles between players than the y-axis, as typically players are standing
+        // on the same level
+        val sorted = billboards.sortedBy { it.minX }
+        for (i in sorted.indices) {
+            val a = sorted[i]
+            var j = i
+            while (++j < sorted.size && sorted[j].minX <= a.maxX) {
+                val b = sorted[j]
+
+                if (!a.overlapsVerticallyWith(b)) continue // no overlap in screen space, ignore this pair
+
+                if (a.worldNormal == b.worldNormal) {
+                    // both billboards are aligned, so we can sort by the pre-calculated alignedDistance as a shortcut
+                    if (a.alignedDistance >= b.alignedDistance) {
+                        a.setBehind(b)
+                    } else {
+                        b.setBehind(a)
+                    }
+                    continue
+                }
+
+                // check if one is fully behind the other, skips need for more complex checks
+                if (a.isFullyBehind(b)) {
+                    a.setBehind(b)
+                } else if (b.isFullyBehind(a)) {
+                    b.setBehind(a)
+                } else {
+                    // depths overlap, so we will determine the center of the overlap area, and then we will sort by the
+                    // depth at that point on each billboard's plane
+
+                    // this attempts to account for situations like https://www.khronos.org/opengl/wiki_opengl/images/Sort_by_what.png (A is camera)
+
+                    // this also handles intersecting billboards, which will always be incorrect, as whichever is in front
+                    // will always have some area behind the other but is just the best we can do with render sorting alone
+
+                    // this AABB check is not perfect, for particles rotated by 45 degrees the AABB may be up to 2 times
+                    // larger (averaging about 1.5) than the actual screen space polygons, resulting in more false overlaps
+                    // & more complex topology data, but AABB is a compromise to avoid more complex polygon clipping operations
+
+                    // checking the depth at the center is also an arbitrary compromise, as checking all 4 vertices
+                    // (maybe more if we tested actual polygon overlaps) for "depth extremes" may give a better indication
+                    // of which is "more in front", but given this only affects intersecting billboards which can't
+                    // be sorted correctly anyway, this isn't that important
+
+                    val (x, y) = a.centerOfOverlap(b)
+                    val rayDir = mutableVec3(cameraRight.times(x))
+                        .plusSelf(cameraUp.times(y))
+                        .plusSelf(cameraFacing)
+                    // Note: These aren't actual depth values. They are based on an actual depth computation but were
+                    // aggressively optimized for our use-case which only needs to know how they compare to each other.
+                    val aDepth = a.depthFactor / rayDir.dot(a.worldNormal)
+                    val bDepth = b.depthFactor / rayDir.dot(b.worldNormal)
+
+                    if (aDepth >= bDepth) {
+                        a.setBehind(b)
+                    } else {
+                        b.setBehind(a)
+                    }
+                }
+            }
+        }
+
+        // our DG of billboards now has all the ordering relationships we need to sort them, however it may contain cycles
+        // which refers to entries in the DG data that can never be correctly sorted in order because their topology is
+        // a cycle (e.g. A > B > C > A), also see "triple overlaps" https://www.khronos.org/opengl/wiki_opengl/images/Triple_overlap.png
+
+        // to resolve this as best we can we will use Tarjan's strongly connected components (SCC) algorithm, which runs a depth first
+        // search which can handle cycles in the DG by grouping them into single nodes before adding them to the final
+        // sorted list https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm
+
+        val resultList = ArrayList<Particle>(billboards.size)
+
+        val stack = ArrayDeque<Billboard>(billboards.size)
+        var index = 0
+
+        // variable names are aligned with the example pseudocode in the wikipedia article for Tarjan's algorithm
+        fun strongConnect(v: Billboard) {
+            // set the depth index for v to the smallest unused index
+            v.sortIndex = index
+            v.lowLink = index
+            index++
+
+            stack.addLast(v)
+            v.onStack = true
+
+            v.forEachDependant { i ->
+                val w = billboards[i]
+                if (w.sortIndex == -1) { // w is not yet visited, recurse into it
+                    strongConnect(w)
+                    v.lowLink = minOf(v.lowLink, w.lowLink)
+                } else if (w.onStack) { // w is onStack and is within the current SCC
+                    v.lowLink = minOf(v.lowLink, w.sortIndex)
+                } // w is not onStack, so (v, w) is an edge pointing to an SCC already found and must be ignored
+            }
+
+
+            if (v.lowLink == v.sortIndex) {
+                // v is a root node, pop the stack into a singular, or cyclic, SCC node and add to the result list
+
+                // first lets check if this is a single node or a cycle, potentially skipping some work and allocations
+                val w0 = stack.removeLast()
+                w0.onStack = false
+                if (w0 == v) {
+                    resultList.add(w0.particle)
+                    return
+                }
+
+                // there are multiple nodes required so we will collect them into a list and then apply the backup sort
+                val sccNode = mutableListOf(w0)
+                while (true) {
+                    val w = stack.removeLast()
+                    w.onStack = false
+                    sccNode.add(w)
+                    if (w == v) break
+                }
+
+                // this scc node represents a cycle, so we will use a fallback sorting value for the particles within it
+                sccNode.sortBy { it.fallbackSortZ }
+
+                for (node in sccNode) {
+                    resultList.add(node.particle)
+                }
+            }
+        }
+
+        // fill the result list from the billboard directed graph via Tarjan's strongly connected components algorithm
+        for (v in billboards) {
+            // if not yet visited by strongConnect()
+            if (v.sortIndex == -1) strongConnect(v)
+        }
+
+        resultList.reverse()
+
+        return resultList
+    }
+
     private class Emitter(
         val system: ParticleSystem,
         val universe: Universe,
-        val effect: ParticleEffect,
+        val effectRef: ParticleEffectWithReferencedEffects,
+        val textureSource: () -> RenderBackend.Texture?,
         val sourceEntity: MolangQueryEntity,
         /** Global position of the emitter. Updated each frame if alive and bound to a locator. */
         var position: Vec3,
@@ -288,6 +615,8 @@ class ParticleSystem(
         /** Offset of this emitter from the locator position in local space. */
         val locatorOffset: Vec3?,
     ) {
+
+        val effect = effectRef.particleEffect
         private val components = effect.components
         private val curveVariables = CurveVariables({ molang }, effect.curves)
         private val variables = VariablesMap().fallbackBackTo(curveVariables)
@@ -372,8 +701,10 @@ class ParticleSystem(
             components.emitterInitialization?.perUpdateExpression?.eval(molang)
 
             if (locator != null) {
-                position = locator.position
-                rotation = locator.rotation
+                // more performant to get them together
+                val posRot = locator.positionAndRotation
+                position = posRot.first
+                rotation = posRot.second
                 velocity = locator.velocity
                 if (locatorOffset != null) {
                     position = position.plus(locatorOffset.rotateBy(rotation))
@@ -424,6 +755,9 @@ class ParticleSystem(
         }
 
         fun emit(dt: Float, inheritVelocity: Boolean = false) {
+            // Don't emit particle if the locator bone is not visible
+            if (locator?.isVisible == false) return
+
             val localSpace = if (components.emitterLocalSpace?.position == true) locator else null
 
             val particle = Particle(this, localSpace)
@@ -478,7 +812,7 @@ class ParticleSystem(
             }
 
             event.particle?.let { config ->
-                val targetEffect = effect.referencedEffects[config.effect] ?: return@let
+                val targetEffectRef = effectRef.getOtherParticleByReference(config.effect) ?: return@let
                 // TODO: docs say about "particle" that we should be "creating the emitter if it doesn't already exist"
                 //       but how are we supposed to determine whether an emitter "at the event location" already
                 //       exists in the first place? just going to create a new one each time for now
@@ -486,7 +820,8 @@ class ParticleSystem(
                     Emitter(
                         system,
                         universe,
-                        targetEffect,
+                        targetEffectRef,
+                        textureSource,
                         sourceEntity,
                         particle?.globalPosition ?: position,
                         rotation,
@@ -500,7 +835,8 @@ class ParticleSystem(
                     Emitter(
                         system,
                         universe,
-                        targetEffect,
+                        targetEffectRef,
+                        textureSource,
                         sourceEntity,
                         particle?.globalPosition ?: position,
                         Quaternion.Identity,
@@ -520,7 +856,7 @@ class ParticleSystem(
             }
 
             event.sound?.let { config ->
-                val targetSound = effect.referencedSounds[config.event] ?: return@let
+                val targetSound = effectRef.referencedSounds[config.event] ?: return@let
                 system.playSound(ModelAnimationState.SoundEvent(
                     universe.timeSource,
                     universe.lastUpdate - timeSince,
@@ -542,6 +878,8 @@ class ParticleSystem(
                 get() = emitter.rotation
             override val velocity: Vec3
                 get() = emitter.velocity
+            override val isVisible: Boolean
+                get() = parent?.isVisible ?: true
         }
     }
 
@@ -550,6 +888,7 @@ class ParticleSystem(
         /** This is the locator describing the space in which this particle is simulated if it is not global. */
         val localSpace: Locator?,
     ) {
+        val renderPass = emitter.effect.renderPass(emitter.textureSource)
         private val components = emitter.effect.components
         val curveVariables = CurveVariables({ molang }, emitter.effect.curves)
         private val variables = VariablesMap()
@@ -598,7 +937,11 @@ class ParticleSystem(
         var billboardPosition = vec3()
         /** Stores the global rotation of the billboard (if any) of this particle. Valid only during rendering. */
         var billboardRotation = Quaternion.Identity
-        /** Temporary value used for sorting because Kotlin doesn't seem to have a `sort_by_cached_key`. */
+        /** Stores the x, y sizes of the billboard (if any) of this particle. Valid only during rendering. */
+        var billboardSize = vec2()
+        /** Temporary value used to calculate distance, and check for plane alignment of particles. Valid only during rendering. */
+        var normal: Vec3 = vecZero()
+        /** Temporary value used for sorting normal aligned billboards by their distance. Valid only during rendering. */
         var distance: Float = 0f
 
         fun emit(inheritVelocity: Boolean) {
@@ -753,6 +1096,11 @@ class ParticleSystem(
 
             components.particleMotionParametric?.let { config ->
                 position.set(config.relativePosition.eval(molang))
+                if (localSpace == null) {
+                    position.plusSelf(emitter.position)
+                } else if (emitter.locatorOffset != null) {
+                    position.plusSelf(emitter.locatorOffset)
+                }
                 rotationAngle = config.rotation.eval(molang)
                 if (config.direction != null) {
                     direction.set(config.direction.eval(molang))
@@ -962,6 +1310,9 @@ class ParticleSystem(
 
             billboardPosition = position
             billboardRotation = rot
+
+            components.particleInitialization?.perRenderExpression?.eval(molang)
+            billboardSize = appearance.size.eval(molang)
         }
 
         /**
@@ -976,19 +1327,21 @@ class ParticleSystem(
             cameraFacing: Vec3,
             cameraUuid: UUID,
             cameraFirstPerson: Boolean,
+            hideParticlesInFirstPerson: Boolean,
         ) {
             // Abide by the particle effect visibility component for the current player.
             if (cameraUuid == emitter.sourceEntity.uuid) {
+                if (cameraFirstPerson && hideParticlesInFirstPerson) return
                 if (!components.particleVisibility.let { if (cameraFirstPerson) it.firstPerson else it.thirdPerson }) return
             }
 
             val appearance = components.particleAppearanceBillboard ?: throw UnsupportedOperationException()
 
-            components.particleInitialization?.perRenderExpression?.eval(molang)
-
+            // grab billboard values calculated in [prepareBillboard]
             val position = billboardPosition
             val rotation = billboardRotation
-            val (sizeX, sizeY) = appearance.size.eval(molang)
+            val (sizeX, sizeY) = billboardSize
+
             val textureSize = vec2(appearance.uv.textureWidth.toFloat(), appearance.uv.textureHeight.toFloat())
             val color = components.particleAppearanceTinting?.color?.eval(molang)?.let(Color::fromVec) ?: Color.WHITE
             val light = if (components.particleAppearanceLighting != null) {
@@ -1072,6 +1425,8 @@ class ParticleSystem(
                 get() = Quaternion.Identity
             override val velocity: Vec3
                 get() = particle.globalVelocity
+            override val isVisible: Boolean
+                get() = parent?.isVisible ?: true
         }
     }
 
@@ -1081,6 +1436,7 @@ class ParticleSystem(
         val position: Vec3
         val rotation: Quaternion
         val velocity: Vec3
+        val isVisible: Boolean
 
         // May be more efficient than calling [position] and [rotation] separately for some implementations
         val positionAndRotation: Pair<Vec3, Quaternion>
@@ -1097,6 +1453,8 @@ class ParticleSystem(
                 get() = Quaternion.Identity
             override val velocity: Vec3
                 get() = vecZero()
+            override val isVisible: Boolean
+                get() = true
         }
     }
 
@@ -1111,7 +1469,7 @@ private fun reflect(vec: Vec3, norm: Vec3) =
 
 private fun Pair<Float, Float>.toVec2() = mutableVec2(first, second)
 
-private fun Pair<MolangExpression, MolangExpression>.eval(context: MolangContext) =
+private fun Pair<Molang, Molang>.eval(context: MolangContext) =
     mutableVec2(first.eval(context), second.eval(context))
 
 private class CurveVariables(

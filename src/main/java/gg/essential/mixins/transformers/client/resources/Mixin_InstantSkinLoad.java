@@ -13,6 +13,7 @@ package gg.essential.mixins.transformers.client.resources;
 
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.minecraft.MinecraftProfileTexture;
+import gg.essential.Essential;
 import gg.essential.handlers.GameProfileManager;
 import gg.essential.mod.Skin;
 import gg.essential.util.SkinKt;
@@ -44,7 +45,13 @@ public class Mixin_InstantSkinLoad {
         at = @At("HEAD")
     )
     private void essential$instantSkinLoad(GameProfile profile, SkinManager.SkinAvailableCallback callback, boolean requireSecure, CallbackInfo ci) {
-        Skin skin = SkinKt.gameProfileToSkin(profile);
+        Skin skin;
+        try {
+            skin = SkinKt.gameProfileToSkin(profile);
+        } catch (Exception e) {
+            Essential.logger.warn("Failed to decode skin texture:", e);
+            return;
+        }
 
         if (skin != null) {
             //#if MC>=11600

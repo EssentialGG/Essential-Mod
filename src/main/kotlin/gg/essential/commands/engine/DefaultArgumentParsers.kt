@@ -16,7 +16,9 @@ import gg.essential.Essential
 import gg.essential.universal.UMinecraft
 import net.minecraft.entity.player.EntityPlayer
 import gg.essential.api.commands.*
+import gg.essential.gui.elementa.state.v2.State
 import gg.essential.util.UUIDUtil
+import gg.essential.util.UuidNameLookup
 import gg.essential.util.getOtherUser
 import gg.essential.util.isAnnouncement
 import java.lang.reflect.Parameter
@@ -188,23 +190,29 @@ object EssentialUserArgumentParser : ArgumentParser<EssentialUser> {
 
     private val connectionManager = Essential.getInstance().connectionManager
 
+    private fun getSpsInvites(): Set<UUID> {
+        return connectionManager.spsManager.invitedUsers
+    }
 
-    val users: Set<EssentialUser> // SPS invited users is added because users who are not friend with the host can join the world through Discord
-        get() = (connectionManager.relationshipManager.friends.keys + connectionManager.spsManager.invitedUsers).map { EssentialUser(it) }.toSet()
+    val users: Map<UUID, State<String?>>
+        // SPS invited users is added because users who are not friend with the host can join the world through Discord
+        get() = (connectionManager.relationshipManager.friends.keys + getSpsInvites())
+            .associateWith { UuidNameLookup.nameState(it, null) }
 
     override fun parse(arguments: ArgumentQueue, param: Parameter): EssentialUser? {
-        val name = arguments.poll()
-        return users.find { user ->
-            user.username.getNow(null)?.lowercase() == name.lowercase()
+        val targetName = arguments.poll()
+        return users.firstNotNullOfOrNull { (uuid, nameState) ->
+            val name = nameState.getUntracked()
+            if (name?.lowercase() == targetName.lowercase()) EssentialUser(uuid, name) else null
         }
     }
 
     override fun complete(arguments: ArgumentQueue, param: Parameter): List<String> {
         val nameStart = arguments.poll().lowercase()
-        return users.mapNotNull { it.username.getNow(null) }.filter { it.lowercase().startsWith(nameStart) }
+        return users.mapNotNull { it.value.getUntracked() }.filter { it.lowercase().startsWith(nameStart) }
     }
 }
-data class EssentialUser(val uuid: UUID) {
 
+data class EssentialUser(val uuid: UUID, val name: String) {
     val username: CompletableFuture<String> = UUIDUtil.getName(uuid)
 }

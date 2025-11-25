@@ -13,48 +13,37 @@ package gg.essential.model
 
 import dev.folomeev.kotgl.matrix.matrices.Mat4
 import dev.folomeev.kotgl.matrix.matrices.mutables.timesSelf
-import dev.folomeev.kotgl.matrix.matrices.mutables.toMutable
 import dev.folomeev.kotgl.matrix.vectors.vecUnitX
 import dev.folomeev.kotgl.matrix.vectors.vecUnitY
 import dev.folomeev.kotgl.matrix.vectors.vecUnitZ
 import gg.essential.model.util.Quaternion
 import gg.essential.model.util.UMatrixStack
 import gg.essential.model.util.UVertexConsumer
-import kotlin.jvm.JvmField
+
+typealias BoneId = Int
 
 // TODO clean up
 class Bone(
-    @JvmField
-    val boxName: String
+    val id: BoneId,
+    val boxName: String,
+    val childModels: List<Bone> = emptyList(),
+    val pivotX: Float = 0f,
+    val pivotY: Float = 0f,
+    val pivotZ: Float = 0f,
+    var poseRotX: Float = 0f,
+    var poseRotY: Float = 0f,
+    var poseRotZ: Float = 0f,
+    val side: Side? = null,
 ) {
-    var textureWidth = 64
-    var textureHeight = 32
-    @JvmField
-    var pivotX = 0f
-    @JvmField
-    var pivotY = 0f
-    @JvmField
-    var pivotZ = 0f
-    @JvmField
-    var rotateAngleX = 0f
-    @JvmField
-    var rotateAngleY = 0f
-    @JvmField
-    var rotateAngleZ = 0f
-    var extra: Mat4? = null
-    var mirror = false
-    var showModel = true
-    @JvmField
-    var isHidden = false
-    @JvmField
-    var cubeList = mutableListOf<Cube>()
-    @JvmField
-    var childModels = mutableListOf<Bone>()
-    @JvmField
+    val part: EnumPart? = EnumPart.fromBoneName(boxName)
+
+    var poseOffsetX = 0f
+    var poseOffsetY = 0f
+    var poseOffsetZ = 0f
+    var poseExtra: Mat4? = null
+
     var animOffsetX = 0f
-    @JvmField
     var animOffsetY = 0f
-    @JvmField
     var animOffsetZ = 0f
     var animRotX = 0f
     var animRotY = 0f
@@ -62,24 +51,26 @@ class Bone(
     var animScaleX = 0f
     var animScaleY = 0f
     var animScaleZ = 0f
-    @JvmField
+
     var userOffsetX = 0f
-    @JvmField
     var userOffsetY = 0f
-    @JvmField
     var userOffsetZ = 0f
-    @JvmField
-    var childScale = 1f
-    var side: Side? = null
-    @JvmField
+
+    var child = false
+
     var visible: Boolean? = null // determines visibility for all bones in this tree unless overwritten in a child
-    private var isVisible = true // actual visibility for this specific bone, set in propagateVisibility
     private var fullyInvisible = false // propagateVisibility has determined that we can skip this entire tree
+    var isVisible = true // actual visibility for this specific bone, set in propagateVisibility
+        private set // private to ensure isVisible is still only set by propagateVisibility
 
     /** Whether an animation targeting this bone will have an effect on the player pose. */
-    var affectsPose = false // initialized by ModelParser
+    val affectsPose: Boolean
+        get() = affectsPoseParts.isNotEmpty()
     /** Which parts of the player pose will be affected by an animation targeting this bone. */
-    var affectsPoseParts = emptySet<EnumPart>() // initialized by ModelParser
+    val affectsPoseParts: Set<EnumPart> = buildSet {
+        part?.let { add(it) }
+        childModels.forEach { addAll(it.affectsPoseParts) }
+    }
 
     /** Whether this bone should undo all parent rotation, as if it was stabilized by three gimbals. */
     var gimbal = false
@@ -92,14 +83,18 @@ class Bone(
         resetAnimationOffsets(false)
     }
 
-    fun addChild(child: Bone) {
-        childModels.add(child)
+    private fun propagateSideVisibilityOff(){
+        // Propagate visibility for disabled sides so Locator.isVisible is always correct for these Bones
+        isVisible = false
+        fullyInvisible = true
+        for (child in childModels) {
+            child.propagateSideVisibilityOff()
+        }
     }
 
     fun propagateVisibility(parentVisible: Boolean, side: Side?) {
         if (this.side != null && side != null && this.side !== side) {
-            isVisible = false
-            fullyInvisible = true
+            propagateSideVisibilityOff()
             return
         }
         val isVisible = if (visible == null) parentVisible else visible!!
@@ -130,101 +125,74 @@ class Bone(
         }
     }
 
+    fun applyTransform(matrixStack: UMatrixStack) {
+        if (child) {
+            val isHead = part == EnumPart.HEAD
+            val childScale = if (isHead) 0.75f else 0.5f
+            matrixStack.scale(childScale, childScale, childScale)
+            if (isHead) matrixStack.translate(0f, 8f, 0f)
+        }
+        matrixStack.translate(pivotX + poseOffsetX + animOffsetX, pivotY - poseOffsetY - animOffsetY, pivotZ + poseOffsetZ + animOffsetZ)
+        if (gimbal) {
+            matrixStack.rotate(parentRotation.conjugate())
+        }
+        matrixStack.rotate(poseRotZ + animRotZ, 0.0f, 0.0f, 1.0f, false)
+        matrixStack.rotate(poseRotY + animRotY, 0.0f, 1.0f, 0.0f, false)
+        matrixStack.rotate(poseRotX + animRotX, 1.0f, 0.0f, 0.0f, false)
+        poseExtra?.let {
+            matrixStack.peek().model.timesSelf(it)
+        }
+        matrixStack.scale(animScaleX, animScaleY, animScaleZ)
+        matrixStack.translate(-pivotX - userOffsetX, -pivotY - userOffsetY, -pivotZ - userOffsetZ)
+    }
+
     fun render(
         matrixStack: UMatrixStack,
         renderer: UVertexConsumer,
+        geometry: RenderGeometry,
         light: Int,
-        scale: Float,
         verticalUVOffset: Float
     ) {
-        if (!isHidden && showModel && !fullyInvisible) {
+        if (!fullyInvisible) {
             matrixStack.push()
-            matrixStack.scale(childScale, childScale, childScale)
-            val translateX = pivotX * scale + animOffsetX * scale
-            val translateY = pivotY * scale - animOffsetY * scale
-            val translateZ = pivotZ * scale + animOffsetZ * scale
-            matrixStack.translate(translateX, translateY, translateZ)
-            if (gimbal) {
-                matrixStack.rotate(parentRotation.conjugate())
-            }
-            matrixStack.rotate(rotateAngleZ + animRotZ, 0.0f, 0.0f, 1.0f, false)
-            matrixStack.rotate(rotateAngleY + animRotY, 0.0f, 1.0f, 0.0f, false)
-            matrixStack.rotate(rotateAngleX + animRotX, 1.0f, 0.0f, 0.0f, false)
-            extra?.let {
-                matrixStack.peek().model.timesSelf(it.toMutable().apply {
-                    m03 *= scale
-                    m13 *= scale
-                    m23 *= scale
-                })
-            }
-            matrixStack.scale(animScaleX, animScaleY, animScaleZ)
-            matrixStack.translate(
-                -pivotX * scale - userOffsetX * scale,
-                -pivotY * scale - userOffsetY * scale,
-                -pivotZ * scale - userOffsetZ * scale
-            )
+            applyTransform(matrixStack)
             if (isVisible) {
-                for (cube in cubeList) {
-                    cube.render(matrixStack, renderer, light, scale, verticalUVOffset)
+                for (cube in geometry[id]) {
+                    cube.render(matrixStack, renderer, light, verticalUVOffset)
                 }
             }
             for (childModel in childModels) {
-                childModel.render(matrixStack, renderer, light, scale, verticalUVOffset)
+                if (childModel.part != null) {
+                    // Special parts do not actually inherit the matrix stack, because it was already baked into their
+                    // pose, so we'll render them separately
+                    continue
+                }
+                childModel.render(matrixStack, renderer, geometry, light, verticalUVOffset)
             }
             matrixStack.pop()
         }
     }
 
-    fun setTextureSize(p_setTextureSize_1_: Int, p_setTextureSize_2_: Int) {
-        textureWidth = p_setTextureSize_1_
-        textureHeight = p_setTextureSize_2_
-    }
-
-    fun deepCopy(): Bone {
-        val bone = Bone(boxName)
-        bone.textureWidth = textureWidth
-        bone.textureHeight = textureHeight
-        bone.pivotX = pivotX
-        bone.pivotY = pivotY
-        bone.pivotZ = pivotZ
-        bone.rotateAngleX = rotateAngleX
-        bone.rotateAngleY = rotateAngleY
-        bone.rotateAngleZ = rotateAngleZ
-        bone.cubeList = ArrayList()
-        for (cube in cubeList) {
-            bone.cubeList.add(Cube(cube.getQuadList().map { face ->
-                Face(face.vertexPositions.map { it.copy() }.toTypedArray())
-            }, cube.mirror))
-        }
-        for (childModel in childModels) {
-            bone.addChild(childModel.deepCopy())
-        }
-        bone.affectsPose = affectsPose
-        bone.affectsPoseParts = affectsPoseParts
-        bone.side = side
-        return bone
-    }
-
     /**
      * Returns true if this bone or any of its children contain visible boxes
      */
-    fun containsVisibleBoxes(): Boolean {
-        return !fullyInvisible && ((this.cubeList.isNotEmpty() && isVisible) || this.childModels.any { it.containsVisibleBoxes() })
+    fun containsVisibleBoxes(geometry: RenderGeometry): Boolean {
+        return !fullyInvisible && ((geometry[id].isNotEmpty() && isVisible) || this.childModels.any { it.containsVisibleBoxes(geometry) })
     }
 
     fun propagateGimbal(parentRotation: Quaternion, entityRotation: Quaternion) {
         if (gimbal) {
             // If this is a gimbal, ignore parent and pose rotation, only keep animation rotation
-            this.rotateAngleX = 0f
-            this.rotateAngleY = 0f
-            this.rotateAngleZ = 0f
+            this.poseRotX = 0f
+            this.poseRotY = 0f
+            this.poseRotZ = 0f
             this.parentRotation = if (worldGimbal) entityRotation * parentRotation else parentRotation
         }
 
         var ownRotation = if (gimbal) Quaternion.Identity else parentRotation
-        ownRotation *= Quaternion.fromAxisAngle(vecUnitZ(), rotateAngleZ + animRotZ)
-        ownRotation *= Quaternion.fromAxisAngle(vecUnitY(), rotateAngleY + animRotY)
-        ownRotation *= Quaternion.fromAxisAngle(vecUnitX(), rotateAngleX + animRotX)
+        ownRotation *= Quaternion.fromAxisAngle(vecUnitZ(), poseRotZ + animRotZ)
+        ownRotation *= Quaternion.fromAxisAngle(vecUnitY(), poseRotY + animRotY)
+        ownRotation *= Quaternion.fromAxisAngle(vecUnitX(), poseRotX + animRotX)
         for (child in childModels) {
             child.propagateGimbal(ownRotation, if (worldGimbal) Quaternion.Identity else entityRotation)
         }

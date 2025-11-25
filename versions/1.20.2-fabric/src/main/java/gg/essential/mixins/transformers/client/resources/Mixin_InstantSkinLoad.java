@@ -30,7 +30,7 @@ public class Mixin_InstantSkinLoad {
     // expiry time is the SkinTextures and a wrapper CompletableFuture.
     // As such, there should not be much harm in substantially increasing this value to prevent already loaded skins
     // from taking a frame (or more) to actually show up on newly created (UI3D)players.
-    //#if MC>12104
+    //#if MC>12109
     //$$ TODO verify above is still the case / if this is still necessary
     //#endif
     @ModifyArg(method = "<init>", at = @At(value = "INVOKE", target = "Lcom/google/common/cache/CacheBuilder;expireAfterAccess(Ljava/time/Duration;)Lcom/google/common/cache/CacheBuilder;"))

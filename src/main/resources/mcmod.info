@@ -2,7 +2,7 @@
   {
     "modid": "essential",
     "name": "Essential",
-    "description": "Provides essential features to Minecraft and our Partners.",
+    "description": "Enhances your Minecraft with powerful features. Host worlds for free. Chat with friends. Create custom outfits. React with emotes. And many quality of life improvements!",
     "version": "${version}",
     "mcversion": "${mcVersionStr}",
     "url": "https://essential.gg/",

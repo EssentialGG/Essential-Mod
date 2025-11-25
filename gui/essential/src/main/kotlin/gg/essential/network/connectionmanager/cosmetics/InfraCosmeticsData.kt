@@ -30,6 +30,7 @@ import gg.essential.mod.cosmetics.settings.CosmeticProperty
 import gg.essential.mod.cosmetics.CosmeticSlot
 import gg.essential.mod.cosmetics.CosmeticType
 import gg.essential.mod.cosmetics.featured.FeaturedItem
+import gg.essential.mod.cosmetics.featured.FeaturedItemRow
 import gg.essential.network.CMConnection
 import gg.essential.network.cosmetics.toMod
 import gg.essential.util.Client
@@ -169,7 +170,7 @@ class InfraCosmeticsData private constructor(
                     if (collection == null)
                         return@whenCompleteAsync
 
-                    val featuredItems = collection.pages.values.flatMap { it.rows }.flatten()
+                    val featuredItems = collection.pages.values.flatMap { it.rows }.filterIsInstance<FeaturedItemRow>().flatMap { it.items }
                     requestCosmeticsIfMissing(featuredItems.filterIsInstance<FeaturedItem.Cosmetic>().map { it.cosmetic }.toSet())
                     requestBundlesIfMissing(featuredItems.filterIsInstance<FeaturedItem.Bundle>().map { it.bundle }.toSet())
 

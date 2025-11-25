@@ -20,13 +20,12 @@ import gg.essential.network.connectionmanager.handler.PacketHandler;
 import gg.essential.network.cosmetics.Cosmetic;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-public class ServerCosmeticsUserUnlockedPacketHandler extends PacketHandler<ServerCosmeticsUserUnlockedPacket> {
-    public static final Set<String> suppressNotifications = new HashSet<>();
+import static gg.essential.connectionmanager.common.packet.cosmetic.ServerCosmeticsUserUnlockedPacket.suppressNotifications;
 
+public class ServerCosmeticsUserUnlockedPacketHandler extends PacketHandler<ServerCosmeticsUserUnlockedPacket> {
     @Override
     protected void onHandle(
         @NotNull final ConnectionManager connectionManager, @NotNull final ServerCosmeticsUserUnlockedPacket packet
@@ -55,7 +54,7 @@ public class ServerCosmeticsUserUnlockedPacketHandler extends PacketHandler<Serv
             }
             final Cosmetic cosmetic = cosmeticsManager.getCosmetic(newCosmetic);
             if (cosmetic != null) {
-                CosmeticToastsKt.sendNewCosmeticUnlockToast(cosmetic);
+                CosmeticToastsKt.sendCosmeticUnlockedToast(cosmetic);
             }
         });
     }

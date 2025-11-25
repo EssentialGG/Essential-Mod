@@ -11,14 +11,38 @@
  */
 package gg.essential.gui.common.modal
 
+import gg.essential.elementa.UIComponent
 import gg.essential.elementa.components.*
 import gg.essential.elementa.constraints.*
 import gg.essential.elementa.dsl.*
 import gg.essential.elementa.effects.ScissorEffect
 import gg.essential.gui.EssentialPalette
 import gg.essential.gui.common.*
+import gg.essential.gui.common.input.UITextInput
+import gg.essential.gui.common.input.essentialInput
+import gg.essential.gui.elementa.state.v2.effect
+import gg.essential.gui.elementa.state.v2.memo
+import gg.essential.gui.elementa.state.v2.mutableStateOf
+import gg.essential.gui.elementa.state.v2.stateOf
+import gg.essential.gui.layoutdsl.Alignment
+import gg.essential.gui.layoutdsl.Modifier
+import gg.essential.gui.layoutdsl.alignHorizontal
+import gg.essential.gui.layoutdsl.box
+import gg.essential.gui.layoutdsl.color
+import gg.essential.gui.layoutdsl.fillHeight
+import gg.essential.gui.layoutdsl.fillWidth
+import gg.essential.gui.layoutdsl.floatingBox
+import gg.essential.gui.layoutdsl.height
+import gg.essential.gui.layoutdsl.hoverColor
+import gg.essential.gui.layoutdsl.hoverScope
+import gg.essential.gui.layoutdsl.layout
+import gg.essential.gui.layoutdsl.shadow
+import gg.essential.gui.layoutdsl.width
 import gg.essential.gui.overlay.ModalManager
+import gg.essential.gui.util.hoveredStateV2
 import gg.essential.util.*
+import gg.essential.vigilance.utils.onLeftClick
+import java.awt.Color
 
 /** A [ConfirmDenyModal] with a searchbar and scroll container */
 open class SearchableConfirmDenyModal(
@@ -33,9 +57,9 @@ open class SearchableConfirmDenyModal(
         height = ChildBasedSizeConstraint()
     } childOf customContent
 
-    val searchbar by EssentialSearchbar() childOf searchContainer
+    val searchBarTextState = mutableStateOf("")
 
-    protected val middleSpacer by Spacer(height = searchbarPadding) childOf searchContainer
+    protected val middleSpacer by Spacer(height = searchbarPadding)
 
     protected val scrollContainer by UIContainer().constrain {
         y = SiblingConstraint()
@@ -44,24 +68,15 @@ open class SearchableConfirmDenyModal(
     } effect ScissorEffect() childOf customContent
 
     val scroller by ScrollComponent(emptyString = "Nothing Found").constrain {
-        width = FillConstraint()
+        width = 100.percent
         height = 148.pixels
     } childOf scrollContainer scrollGradient 30.pixels
 
-    val scrollbarContainer by UIContainer().constrain {
-        x = 0.pixels(alignOpposite = true)
-        y = 0.pixels(alignOpposite = true)
-        width = ChildBasedSizeConstraint() * 2
-        height = 100.percent boundTo scroller
-    } childOf scrollContainer
+    val scrollbarContainer by UIContainer()
 
-    private val scrollBarBackground by UIBlock(EssentialPalette.COMPONENT_BACKGROUND).constrain {
-        x = 0.pixels(alignOpposite = true)
-        width = ChildBasedSizeConstraint()
-        height = 100.percent
-    } childOf scrollbarContainer
+    private val scrollBarBackground by UIContainer()
 
-    private val scrollBar by UIBlock(EssentialPalette.SCROLLBAR).setWidth(2.pixels) childOf scrollBarBackground
+    private val scrollBar by UIContainer()
 
     private val hiddenSpacer by Spacer().constrain {
         height = 100.percent boundTo searchContainer
@@ -74,11 +89,66 @@ open class SearchableConfirmDenyModal(
             titleTextColor = EssentialPalette.TEXT_HIGHLIGHT
         }
 
+        searchContainer.layout {
+            val input = UITextInput("Search", false)
+            input.setColor(EssentialPalette.TEXT)
+            input.placeholderShadow.set(false)
+            input.placeholderColor.set(EssentialPalette.TEXT_MID_GRAY)
+            effect(stateScope) {
+                searchBarTextState.set(input.textState())
+            }
+            essentialInput(
+                input,
+                icon = EssentialPalette.SEARCH_7X,
+                backgroundColor = stateOf(EssentialPalette.MODAL_BACKGROUND),
+                iconColor = stateOf(EssentialPalette.TEXT_MID_GRAY),
+                // Same as background, as hiding the shadow would be complicating essentialInput even further
+                iconShadowColor = stateOf(EssentialPalette.GUI_BACKGROUND),
+                outlineColor = EssentialPalette.GRAY_OUTLINE_BUTTON,
+                outlineHoveredColor = EssentialPalette.GRAY_OUTLINE_BUTTON_HOVER,
+                outlineFocusedColor = EssentialPalette.SEARCHBAR_BLUE_OUTLINE,
+                iconAndInputWidthPadding = 3f,
+                iconAndInputPadding = 3f,
+                modifier = Modifier.fillWidth().height(19f).shadow(Color.BLACK),
+            )
+            middleSpacer()
+        }
+
         scroller.emptyText.constrain {
             y += 2.pixels
             color = EssentialPalette.TEXT_DISABLED.toConstraint()
         }.setShadowColor(EssentialPalette.COMPONENT_BACKGROUND)
-        scroller.setVerticalScrollBarComponent(scrollBar, true)
+        scrollContainer.layout {
+            val scrollbar: UIComponent
+            val box = floatingBox(Modifier.height(scroller).width(16f)) {
+                scrollbar = box(Modifier.width(6f).alignHorizontal(Alignment.Start(1f)).hoverScope()) {
+                    box(Modifier.width(2f).fillHeight().color(EssentialPalette.LIGHTEST_BACKGROUND).hoverColor(EssentialPalette.SCROLLBAR))
+                }
+            }.constrain {
+                x = SiblingConstraint() boundTo scrollContainer
+                y = 0.pixels boundTo scrollContainer
+            }
+            scroller.setVerticalScrollBarComponent(scrollbar)
+            val isScrollerBiggerThanParent = mutableStateOf(true)
+            scroller.addScrollAdjustEvent(false) { _, percentageOfParent ->
+                isScrollerBiggerThanParent.set(percentageOfParent >= 1f)
+            }
+            val scrollerHovered = scroller.hoveredStateV2()
+            val boxHovered = box.hoveredStateV2()
+            val scrollbarBeingDragged = mutableStateOf(false)
+
+            scrollbar.onLeftClick { scrollbarBeingDragged.set(true) }
+            scrollbar.onMouseRelease { Window.enqueueRenderOperation { scrollbarBeingDragged.set(false) } }
+
+            val shouldHide = memo { isScrollerBiggerThanParent() || !(boxHovered() || scrollerHovered() || scrollbarBeingDragged()) }
+            gg.essential.gui.elementa.state.v2.effect(stateScope) {
+                if (shouldHide()) {
+                    scrollbar.hide(true)
+                } else {
+                    scrollbar.unhide()
+                }
+            }
+        }
 
         spacer.setHeight(10.pixels)
     }

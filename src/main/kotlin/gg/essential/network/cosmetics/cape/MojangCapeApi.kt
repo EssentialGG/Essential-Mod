@@ -11,7 +11,6 @@
  */
 package gg.essential.network.cosmetics.cape
 
-import com.mojang.authlib.properties.Property
 import gg.essential.handlers.MojangSkinManager
 import gg.essential.lib.gson.Gson
 import gg.essential.lib.gson.TypeAdapter
@@ -35,7 +34,7 @@ object MojangCapeApi {
         "https://api.minecraftservices.com/minecraft/profile",
     )
 
-    fun fetchCurrentTextures(): Property = MojangSkinManager.getTextureProperty(UUIDUtil.getClientUUID())
+    fun fetchCurrentTextures(): Pair<String, String> = MojangSkinManager.getTextureProperty(UUIDUtil.getClientUUID())
         ?: throw IOException("Failed to fetch current texture property")
 
     fun fetchCapes(): List<Cape> {

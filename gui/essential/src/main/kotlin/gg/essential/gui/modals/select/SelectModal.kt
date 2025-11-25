@@ -11,13 +11,10 @@
  */
 package gg.essential.gui.modals.select
 
-import gg.essential.elementa.UIComponent
 import gg.essential.elementa.components.GradientComponent
 import gg.essential.elementa.components.UIContainer
 import gg.essential.elementa.constraints.ChildBasedMaxSizeConstraint
 import gg.essential.elementa.constraints.SiblingConstraint
-import gg.essential.elementa.dsl.basicHeightConstraint
-import gg.essential.elementa.dsl.basicYConstraint
 import gg.essential.elementa.dsl.childOf
 import gg.essential.elementa.dsl.constrain
 import gg.essential.elementa.dsl.effect
@@ -28,12 +25,9 @@ import gg.essential.elementa.dsl.pixels
 import gg.essential.elementa.dsl.plus
 import gg.essential.elementa.effects.ScissorEffect
 import gg.essential.gui.EssentialPalette
-import gg.essential.gui.about.components.ColoredDivider
 import gg.essential.gui.common.effect.HorizontalScissorEffect
 import gg.essential.gui.common.modal.SearchableConfirmDenyModal
-import gg.essential.gui.common.modal.defaultEssentialModalFadeTime
 import gg.essential.gui.common.onSetValueAndNow
-import gg.essential.gui.elementa.GuiScaleOffsetConstraint
 import gg.essential.gui.elementa.state.v2.MutableState
 import gg.essential.gui.elementa.state.v2.State
 import gg.essential.gui.elementa.state.v2.combinators.and
@@ -55,15 +49,15 @@ private typealias SelectionListenerBlock<T> = SelectModal<T>.(identifier: T, sel
  */
 class SelectModal<T>(
     modalManager: ModalManager,
+    private val modalSimpleName: String,
     private val sections: List<Section<T, *>>,
     requiresButtonPress: Boolean,
     requiresSelection: Boolean,
-    fadeTime: Float = defaultEssentialModalFadeTime,
     private val shadowsOnEntries: Boolean = true,
     private val initiallySelected: Set<T> = setOf(),
     whenEmpty: (LayoutScope.() -> Unit)? = null,
     extraContent: (LayoutScope.() -> Unit)? = null,
-) : SearchableConfirmDenyModal(modalManager, requiresButtonPress, fadeTime) {
+) : SearchableConfirmDenyModal(modalManager, requiresButtonPress) {
     private val selectedStates = mutableMapOf<T, MutableState<Boolean>>()
     private val filteredStates = mutableMapOf<T, State<Boolean>>()
 
@@ -71,8 +65,9 @@ class SelectModal<T>(
     private val selectionListeners = mutableListOf<SelectionListenerBlock<T>>()
 
     private val sectionTitleScaleOffset = -1f
-    private val sectionTitleHasShadows = false
-    private val topPadding = 13f
+
+    override val modalName: String
+        get() = "${super.modalName}-$modalSimpleName"
 
     /**
      * Returns a list of selected identifiers
@@ -83,36 +78,40 @@ class SelectModal<T>(
         }
 
     init {
-        bottomSpacer.setHeight(8.pixels)
+        bottomSpacer.setHeight(10.pixels)
         val isEmpty = stateBy {
             sections.all { it.identifiers().isEmpty() }
         }
-
         scroller.layout {
             if_(isEmpty) {
                 box(Modifier.fillWidth()) {
                     whenEmpty?.let { it() }
                 }
             } `else` {
-                column(Modifier.fillWidth(), Arrangement.spacedBy(4f)) {
+                column(Modifier.fillWidth(), Arrangement.spacedBy(7f)) {
                     val shouldDisplaySelected = stateBy {
                         sections.any { shouldDisplaySelectedRows(it)() }
                     }
 
                     if_(shouldDisplaySelected) {
-                        column(Modifier.fillWidth(), Arrangement.spacedBy(2f)) {
+                        column(Modifier.fillWidth(), Arrangement.spacedBy(6f)) {
                             sectionTitle("Selected")
-                            sections.forEach {
-                                sectionRows(it, isSelectedSection = true)
+                            column(Modifier.fillWidth(), Arrangement.spacedBy(2f)) {
+                                sections.forEach {
+                                    sectionRows(it, isSelectedSection = true)
+                                }
                             }
                         }
                     }
 
+
                     sections.forEach { section ->
                         if_(shouldDisplaySection(section)) {
-                            column(Modifier.fillWidth(), Arrangement.spacedBy(2f)) {
+                            column(Modifier.fillWidth(), Arrangement.spacedBy(6f)) {
                                 sectionTitle(section.title)
-                                sectionRows(section)
+                                column(Modifier.fillWidth(), Arrangement.spacedBy(2f)) {
+                                    sectionRows(section)
+                                }
                             }
                         }
                     }
@@ -132,28 +131,8 @@ class SelectModal<T>(
         }
         customContent.insertChildBefore(extraContentContainer, bottomSpacer)
 
-        // Create a fake title section to calculate the height of the middle spacer to get exactly topPadding
-        // from the search bar
-        val dividerLine: UIComponent
-        middleSpacer.layout {
-            row(BasicYModifier { basicYConstraint { 0f } }, verticalAlignment = Alignment.TrueCenter) {
-                text("", shadow = sectionTitleHasShadows).constrain {
-                    y = 0.pixels
-                    textScale = GuiScaleOffsetConstraint(sectionTitleScaleOffset)
-                }
-                dividerLine = box().constrain {
-                    height = GuiScaleOffsetConstraint(sectionTitleScaleOffset)
-                }
-            }
-        }
-        val aboveLineHeight = basicHeightConstraint { dividerLine.getTop() }
-        middleSpacer.setHeight(topPadding.pixels - aboveLineHeight)
-        scrollbarContainer.constrain {
-            height -= aboveLineHeight
-        }
-        scroller.constrain {
-            height += aboveLineHeight
-        }
+        spacer.setHeight(9.pixels)
+        middleSpacer.setHeight(10.pixels)
 
         onPrimaryAction { ->
             primaryActionListeners.forEach {
@@ -167,7 +146,7 @@ class SelectModal<T>(
                 sections.any { selectedIdentifiersFor(it)().isNotEmpty() }
             }
 
-            primaryActionButton.rebindEnabled(enabledState.toV1(scroller))
+            bindConfirmAvailable(enabledState.toV1(scroller))
         }
 
         if (shadowsOnEntries) {
@@ -252,7 +231,7 @@ class SelectModal<T>(
     private fun <S : Any> filteredStateFor(identifier: S, section: Section<T, S>): State<Boolean> {
         val mappedIdentifier = section.map(identifier)
         return filteredStates.getOrPut(mappedIdentifier) {
-            section.filter(identifier, searchbar.textContentV2)
+            section.filter(identifier, searchBarTextState)
         }
     }
 
@@ -269,8 +248,13 @@ class SelectModal<T>(
                     entryStyle = entryStyle.shadow(Color.BLACK)
                 }
 
+                var entryInnerStyle = Modifier.color(EssentialPalette.COMPONENT_BACKGROUND_HIGHLIGHT)
+
+                entryStyle = entryStyle.hoverColor(EssentialPalette.GRAY_OUTLINE_BUTTON_OUTLINE).hoverScope()
+                entryInnerStyle = entryInnerStyle.hoverColor(EssentialPalette.BUTTON_HIGHLIGHT)
+
                 box(entryStyle.height(19f).fillWidth()) {
-                    box(Modifier.fillParent(padding = 1f).color(EssentialPalette.COMPONENT_HIGHLIGHT)) {
+                    box(entryInnerStyle.fillParent(padding = 1f)) {
                         section.layout(this, selected, identifier)
                     }
                 }
@@ -279,18 +263,9 @@ class SelectModal<T>(
     }
 
     private fun LayoutScope.sectionTitle(text: String) {
-        val divider = ColoredDivider(
-            text = text,
-            textColor = EssentialPalette.TEXT_DISABLED,
-            hasShadow = sectionTitleHasShadows,
-            dividerColor = EssentialPalette.BUTTON_HIGHLIGHT,
-            textPadding = 3f,
-            scaleOffset = sectionTitleScaleOffset,
-        )
-
-        box(modifier = Modifier.fillWidth().color(EssentialPalette.GUI_BACKGROUND)) {
-            divider()
-            spacer(height = 1f)
+        row(Modifier.fillWidth(), Arrangement.spacedBy(3f)) {
+            text(text, shadow = false, modifier = Modifier.color(EssentialPalette.TEXT_DISABLED))
+            box(Modifier.height(1f).fillRemainingWidth().alignVertical(Alignment.Center(true)).color(EssentialPalette.DIVIDER))
         }
     }
 }

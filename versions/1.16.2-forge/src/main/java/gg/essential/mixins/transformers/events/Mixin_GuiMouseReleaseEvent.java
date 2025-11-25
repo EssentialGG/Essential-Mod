@@ -25,7 +25,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class Mixin_GuiMouseReleaseEvent {
 
     @Inject(method = { "lambda$mouseButtonCallback$1", "func_198027_a", "lambda$onPress$1", "method_1605", "m_168078_" }, at = @At("HEAD"), cancellable = true, remap = false)
-    //#if MC>=11700 && FORGE==0
+    //#if MC>=11700 && FORGE==0 || MC>=12006
     //$$ static
     //#endif
     private void onMouseReleased(
@@ -36,7 +36,7 @@ public class Mixin_GuiMouseReleaseEvent {
         double mouseX, double mouseY, int mouseButton, CallbackInfo ci
     ) {
         Screen screen = Minecraft.getInstance().currentScreen;
-        Essential.EVENT_BUS.post(new GuiMouseReleaseEvent(screen));
+        Essential.EVENT_BUS.post(new GuiMouseReleaseEvent(screen, mouseButton));
         if (Minecraft.getInstance().currentScreen != screen) {
             result[0] = true;
             ci.cancel(); // screen was closed, prevent the event from reaching the new screen

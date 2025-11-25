@@ -23,101 +23,108 @@ import gg.essential.elementa.utils.ObservableAddEvent
 import gg.essential.elementa.utils.ObservableClearEvent
 import gg.essential.elementa.utils.ObservableList
 import gg.essential.elementa.utils.ObservableRemoveEvent
-import gg.essential.gui.elementa.state.v2.toV1
-import gg.essential.gui.util.hasWindow
+import gg.essential.gui.elementa.state.v2.effect
+import gg.essential.gui.elementa.state.v2.toV2
 import kotlin.reflect.KProperty
 
-@Deprecated("Using StateV1 is discouraged, use StateV2 instead")
-fun <T> State<T>.weak() = WeakState(this)
+import gg.essential.gui.elementa.state.v2.State as StateV2
 
-fun <T : UIComponent, S> T.bindConstraints(state: State<S>, config: UIConstraints.(S) -> Unit) = apply {
-    state.onSetValueAndNow {
-        constraints.config(it)
+@Deprecated("Using StateV2 instead")
+@Suppress("DEPRECATION")
+fun <T : UIComponent, S> T.bindConstraints(state: State<S>, config: UIConstraints.(S) -> Unit) =
+    bindConstraints(state.toV2(), config)
+
+@Deprecated("Use the `Modifier` system instead. Or where not possible, just write an `effect` yourself.")
+fun <T : UIComponent, S> T.bindConstraints(state: StateV2<S>, config: UIConstraints.(S) -> Unit) = apply {
+    effect(this) {
+        constraints.config(state())
     }
 }
 
-fun <T : UIComponent, S> T.bindConstraints(state: gg.essential.gui.elementa.state.v2.State<S>, config: UIConstraints.(S) -> Unit) = apply {
-    constraints.config(state.get())
-    state.onSetValue(this) {
-        constraints.config(it)
-    }
-}
-
+@Deprecated("Use StateV2 version instead")
+@Suppress("DEPRECATION")
 fun <T : UIComponent> T.bindParent(
     parent: UIComponent,
     state: State<Boolean>,
     delayed: Boolean = false,
     index: Int? = null
-) =
-    bindParent(state.map {
-        if (it) parent else null
-    }, delayed, index)
+) = bindParent(parent, state.toV2(), delayed, index)
 
+@Deprecated("Use LayoutDSL instead")
+@Suppress("DEPRECATION")
 fun <T : UIComponent> T.bindParent(
     parent: UIComponent,
-    state: gg.essential.gui.elementa.state.v2.State<Boolean>,
+    state: StateV2<Boolean>,
     delayed: Boolean = false,
     index: Int? = null
-) = bindParent(parent, state.toV1(parent), delayed, index)
+) = bindParent({ if (state()) parent else null }, delayed, index)
 
-fun <T : UIComponent> T.bindFloating(state: State<Boolean>) = apply {
-    state.onSetValueAndNow {
-        if (hasWindow) {
-            this.setFloating(it)
-        }
-    }
-}
+@Deprecated("Use StateV2 version instead")
+@Suppress("DEPRECATION")
+fun <T : UIComponent> T.bindEffect(effect: Effect, state: State<Boolean>, delayed: Boolean = true) =
+    bindEffect(effect, state.toV2(), delayed)
 
-fun <T : UIComponent> T.bindEffect(effect: Effect, state: State<Boolean>, delayed: Boolean = true) = apply {
-    state.onSetValueAndNow {
-        val update = {
-            if (it) {
-                this.effect(effect)
+@Deprecated("Use the `Modifier` system instead.",
+        replaceWith = ReplaceWith("Modifier.whenTrue(state, Modifier.effect { MyEffect() })"))
+fun <T : UIComponent> T.bindEffect(effect: Effect, state: StateV2<Boolean>, delayed: Boolean = true) = apply {
+    effect(this) {
+        fun update(toggle: Boolean) {
+            if (toggle) {
+                this@apply.effect(effect)
             } else {
-                this.removeEffect(effect)
+                this@apply.removeEffect(effect)
             }
         }
+        val toggleState = state()
         if (delayed) {
             Window.enqueueRenderOperation {
-                update()
+                update(toggleState)
             }
         } else {
-            update()
+            update(toggleState)
         }
     }
 }
 
-fun <T : UIComponent> T.bindEffect(effect: Effect, state: gg.essential.gui.elementa.state.v2.State<Boolean>, delayed: Boolean = true) =
-    bindEffect(effect, state.toV1(this), delayed)
+@Deprecated("Use StateV2 version instead")
+@Suppress("DEPRECATION")
+fun <T : UIComponent> T.bindParent(state: State<UIComponent?>, delayed: Boolean = false, index: Int? = null) =
+    bindParent(state.toV2(), delayed, index)
 
-fun <T : UIComponent> T.bindParent(state: State<UIComponent?>, delayed: Boolean = false, index: Int? = null) = apply {
-    state.onSetValueAndNow { parent ->
-        val handleStateUpdate = {
-            if (this.hasParent && this.parent != parent) {
-                this.parent.removeChild(this)
+@Deprecated("Use LayoutDSL instead")
+fun <T : UIComponent> T.bindParent(state: StateV2<UIComponent?>, delayed: Boolean = false, index: Int? = null) = apply {
+    effect(this) {
+        val parent = state()
+        fun handleStateUpdate(newParent: UIComponent?) {
+            if (this@apply.hasParent && this@apply.parent != newParent) {
+                this@apply.parent.removeChild(this@apply)
             }
-            if (parent != null && this !in parent.children) {
+            if (newParent != null && this@apply !in newParent.children) {
                 if (index != null) {
-                    parent.insertChildAt(this, index)
+                    newParent.insertChildAt(this@apply, index)
                 } else {
-                    parent.addChild(this)
+                    newParent.addChild(this@apply)
                 }
             }
         }
         if (delayed) {
             Window.enqueueRenderOperation {
-                handleStateUpdate()
+                handleStateUpdate(parent)
             }
         } else {
-            handleStateUpdate()
+            handleStateUpdate(parent)
         }
     }
 }
 
+@Deprecated("Use StateV2 instead", ReplaceWith("State { this().isBlank() }"))
 fun State<String>.empty() = map { it.isBlank() }
+@Deprecated("Use StateV2 instead", ReplaceWith("State { this() && other() }"))
 infix fun State<Boolean>.and(other: State<Boolean>) = zip(other).map { (a, b) -> a && b }
+@Deprecated("Use StateV2 instead", ReplaceWith("State { this() || other() }"))
 infix fun State<Boolean>.or(other: State<Boolean>) = zip(other).map { (a, b) -> a || b }
 
+@Deprecated("Use StateV2 instead, where `State` is read-only by default and a separate `MutableState` interface exists")
 class ReadOnlyState<T>(private val internalState: State<T>) : State<T>() {
 
     init {
@@ -137,20 +144,16 @@ class ReadOnlyState<T>(private val internalState: State<T>) : State<T>() {
     }
 }
 
+@Deprecated("This makes it too easy to accidentally read a state without observing it. Explicitly use `getUntracked` where this is desired.")
 operator fun <T> State<T>.getValue(obj: Any, property: KProperty<*>): T = get()
+@Deprecated("The `getValue` operator function is deprecated and `setValue` cannot be used without it.")
 operator fun <T> State<T>.setValue(obj: Any, property: KProperty<*>, value: T) = set(value)
 
-fun <T> State<T>.mapToString() = this.map { it.toString() }
-
+@Deprecated("Use StateV2 instead", ReplaceWith("stateOf(this)"))
 fun <T> T.state() = BasicState(this)
 
-fun <T> State<T>.layoutSafe(): State<T> {
-    val safeState = BasicState(get())
-    onSetValue { Window.enqueueRenderOperation { safeState.set(it) } }
-    return safeState
-}
 
-
+@Deprecated("Use StateV2 for filtering and sorting, and LayoutDSL's `forEach` for binding instead")
 fun <T : UIComponent, E> T.bindChildren(
     list: ObservableList<E>,
     filter: (E) -> Boolean = { true },
@@ -223,6 +226,7 @@ fun <T : UIComponent, E> T.bindChildren(
  * of type [V] using the given [mapper] function.
  *
  */
+@Deprecated("Use StateV2's `ListState` instead")
 fun <E, V> ObservableList<E>.map(
     mapper: (E) -> V,
 ): ObservableList<V> {

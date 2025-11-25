@@ -20,6 +20,7 @@ import gg.essential.config.AccessedViaReflection;
 import gg.essential.config.EssentialConfig;
 import gg.essential.config.EssentialConfigApiImpl;
 import gg.essential.config.McEssentialConfig;
+import gg.essential.cosmetics.IngameEquippedOutfitsUpdateDispatcher;
 import gg.essential.cosmetics.PlayerWearableManager;
 import gg.essential.cosmetics.events.CosmeticEventEmitter;
 import gg.essential.data.OnboardingData;
@@ -32,11 +33,14 @@ import gg.essential.event.client.InitializationEvent;
 import gg.essential.event.client.PostInitializationEvent;
 import gg.essential.event.client.PreInitializationEvent;
 import gg.essential.event.essential.TosAcceptedEvent;
+import gg.essential.event.render.RenderTickEvent;
+import gg.essential.forge.EssentialForgeMod;
 import gg.essential.gui.EssentialPalette;
 import gg.essential.gui.account.factory.*;
 import gg.essential.gui.api.ComponentFactory;
 import gg.essential.gui.common.UI3DPlayer;
 import gg.essential.gui.elementa.state.v2.MutableState;
+import gg.essential.gui.elementa.state.v2.StateScheduler;
 import gg.essential.gui.image.ResourceImageFactory;
 import gg.essential.gui.notification.Notifications;
 import gg.essential.handlers.OptionsScreenOverlay;
@@ -49,7 +53,10 @@ import gg.essential.key.EssentialKeybindingRegistry;
 import gg.essential.lib.gson.Gson;
 import gg.essential.lib.gson.GsonBuilder;
 import gg.essential.network.connectionmanager.ConnectionManager;
+import gg.essential.network.connectionmanager.skins.PlayerSkinLookup;
+import gg.essential.network.connectionmanager.telemetry.FeatureSessionTelemetry;
 import gg.essential.sps.McIntegratedServerManager;
+import gg.essential.sps.WindowTitleManager;
 import gg.essential.universal.UMinecraft;
 import gg.essential.util.*;
 import gg.essential.util.crash.StacktraceDeobfuscator;
@@ -59,6 +66,7 @@ import me.kbrewster.eventbus.Subscribe;
 import me.kbrewster.eventbus.invokers.InvokerType;
 import me.kbrewster.eventbus.invokers.LMFInvoker;
 import me.kbrewster.eventbus.invokers.ReflectionInvoker;
+import net.minecraft.client.resources.SimpleReloadableResourceManager;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -70,6 +78,8 @@ import org.jetbrains.annotations.Nullable;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.net.InetAddress;
+import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -132,13 +142,10 @@ public class Essential implements EssentialAPI {
     @NotNull
     private final ConnectionManager connectionManager = new ConnectionManager(new NetworkHook(), baseDir, lwjgl3, integratedServerManager);
     private final List<SessionFactory> sessionFactories = new ArrayList<>();
-    @NotNull
-    private final EssentialKeybindingRegistry keybindingRegistry = new EssentialKeybindingRegistry();
     private ImageCache imageCache;
 
     private PlayerWearableManager playerWearableManager;
-    private final GameProfileManager gameProfileManager = new GameProfileManager();
-    private final MojangSkinManager skinManager = new MojangSkinManager(gameProfileManager, () -> Wardrobe.getInstance() != null);
+    private final MojangSkinManager skinManager = new McMojangSkinManager(() -> Wardrobe.getInstance() != null);
     private CosmeticEventEmitter cosmeticEventEmitter;
     private Map<Object, Boolean> dynamicListeners = new HashMap<>();
     private EssentialGameRules gameRules;
@@ -180,7 +187,7 @@ public class Essential implements EssentialAPI {
 
     @NotNull
     public EssentialKeybindingRegistry getKeybindingRegistry() {
-        return this.keybindingRegistry;
+        return EssentialKeybindingRegistry.getInstance();
     }
 
     @SuppressWarnings("ResultOfMethodCallIgnored")
@@ -200,6 +207,8 @@ public class Essential implements EssentialAPI {
 
         loadSessionFactories();
         this.connectionManager.start();
+
+        PlayerSkinLookup.INSTANCE.supplySkinFromGame(USession.Companion.activeNow().getUuid(), skinManager.getActiveSkin());
 
         dispatchStaticInitializers();
     }
@@ -261,10 +270,6 @@ public class Essential implements EssentialAPI {
         }
     }
 
-    public GameProfileManager getGameProfileManager() {
-        return gameProfileManager;
-    }
-
     public MojangSkinManager getSkinManager() {
         return skinManager;
     }
@@ -288,15 +293,18 @@ public class Essential implements EssentialAPI {
         //#endif
 
         imageCache = new FileImageCache(new File(getBaseDir(), "image-cache"), 1, TimeUnit.HOURS, true);
+        PlayerSkinLookup.INSTANCE.loadCache(getBaseDir().toPath().resolve("cache"));
 
         EVENT_BUS.register(EssentialCommandRegistry.INSTANCE);
-        keybindingRegistry.refreshBinds(); // config is ready now, time to refresh which bindings we actually want
-        registerListener(keybindingRegistry);
+        getKeybindingRegistry().refreshBinds(); // config is ready now, time to refresh which bindings we actually want
+        registerListener(getKeybindingRegistry());
         registerListenerRequiresEssential(new NetworkSubscriptionStateHandler());
         registerListener(MinecraftUtils.INSTANCE);
         registerListenerRequiresEssential(new ServerStatusHandler());
         registerListener(GuiUtil.INSTANCE);
-        registerListener(OverlayManagerImpl.Events.INSTANCE);
+        //#if MC>=12106
+        //$$ registerListener(AdvancedDrawContext.INSTANCE);
+        //#endif
         registerListener(new PauseMenuDisplay());
         registerListenerRequiresEssential(DiscordIntegration.INSTANCE);
         registerListener(new OptionsScreenOverlay());
@@ -310,7 +318,10 @@ public class Essential implements EssentialAPI {
         if (!OptiFineUtil.isLoaded()) {
             registerListenerRequiresEssential(ZoomHandler.getInstance());
         }
-        connectionManager.getSubscriptionManager().addListener(gameProfileManager);
+        registerListener(new IngameEquippedOutfitsUpdateDispatcher(
+            connectionManager.getSubscriptionManager().getSubscriptionsAndSelf(),
+            connectionManager.getCosmeticsManager().getInfraEquippedOutfitsManager()
+        ));
 
         Net.INSTANCE.init();
         Multithreading.runAsync(() -> {
@@ -327,6 +338,7 @@ public class Essential implements EssentialAPI {
         if (OnboardingData.hasAcceptedTos()) {
             EVENT_BUS.post(new TosAcceptedEvent());
         }
+        WindowTitleManager.INSTANCE.register();
 
         //#if MC<11400
         // Patcher screenshot manager conflicts with ours, so we disable it
@@ -364,6 +376,22 @@ public class Essential implements EssentialAPI {
 
         EssentialChannelHandler.registerEssentialChannel();
 
+        // NeoForge enforces use of their event as of 1.21.4 (specifically 21.4.84-beta), so we need to use it when it's
+        // available
+        // See https://github.com/neoforged/NeoForge/pull/1915
+        if (EssentialForgeMod.USE_NEW_NEOFORGE_RESOURCE_EVENT) {
+            // See EssentialForgeMod.<init>
+            // Can't be here because it's too late.
+            // Can't be in our pre-init because it's too early (on some NeoForge versions).
+        } else {
+            ((SimpleReloadableResourceManager) UMinecraft.getMinecraft().getResourceManager())
+                .registerReloadListener(ResourceManagerUtil.INSTANCE);
+        }
+
+        // Fetch update changelog now so it is preloaded for later use
+        AutoUpdate.INSTANCE.getChangelog();
+
+        FeatureSessionTelemetry.INSTANCE.start();
     }
 
     private File createEssentialDir() {
@@ -377,7 +405,9 @@ public class Essential implements EssentialAPI {
     private void loadSessionFactories() {
         try {
             // In order of preference (earlier takes priority)
-            final MicrosoftAccountSessionFactory microsoftAccountSessionFactory = new MicrosoftAccountSessionFactory(baseDir.toPath().resolve("microsoft_accounts.json"));
+            Path savePath = ExtensionsKt.getGlobalEssentialDirectory().resolve("microsoft_accounts.json");
+            Path oldSavePath = baseDir.toPath().resolve("microsoft_accounts.json");
+            final MicrosoftAccountSessionFactory microsoftAccountSessionFactory = new MicrosoftAccountSessionFactory(savePath, oldSavePath);
             Multithreading.runAsync(microsoftAccountSessionFactory::refreshRefreshTokensIfNecessary);
             sessionFactories.add(microsoftAccountSessionFactory);
             // Official launcher factories are disabled for now because apparently having accounts listed which you
@@ -426,6 +456,13 @@ public class Essential implements EssentialAPI {
             logger.error("Could not set up LMFInvoker: ", e);
             return new ReflectionInvoker();
         }
+    }
+
+    @Subscribe
+    public void preRenderTick(RenderTickEvent event) {
+        if (!event.isPre()) return;
+
+        StateScheduler.updateSystemTime(Instant.now());
     }
 
     /**

@@ -9,6 +9,7 @@
  * commercialize, or otherwise exploit, or create derivative works based
  * upon, this file or any other in this repository, all of which is reserved by Essential.
  */
+@file:Suppress("DEPRECATION")
 package gg.essential.gui.elementa.state.v2.impl.legacy
 
 import gg.essential.config.AccessedViaReflection

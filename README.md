@@ -15,7 +15,7 @@ Before building Essential, you must have [Java Development Kits (JDKs)](https://
 installed for Java versions 21, 17, 16, and 8 (even if you only want to build for a specific Minecraft version).
 Java 21 (or newer) must be the default Java version on your system.
 
-No additional tools are required. Gradle will be automatically be installed by the
+No additional tools are required. Gradle will be automatically installed by the
 [gradle-wrapper](https://docs.gradle.org/current/userguide/gradle_wrapper.html) program included in the repository and
 available via the `./gradlew` (Linux/Mac) or `gradlew.bat` (Windows) scripts.
 We highly recommend using these instead of a local installation of Gradle to ensure you're using the exact same version
@@ -178,15 +178,16 @@ Essential Mod's source code.
 
 **What you CAN do**
 
-- Audit the source code
-- Compile the source code to confirm the authenticity of the official releases
+- Audit the source code.
+- Compile the source code to confirm the authenticity of the official releases.
+- Create unmodified forks of the repository.
 
 **What you CANNOT do**
 
-- Utilize any code or assets, including for personal use
-- Incorporate the source code in any other projects or use our code as a reference in new projects
-- Modify or alter the source code provided here
-- Distribute compiled versions of the source code or modified source code
+- Utilize any code or assets, including for personal use.
+- Incorporate the source code in any other projects or use our code as a reference in new projects.
+- Modify or alter the source code provided here.
+- Distribute compiled versions of the source code or modified source code.
 
 This summary is not an exhaustive interpretation of the license; for a comprehensive understanding, please refer to [the
 full license file](https://github.com/EssentialGG/Essential/blob/main/LICENSE).

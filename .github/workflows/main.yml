@@ -27,7 +27,7 @@ jobs:
       - name: Generate checksums
         run: sha256sum versions/*/build/libs/* loader/{container,stage{0,1,2}}/{fabric,launchwrapper,modlauncher{8,9}}/build/libs/* | tee checksums.txt
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: checksums
           path: checksums.txt
@@ -75,7 +75,7 @@ jobs:
           fi
 
       # Upload the raw jars to aid in debugging non-determinism issues if we got a checksum mismatch
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: ${{ failure() && steps.verify.conclusion == 'failure' }}
         with:
           name: mod-jars

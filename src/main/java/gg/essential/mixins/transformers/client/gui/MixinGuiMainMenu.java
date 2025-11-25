@@ -11,8 +11,11 @@
  */
 package gg.essential.mixins.transformers.client.gui;
 
+import gg.essential.Essential;
+import gg.essential.event.gui.GuiKeyTypedEvent;
 import net.minecraft.client.gui.GuiMainMenu;
 import gg.essential.mixins.impl.client.gui.GuiMainMenuHook;
+import net.minecraft.client.gui.GuiScreen;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -31,6 +34,12 @@ public class MixinGuiMainMenu {
         if (guiMainMenuHook.keyTyped(typedChar, keyCode).isCancelled()) {
             ci.cancel();
         }
+    }
+
+    // Same reason as above
+    @Inject(method = "keyTyped", at = @At("TAIL"))
+    private void keyTyped2(char typedChar, int keyCode, CallbackInfo ci) {
+        Essential.EVENT_BUS.post(new GuiKeyTypedEvent.Post((GuiScreen) (Object) this, typedChar, keyCode));
     }
     //#endif
 }

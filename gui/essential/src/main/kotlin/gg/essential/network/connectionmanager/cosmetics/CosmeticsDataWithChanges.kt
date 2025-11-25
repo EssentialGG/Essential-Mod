@@ -16,6 +16,8 @@ import gg.essential.cosmetics.CosmeticCategoryId
 import gg.essential.cosmetics.CosmeticId
 import gg.essential.cosmetics.CosmeticTypeId
 import gg.essential.cosmetics.FeaturedPageCollectionId
+import gg.essential.cosmetics.ImplicitOwnership
+import gg.essential.cosmetics.ImplicitOwnershipId
 import gg.essential.gui.elementa.state.v2.*
 import gg.essential.gui.elementa.state.v2.collections.asMap
 import gg.essential.mod.cosmetics.CosmeticBundle
@@ -23,6 +25,7 @@ import gg.essential.mod.cosmetics.CosmeticCategory
 import gg.essential.mod.cosmetics.CosmeticType
 import gg.essential.mod.cosmetics.featured.FeaturedPageCollection
 import gg.essential.network.cosmetics.Cosmetic
+import gg.essential.util.logExceptions
 import java.util.concurrent.CompletableFuture
 
 class CosmeticsDataWithChanges(
@@ -34,6 +37,7 @@ class CosmeticsDataWithChanges(
     private val updatedTypes = mutableStateOf(mapOf<CosmeticTypeId, CosmeticType?>())
     private val updatedBundles = mutableStateOf(mapOf<CosmeticBundleId, CosmeticBundle?>())
     private val updatedFeaturedPageCollections = mutableStateOf(mapOf<FeaturedPageCollectionId, FeaturedPageCollection?>())
+    private val updatedImplicitOwnerships = mutableStateOf(mapOf<ImplicitOwnershipId, ImplicitOwnership?>())
 
     override val cosmetics: ListState<Cosmetic> = stateBy {
         val originals = inner.cosmetics().associateBy { it.id }
@@ -73,11 +77,18 @@ class CosmeticsDataWithChanges(
         (originals + updates).mapNotNull { it.value }
     }.toListState()
 
+    override val implicitOwnerships: ListState<ImplicitOwnership> = stateBy {
+        val originals = inner.implicitOwnerships().associateBy { it.id }
+        val updates = updatedImplicitOwnerships()
+        (originals + updates).mapNotNull { it.value }
+    }.toListState()
+
     private val refHolder = ReferenceHolderImpl()
     private val categoriesMap = categories.asMap(refHolder) { it.id to it }
     private val typesMap = types.asMap(refHolder) { it.id to it }
     private val bundlesMap = bundles.asMap(refHolder) { it.id to it }
     private val featuredPageCollectionsMap = featuredPageCollections.asMap(refHolder) { it.id to it }
+    private val implicitOwnershipsMap = implicitOwnerships.asMap(refHolder) { it.id to it }
     private val cosmeticsMap = cosmetics.asMap(refHolder) { it.id to it }
 
     fun updateCosmetic(id: CosmeticId, cosmetic: Cosmetic?) {
@@ -120,14 +131,51 @@ class CosmeticsDataWithChanges(
         }
     }
 
+    fun updateImplicitOwnership(id: ImplicitOwnershipId, implicitOwnership: ImplicitOwnership?) {
+        if (inner.getImplicitOwnership(id) != implicitOwnership) {
+            updatedImplicitOwnerships.set { it + (id to implicitOwnership) }
+        } else {
+            updatedImplicitOwnerships.set { it - id }
+        }
+    }
+
     fun writeChangesToLocalCosmeticData(localCosmeticsData: LocalCosmeticsData): CompletableFuture<Unit> {
         return localCosmeticsData.writeChanges(
             categories = categoriesMap + updatedCategories.get().filterValues { it == null },
             types = typesMap + updatedTypes.get().filterValues { it == null },
             bundles = bundlesMap + updatedBundles.get().filterValues { it == null },
             featuredPageCollections = featuredPageCollectionsMap + updatedFeaturedPageCollections.get().filterValues { it == null },
+            implicitOwnerships = implicitOwnershipsMap + updatedImplicitOwnerships.getUntracked().filterValues { it == null },
             cosmetics = cosmeticsMap + updatedCosmetics.get().filterValues { it == null },
-        )
+        ).thenApply {
+            updatedCosmetics.set(emptyMap())
+            updatedCategories.set(emptyMap())
+            updatedTypes.set(emptyMap())
+            updatedBundles.set(emptyMap())
+            updatedFeaturedPageCollections.set(emptyMap())
+        }.logExceptions()
+    }
+
+    fun getUpdatesSummary() = memo {
+        val updatedCosmetics = updatedCosmetics()
+        val updatedCategories = updatedCategories()
+        val updatedTypes = updatedTypes()
+        val updatedBundles = updatedBundles()
+        val updatedFeaturedPageCollections = updatedFeaturedPageCollections()
+        if(updatedCosmetics.isEmpty() && updatedCategories.isEmpty() && updatedTypes.isEmpty() && updatedBundles.isEmpty() && updatedFeaturedPageCollections.isEmpty()) {
+            return@memo null
+        }
+        val cosmetics = updatedCosmetics.entries.joinToString("\n") { "${it.key} - " + if (it.value == null) "Removed" else "Changed" }
+        val categories = updatedCategories.entries.joinToString("\n") { "${it.key} - " + if (it.value == null) "Removed" else "Changed" }
+        val types = updatedTypes.entries.joinToString("\n") { "${it.key} - " + if (it.value == null) "Removed" else "Changed" }
+        val bundles = updatedBundles.entries.joinToString("\n") { "${it.key} - " + if (it.value == null) "Removed" else "Changed" }
+        val featuredPageCollections = updatedFeaturedPageCollections.entries.joinToString("\n") { "${it.key} - " + if (it.value == null) "Removed" else "Changed" }
+        val cosmeticsText = if (cosmetics.isNotBlank()) "\nCosmetics:\n$cosmetics" else ""
+        val categoriesText = if (categories.isNotBlank()) "\nCategories:\n$categories" else ""
+        val typesText = if (types.isNotBlank()) "\nTypes:\n$types" else ""
+        val bundlesText = if (bundles.isNotBlank()) "\nBundles:\n$bundles" else ""
+        val featuredPageCollectionsText = if (featuredPageCollections.isNotBlank()) "\nFeatured Pages:\n$featuredPageCollections" else ""
+        "Changes:$cosmeticsText$categoriesText$typesText$bundlesText$featuredPageCollectionsText"
     }
 
     override fun getCosmetic(id: CosmeticId): Cosmetic? = cosmeticsMap[id]
@@ -135,5 +183,6 @@ class CosmeticsDataWithChanges(
     override fun getType(id: CosmeticTypeId): CosmeticType? = typesMap[id]
     override fun getCosmeticBundle(id: CosmeticBundleId): CosmeticBundle? = bundlesMap[id]
     override fun getFeaturedPageCollection(id: FeaturedPageCollectionId): FeaturedPageCollection? = featuredPageCollectionsMap[id]
+    override fun getImplicitOwnership(id: ImplicitOwnershipId): ImplicitOwnership? = implicitOwnershipsMap[id]
 
 }

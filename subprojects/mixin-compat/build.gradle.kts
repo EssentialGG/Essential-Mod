@@ -15,7 +15,7 @@ import gg.essential.gradle.util.prebundle
 import gg.essential.gradle.util.RelocationTransform.Companion.registerRelocationAttribute
 
 plugins {
-    id("io.github.goooler.shadow")
+    id("com.gradleup.shadow")
     id("java-library")
 }
 

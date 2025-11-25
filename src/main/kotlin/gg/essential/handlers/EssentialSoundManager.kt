@@ -192,8 +192,9 @@ object EssentialSoundManager {
         // sound. So even if the volume increases later, it won't be playing.
         // To work around this, we never return 0 until the first `update` call.
         private var mayReturnTrueVolume: Boolean = false
-        override fun getVolume(): Float =
-            ((sound?.volume ?: 1f) * volume.getUntracked()).coerceAtLeast(if (mayReturnTrueVolume) 0f else 1e-10f)
+        private fun getMinVolume(): Float = if (mayReturnTrueVolume) 0f else 1e-10f
+        override fun getVolume(): Float  = if (!loc.isVisible) getMinVolume() else // Mute sound while the locator is hidden
+                ((sound?.volume ?: 1f) * volume.getUntracked()).coerceAtLeast(getMinVolume())
 
         override fun getPitch(): Float = sound?.pitch ?: 1f
 

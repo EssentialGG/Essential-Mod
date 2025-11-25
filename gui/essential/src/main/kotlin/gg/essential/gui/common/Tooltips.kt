@@ -39,6 +39,10 @@ abstract class AbstractTooltip(private val logicalParent: UIComponent) : UIConta
 
     private var removalListeners = mutableListOf<() -> Unit>()
 
+    init {
+        isFloating = true
+    }
+
     fun bindVisibility(visible: StateV2<Boolean>): AbstractTooltip {
         val toggle = { show: Boolean ->
             if (show) {
@@ -48,9 +52,8 @@ abstract class AbstractTooltip(private val logicalParent: UIComponent) : UIConta
             }
         }
 
-        toggle(visible.get())
-        visible.onSetValue(logicalParent) {
-            toggle(it)
+        effect(logicalParent) {
+            toggle(visible())
         }
 
         return this
@@ -67,7 +70,6 @@ abstract class AbstractTooltip(private val logicalParent: UIComponent) : UIConta
         }
 
         window.addChild(this)
-        setFloating(true)
 
         // When our logical parent is removed from the component tree, we also need to remove ourselves (our actual
         // parent is the window, so that is not going to happen by itself).
@@ -101,7 +103,6 @@ abstract class AbstractTooltip(private val logicalParent: UIComponent) : UIConta
 
         val window = Window.ofOrNull(this) ?: return
 
-        setFloating(false)
         window.removeChild(this)
 
         removalListeners.forEach { it() }
@@ -192,11 +193,11 @@ abstract class Tooltip(logicalParent: UIComponent) : AbstractTooltip(logicalPare
 
     // Old name of bindText, contrary to its name it actually supports multiple lines and you cannot call it multiple times to add more lines
     fun bindLine(state: StateV2<String>, wrapAtWidth: Float? = null, configure: UIText.() -> Unit = {}): Tooltip {
-        state.onSetValueAndNow(this) { text ->
+        effect(this) {
             clearLines()
-            text.lines().forEach { fullLine ->
+            state().lines().forEach { fullLine ->
                 if (wrapAtWidth != null) {
-                    val lines = getStringSplitToWidth(fullLine, wrapAtWidth, 1f)
+                    val lines = getStringSplitToWidth(fullLine, wrapAtWidth, 1f, processColorCodes = false)
                     for (line in lines) {
                         addLine(line, configure)
                     }
@@ -263,24 +264,32 @@ class EssentialTooltip(
                     Position.RIGHT -> left - 2 - i
                     Position.ABOVE -> hCenter - (notchSize - i) - 0.5
                     Position.BELOW -> hCenter - (notchSize - i) - 0.5
+                    Position.MOUSE -> continue
+                    is Position.MOUSE_OFFSET -> continue
                 },
                 when (position) {
                     Position.LEFT -> vCenter - (notchSize - i) - 0.5
                     Position.RIGHT -> vCenter - (notchSize - i) - 0.5
                     Position.ABOVE -> bottom + i
                     Position.BELOW -> top - 2 - i
+                    Position.MOUSE -> continue
+                    is Position.MOUSE_OFFSET -> continue
                 },
                 when (position) {
                     Position.LEFT -> right + 2 + i
                     Position.RIGHT -> left - 1 - i
                     Position.ABOVE -> hCenter + (notchSize - i) + 0.5
                     Position.BELOW -> hCenter + (notchSize - i) + 0.5
+                    Position.MOUSE -> continue
+                    is Position.MOUSE_OFFSET -> continue
                 },
                 when (position) {
                     Position.LEFT -> vCenter + (notchSize - i) + 0.5
                     Position.RIGHT -> vCenter + (notchSize - i) + 0.5
                     Position.ABOVE -> bottom + i + 2
                     Position.BELOW -> top - i - 1
+                    Position.MOUSE -> continue
+                    is Position.MOUSE_OFFSET -> continue
                 },
             )
             UIBlock.drawBlock(
@@ -291,24 +300,32 @@ class EssentialTooltip(
                     Position.RIGHT -> left - 1 - i
                     Position.ABOVE -> hCenter - (notchSize - i) - 0.5
                     Position.BELOW -> hCenter - (notchSize - i) - 0.5
+                    Position.MOUSE -> continue
+                    is Position.MOUSE_OFFSET -> continue
                 },
                 when (position) {
                     Position.LEFT -> vCenter - (notchSize - i) - 0.5
                     Position.RIGHT -> vCenter - (notchSize - i) - 0.5
                     Position.ABOVE -> bottom + i
                     Position.BELOW -> top - 1 - i
+                    Position.MOUSE -> continue
+                    is Position.MOUSE_OFFSET -> continue
                 },
                 when (position) {
                     Position.LEFT -> right + 1 + i
                     Position.RIGHT -> left - i
                     Position.ABOVE -> hCenter + (notchSize - i) + 0.5
                     Position.BELOW -> hCenter + (notchSize - i) + 0.5
+                    Position.MOUSE -> continue
+                    is Position.MOUSE_OFFSET -> continue
                 },
                 when (position) {
                     Position.LEFT -> vCenter + (notchSize - i) + 0.5
                     Position.RIGHT -> vCenter + (notchSize - i) + 0.5
                     Position.ABOVE -> bottom + i + 1
                     Position.BELOW -> top - i
+                    Position.MOUSE -> continue
+                    is Position.MOUSE_OFFSET -> continue
                 },
             )
         }
@@ -316,7 +333,14 @@ class EssentialTooltip(
         super.afterDraw(matrixStack)
     }
 
-    enum class Position { LEFT, RIGHT, ABOVE, BELOW }
+    sealed interface Position {
+        data object LEFT : Position
+        data object RIGHT : Position
+        data object ABOVE : Position
+        data object BELOW : Position
+        data object MOUSE : Position
+        data class MOUSE_OFFSET(val xOffset: Float = 0f, val yOffset: Float = 0f) : Position
+    }
 }
 
 

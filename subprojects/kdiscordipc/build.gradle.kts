@@ -37,7 +37,7 @@ dependencies {
 
     junixsocket("com.kohlschutter.junixsocket:junixsocket-core:2.6.2")
 
-    api("com.github.caoimhebyrne:KDiscordIPC:0.2.2") {
+    api("com.github.caoimhebyrne:KDiscordIPC:0.2.3") {
         exclude(group = "com.kohlschutter.junixsocket")
     }
 

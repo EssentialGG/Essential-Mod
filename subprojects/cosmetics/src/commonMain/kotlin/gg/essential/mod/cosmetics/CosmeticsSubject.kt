@@ -11,9 +11,9 @@
  */
 package gg.essential.mod.cosmetics
 
+import gg.essential.cosmetics.ArmorSlots
 import gg.essential.cosmetics.events.AnimationTarget
 import gg.essential.mod.Model
-import gg.essential.model.EnumPart
 import gg.essential.model.molang.MolangQueryEntity
 
 /** Information on the subject of a set of cosmetics. */
@@ -23,7 +23,7 @@ data class CosmeticsSubject(
     /** Skin type of the subject. */
     val skinType: Model = Model.STEVE,
     /** Parts of the subject that are covered by armor */
-    val armor: Set<EnumPart> = emptySet(),
+    val armor: ArmorSlots = ArmorSlots(0),
     /** Types of animations to play on this subject (ALL is always included) */
     val animationTargets: Set<AnimationTarget> =
         setOf(AnimationTarget.SELF, AnimationTarget.OTHERS),

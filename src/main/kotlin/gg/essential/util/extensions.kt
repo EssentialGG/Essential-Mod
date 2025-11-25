@@ -11,20 +11,11 @@
  */
 package gg.essential.util
 
-import com.mojang.authlib.GameProfile
-import com.sparkuniverse.toolbox.chat.enums.ChannelType
-import com.sparkuniverse.toolbox.chat.model.Channel
-import com.sparkuniverse.toolbox.chat.model.Message
 import dev.folomeev.kotgl.matrix.matrices.mat3
 import dev.folomeev.kotgl.matrix.matrices.mat4
 import gg.essential.Essential
-import gg.essential.api.gui.EssentialGUI
 import gg.essential.connectionmanager.common.model.knownserver.KnownServer
-import gg.essential.elementa.UIComponent
-import gg.essential.elementa.components.UIContainer
-import gg.essential.elementa.state.State
 import gg.essential.elementa.utils.elementaDebug
-import gg.essential.gui.friends.message.MessageUtils
 import gg.essential.lib.gson.JsonElement
 import gg.essential.lib.gson.JsonPrimitive
 import gg.essential.mixins.ext.client.executor
@@ -61,7 +52,6 @@ import java.util.concurrent.Executor
 import kotlin.io.path.div
 import kotlin.io.path.exists
 import kotlin.io.path.inputStream
-import kotlin.reflect.KClass
 
 //#if MC>=11400
 //$$ import gg.essential.mixins.impl.util.math.Matrix3fExt
@@ -93,14 +83,6 @@ operator fun Color.component3() = this.blue
 operator fun Color.component4() = this.alpha
 
 
-fun Channel.getOtherUser(): UUID? =
-    if (type == ChannelType.DIRECT_MESSAGE) members.firstOrNull { it != UUIDUtil.getClientUUID() } else null
-
-private val BOT_UUID = UUID.fromString("cd899a14-de78-4de8-8d31-9d42fff31d7a") // EssentialBot
-fun Channel.isAnnouncement(): Boolean =
-    this.type == ChannelType.ANNOUNCEMENT || BOT_UUID in members
-
-fun Message.getSentTimestamp(): Long = MessageUtils.getSentTimeStamp(id)
 fun ServerDiscovery.toServerData(knownServers: Map<String, ServerData> = emptyMap()) =
     knownServers[addresses[0]]
         ?: ServerData(
@@ -145,8 +127,6 @@ val MinecraftServer.executor
         //#else
         Executor { addScheduledTask(it) }
 //#endif
-
-fun GameProfile.copy() = GameProfile(id, name).also { it.properties.putAll(properties) }
 
 fun toggleElementaDebug() {
     elementaDebug = !elementaDebug
@@ -196,14 +176,6 @@ fun MCMinecraft.setSession(session: USession) {
     (this as MinecraftExt).setSession(session.toMC())
 }
 
-fun IntRange.reversed(reversed: Boolean): IntProgression {
-    return if (reversed) {
-        this.last downTo this.first
-    } else {
-        this
-    }
-}
-
 fun GuiScreen.findButtonByLabel(vararg label: String): () -> GuiButton? = {
     //#if MC==11903
     //$$ // 1.19.3 uses a unique system for grids
@@ -222,14 +194,6 @@ fun GuiScreen.findButtonByLabel(vararg label: String): () -> GuiButton? = {
     //#endif
 }
 
-inline fun (() -> Unit).catch(vararg exceptions: KClass<out Throwable>, catchBlock: (Throwable) -> Unit) {
-    try {
-        this()
-    } catch (e: Throwable) {
-        if (exceptions.any { it.isInstance(e) }) catchBlock(e) else throw e
-    }
-}
-
 fun UImage.Companion.read(stream: InputStream): UImage {
     //#if MC>=11400
     //$$ return UImage(net.minecraft.client.renderer.texture.NativeImage.read(stream))
@@ -239,17 +203,6 @@ fun UImage.Companion.read(stream: InputStream): UImage {
 }
 
 fun UImage.Companion.read(bytes: ByteArray) = read(bytes.inputStream())
-
-/**
- * Creates and returns a scrollbar bound within the right divider of an EssentialGUI
- */
-fun EssentialGUI.createRightDividerScroller(
-    display: State<Boolean>,
-    xPositionAndWidth: UIComponent = rightDivider,
-    parent: UIComponent = window,
-    yPositionAndHeight: UIComponent = content,
-    initializeToBottom: Boolean = false,
-): Pair<UIContainer, () -> Unit> = createScrollbarRelativeTo(display, xPositionAndWidth, parent, yPositionAndHeight, initializeToBottom)
 
 fun UMatrixStack.toCommon() =
     gg.essential.model.util.UMatrixStack(

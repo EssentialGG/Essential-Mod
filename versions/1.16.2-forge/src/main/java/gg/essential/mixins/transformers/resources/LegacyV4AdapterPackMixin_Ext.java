@@ -11,7 +11,7 @@
  */
 package gg.essential.mixins.transformers.resources;
 
-import gg.essential.mixins.ext.client.resource.FileResourcePackExt;
+import gg.essential.mixins.ext.client.resource.ResourcePackWithPath;
 import net.minecraft.client.resources.LegacyResourcePackWrapperV4;
 import net.minecraft.resources.IResourcePack;
 import org.jetbrains.annotations.Nullable;
@@ -22,15 +22,15 @@ import org.spongepowered.asm.mixin.Shadow;
 import java.nio.file.Path;
 
 @Mixin(LegacyResourcePackWrapperV4.class)
-public class LegacyV4AdapterPackMixin_Ext implements FileResourcePackExt {
+public class LegacyV4AdapterPackMixin_Ext implements ResourcePackWithPath {
 
     @Shadow @Final private IResourcePack field_239479_h_;
 
     @Nullable
     @Override
-    public Path getEssential$file() {
-        if (this.field_239479_h_ instanceof FileResourcePackExt) {
-            return ((FileResourcePackExt) this.field_239479_h_).getEssential$file();
+    public Path getEssential$path() {
+        if (this.field_239479_h_ instanceof ResourcePackWithPath) {
+            return ((ResourcePackWithPath) this.field_239479_h_).getEssential$path();
         }
         return null;
     }

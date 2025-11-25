@@ -14,12 +14,15 @@ package gg.essential.gui.multiplayer
 import gg.essential.Essential
 import gg.essential.config.EssentialConfig
 import gg.essential.connectionmanager.common.enums.ActivityType
+import gg.essential.elementa.UIComponent
 import gg.essential.elementa.components.UIImage
 import gg.essential.gui.EssentialPalette
+import gg.essential.sps.SpsAddress
 import gg.essential.universal.UMatrixStack
 import gg.essential.universal.UMinecraft
 import gg.essential.util.CachedAvatarImage
 import gg.essential.util.UUIDUtil
+import gg.essential.util.findChildOfTypeOrNull
 import gg.essential.vigilance.gui.VigilancePalette
 import net.minecraft.client.multiplayer.ServerData
 import java.util.SortedMap
@@ -30,8 +33,8 @@ class FriendsIndicator(val server: ServerData) {
     private val connectionManager = Essential.getInstance().connectionManager
     private val discoveryServer = findServerByAddress(server.serverIP)
 
-    private val host = connectionManager.spsManager.getHostFromSpsAddress(server.serverIP)
-    private val friendsOnServer: SortedMap<UUID, Pair<UIImage, CompletableFuture<String>>> = sortedMapOf(compareBy({ it != host }, { it }))
+    private val host = SpsAddress.parse(server.serverIP)?.host
+    private val friendsOnServer: SortedMap<UUID, Pair<UIComponent, CompletableFuture<String>>> = sortedMapOf(compareBy({ it != host }, { it }))
 
     init {
         // Status should always be up-to-date for online friends
@@ -53,7 +56,7 @@ class FriendsIndicator(val server: ServerData) {
     }
 
     private fun addIcon(uuid: UUID) {
-        friendsOnServer[uuid] = (CachedAvatarImage.ofUUID(uuid) to UUIDUtil.getName(uuid))
+        friendsOnServer[uuid] = (CachedAvatarImage.create(uuid) to UUIDUtil.getName(uuid))
     }
 
     private fun appendInvite(uuid: UUID) = if (connectionManager.socialManager.incomingServerInvites[uuid] == server.serverIP) " (Invite)" else ""
@@ -79,7 +82,12 @@ class FriendsIndicator(val server: ServerData) {
 
         // Figure out the space available for head icons
         val serverNameEndPos = x + 32 + 2 + UMinecraft.getFontRenderer().getStringWidth(server.serverName) + 16
-        val playerCountStartPos = x + listWidth - 15 - 2 - populationInfoText - (HEAD_PADDING * 2)
+        //#if MC>=12100
+        //$$ val populationInfoOffset = 5
+        //#else
+        val populationInfoOffset = 2
+        //#endif
+        val playerCountStartPos = x + listWidth - 15 - populationInfoOffset - populationInfoText - (HEAD_PADDING * 2)
         val spaceAvailable = playerCountStartPos - serverNameEndPos
 
         // Figure out how many heads can fit in the space available and how many to display if we need to truncate them
@@ -103,7 +111,7 @@ class FriendsIndicator(val server: ServerData) {
             if (mouseX in currentX until currentX + HEAD_SIZE && mouseY in y..(y + HEAD_SIZE)) {
                 tooltip = pair.second.getNow("Loading username…") + appendInvite(uuid)
             }
-            pair.first.drawImage(
+            pair.first.findChildOfTypeOrNull<UIImage>(recursive = true)!!.drawImage(
                 matrixStack,
                 currentX.toDouble(),
                 y.toDouble(),
@@ -135,7 +143,10 @@ class FriendsIndicator(val server: ServerData) {
     }
 
     private fun findServerByAddress(address: String): Any? {
-        return connectionManager.knownServersManager.findServerByAddress(address)
+        return run {
+            // FIXME: remove this helper function after feature flag cleanup
+            connectionManager.knownServersManager.findServerByAddress(address)
+        }
     }
 
     private companion object {

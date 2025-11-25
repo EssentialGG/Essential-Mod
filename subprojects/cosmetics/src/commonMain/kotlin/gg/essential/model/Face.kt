@@ -61,7 +61,6 @@ class Face(@JvmField var vertexPositions: Array<PositionTexVertex>) {
         matrixStack: UMatrixStack,
         buffer: UVertexConsumer,
         light: Int,
-        scale: Float,
         verticalUVOffset: Float
     ) {
         val nx = normal.x
@@ -71,9 +70,9 @@ class Face(@JvmField var vertexPositions: Array<PositionTexVertex>) {
             val PositionTexVertex = vertexPositions[i]
             buffer.pos(
                 matrixStack,
-                (PositionTexVertex.vector3.x * scale).toDouble(),
-                (PositionTexVertex.vector3.y * scale).toDouble(),
-                (PositionTexVertex.vector3.z * scale).toDouble(),
+                PositionTexVertex.vector3.x.toDouble(),
+                PositionTexVertex.vector3.y.toDouble(),
+                PositionTexVertex.vector3.z.toDouble(),
             )
             buffer.tex(
                 PositionTexVertex.texturePositionX.toDouble(),

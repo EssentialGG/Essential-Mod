@@ -24,8 +24,6 @@ import gg.essential.gui.EssentialPalette
 import gg.essential.gui.common.LoadingIcon
 import gg.essential.gui.common.shadow.ShadowEffect
 import gg.essential.gui.common.shadow.ShadowIcon
-import gg.essential.gui.elementa.state.v2.combinators.map
-import gg.essential.gui.elementa.state.v2.combinators.zip
 import java.awt.Color
 import gg.essential.gui.elementa.state.v2.State as StateV2
 
@@ -39,8 +37,11 @@ fun Modifier.effect(effect: () -> Effect) = this then {
 
 fun Modifier.outline(color: Color, width: Float, drawInsideChildren: Boolean = false) = effect { OutlineEffect(color, width, drawInsideChildren = drawInsideChildren) }
 fun Modifier.outline(color: State<Color>, width: State<Float>, drawInsideChildren: Boolean = false) = effect { OutlineEffect(color, width, drawInsideChildren = drawInsideChildren) }
-// TODO: Implement this properly with statev2
-fun Modifier.outline(color: StateV2<Color>, width: StateV2<Float>, drawInsideChildren: Boolean = false) = then(color.zip(width).map { (color, width) -> outline(color, width, drawInsideChildren) })
+fun Modifier.outline(color: StateV2<Color>, width: StateV2<Float>, drawInsideChildren: Boolean = false) = then(StateV2 {
+    val colorValue = color()
+    val widthValue = width()
+    Modifier.effect { OutlineEffect(colorValue, widthValue, drawInsideChildren) }
+})
 
 fun Modifier.shadow(color: Color? = null) = this then {
     when (this) {
@@ -92,7 +93,7 @@ fun Modifier.shadow(color: Color? = null) = this then {
 @Deprecated("Using StateV1 is discouraged, use StateV2 instead")
 fun Modifier.shadow(color: State<Color>) = then(color.map { Modifier.shadow(it) })
 
-fun Modifier.shadow(color: StateV2<Color>) = then(color.map { Modifier.shadow(it) })
+fun Modifier.shadow(color: StateV2<Color>) = then(StateV2 { Modifier.shadow(color()) })
 
 fun Modifier.hoverShadow(shadow: Color?) = whenHovered(Modifier.shadow(shadow))
 

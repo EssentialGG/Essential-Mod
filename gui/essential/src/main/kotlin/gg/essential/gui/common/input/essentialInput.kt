@@ -18,14 +18,14 @@ import gg.essential.elementa.utils.invisible
 import gg.essential.gui.EssentialPalette
 import gg.essential.gui.common.EssentialTooltip
 import gg.essential.gui.common.IconButton
-import gg.essential.gui.common.onSetValueAndNow
 import gg.essential.gui.elementa.state.v2.*
 import gg.essential.gui.elementa.state.v2.combinators.*
-import gg.essential.gui.elementa.state.v2.stateBy
+import gg.essential.gui.image.ImageFactory
 import gg.essential.gui.layoutdsl.*
 import gg.essential.gui.util.hoverScope
 import gg.essential.util.*
 import gg.essential.vigilance.utils.onLeftClick
+import java.awt.Color
 import java.time.Instant
 import java.time.format.DateTimeParseException
 import java.time.temporal.ChronoUnit
@@ -216,52 +216,55 @@ fun <T> LayoutScope.essentialStateTextInput(
     return input
 }
 
-// Overload to allow external control of the error state instead of providing a check function
+// Overload to allow supplying unboxed string
 fun LayoutScope.essentialInput(
     input: AbstractTextInput,
     errorState: State<Boolean>,
     errorMessage: String,
     modifier: Modifier = Modifier,
-) = essentialInput(input, errorState, stateOf(errorMessage), modifier)
+    icon: ImageFactory? = null,
+) = essentialInput(input, errorState, stateOf(errorMessage), modifier, icon)
 
-// Overload to allow external control of the error state instead of providing a check function
+// Overload to allow for boolean input of error message state
 fun LayoutScope.essentialInput(
     input: AbstractTextInput,
     errorState: State<Boolean>,
     errorMessage: State<String?>,
     modifier: Modifier = Modifier,
+    icon: ImageFactory? = null,
 ) {
-    // create this outside the function, so we don't recreate it every time check is called
-    val state = stateBy { if (errorState()) errorMessage() else null }
-    essentialInput(input, state, modifier)
+    val state = State { if (errorState()) errorMessage() else null }
+    essentialInput(input, errorMessageState = state, modifier = modifier, icon = icon)
 }
 
-// Overload to allow external control of the error state instead of providing a check function.
-// We enable checkImmediately to always mirror the error state immediately, since with external control
-// we don't actually do the checking
-fun LayoutScope.essentialInput(
-    input: AbstractTextInput,
-    errorMessageState: State<String?>,
-    modifier: Modifier = Modifier,
-) = essentialInput(input, modifier, { errorMessageState }, true)
-
 fun LayoutScope.essentialInput(
     input: AbstractTextInput,
     modifier: Modifier = Modifier,
-    check: (String) -> State<String?> = { stateOf(null) },
-    checkImmediately: Boolean = false,
+    errorMessageState: State<String?> = State { null },
+    icon: ImageFactory? = null,
+    backgroundColor: State<Color> = stateOf(EssentialPalette.GUI_BACKGROUND),
+    iconColor: State<Color> = stateOf(EssentialPalette.TEXT_MID_GRAY),
+    iconShadowColor: State<Color> = stateOf(EssentialPalette.TEXT_SHADOW),
+    errorColor: State<Color> = stateOf(EssentialPalette.TEXT_WARNING),
+    errorShadowColor: State<Color> = stateOf(EssentialPalette.BLACK),
+    outlineColor: Color = EssentialPalette.LIGHTEST_BACKGROUND,
+    outlineFocusedColor: Color = EssentialPalette.BLUE_BUTTON,
+    outlineHoveredColor: Color = EssentialPalette.TEXT_DARK_DISABLED,
+    outlineErrorColor: Color = EssentialPalette.TEXT_WARNING,
+    iconAndInputWidthPadding: Float = 5f,
+    iconAndInputPadding: Float = 6f,
+    inputModifier: Modifier = Modifier,
 ) {
-    val errorTextState = stateDelegatingTo(stateOf<String?>(null))
-    val errorState = errorTextState.map { it != null }
+    val errorState = errorMessageState.map { it != null }
 
     val inputFocusedState = mutableStateOf(false)
     val inputHoveredState = input.hoverScope().toV2()
-    val outlineColorState = stateBy {
+    val outlineColorState = State {
         when {
-            errorState() -> EssentialPalette.TEXT_WARNING
-            inputFocusedState() -> EssentialPalette.BLUE_BUTTON
-            inputHoveredState() -> EssentialPalette.TEXT_DARK_DISABLED
-            else -> EssentialPalette.LIGHTEST_BACKGROUND
+            errorState() -> outlineErrorColor
+            inputFocusedState() -> outlineFocusedColor
+            inputHoveredState() -> outlineHoveredColor
+            else -> outlineColor
         }
     }
     input.onFocus { inputFocusedState.set(true) }
@@ -272,29 +275,31 @@ fun LayoutScope.essentialInput(
         input.setMaxWidth(100.percent - 8.pixels)
     }
 
-    if (checkImmediately) {
-        input.textState.onSetValueAndNow { errorTextState.rebind(check(it)) }
-    } else {
-        input.onActivate { errorTextState.rebind(check(it)) }
-        input.onFocusLost { errorTextState.rebind(check(input.getText())) }
-    }
-
     val gradient by object : GradientComponent(BasicState(EssentialPalette.GUI_BACKGROUND), BasicState(EssentialPalette.GUI_BACKGROUND.invisible()), BasicState(GradientDirection.RIGHT_TO_LEFT)) {
         // Override because the gradient should be treated as if it does not exist from an input point of view
         override fun isPointInside(x: Float, y: Float) = false
     }
 
     box(Modifier.fillParent().color(outlineColorState).hoverScope() then modifier) {
-        box(Modifier.fillParent(padding = 1f).color(EssentialPalette.GUI_BACKGROUND)) {
-            input(Modifier.alignVertical(Alignment.Center(true)))
+        box(Modifier.fillParent(padding = 1f).color(backgroundColor)) {
+            if(icon != null) {
+                row(Modifier.fillWidth(padding = iconAndInputWidthPadding).alignVertical(Alignment.Center(true)), Arrangement.spacedBy(iconAndInputPadding, FloatPosition.START)) {
+                    box(Modifier.width(10f).heightAspect(1f)) {
+                        image(icon, Modifier.color(iconColor).shadow(iconShadowColor))
+                    }
+                    input(inputModifier)
+                }
+            } else {
+                input(Modifier.alignVertical(Alignment.Center(true)).then(inputModifier))
+            }
 
             if_(errorState) {
                 box(Modifier.width(33f).fillHeight().alignHorizontal(Alignment.End)) {
                     gradient(Modifier.fillParent())
                     icon(
                         EssentialPalette.ROUND_WARNING_7X,
-                        Modifier.alignHorizontal(Alignment.End(4f)).color(EssentialPalette.TEXT_WARNING).shadow(EssentialPalette.BLACK),
-                    ).bindHoverEssentialTooltip(errorTextState.map { it ?: "" }.toV1(stateScope), EssentialTooltip.Position.ABOVE, wrapAtWidth = 150f)
+                        Modifier.alignHorizontal(Alignment.End(4f)).color(errorColor).shadow(errorShadowColor),
+                    ).bindHoverEssentialTooltip(errorMessageState.map { it ?: "" }.toV1(stateScope), EssentialTooltip.Position.ABOVE, wrapAtWidth = 150f)
                 }
             }
 

@@ -23,3 +23,6 @@ val CosmeticSettings.side: Side?
 
 val CosmeticSettings.variant: String?
     get() = setting<CosmeticSetting.Variant>()?.data?.variant
+
+val CosmeticSettings.animationVariant: String?
+    get() = setting<CosmeticSetting.AnimationVariant>()?.data?.animationVariant

@@ -44,7 +44,10 @@ class ModalManagerImpl(
     private var layer: Layer? = null
 
     override var isCurrentlyFadingIn: Boolean = false
-        private set
+        private set(value) {
+            if (field == value) return
+            field = value
+        }
 
     override fun modalClosed() {
         val nextModal = modalQueue.removeFirstOrNull()
@@ -76,7 +79,7 @@ class ModalManagerImpl(
     }
 
     private fun createAndSetupLayer(): Layer {
-        return overlayManager.createPersistentLayer(LayerPriority.Modal).apply {
+        return overlayManager.addLayer(LayerPriority.Modal).apply {
             UIBlock(backgroundColor).constrain {
                 x = 0.pixels
                 y = 0.pixels

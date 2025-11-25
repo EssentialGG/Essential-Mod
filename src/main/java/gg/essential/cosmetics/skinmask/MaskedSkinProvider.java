@@ -113,7 +113,12 @@ public class MaskedSkinProvider {
         generatedConfig = config;
         generatedId = dynamicTextureManager.generateUniqueId(generatedSkin.toString().replace(':', '/'));
         //#if MC>=12104
-        //$$ dynamicTextureManager.register(this, generatedId, new NativeImageBackedTexture(toUImage(generatedTexture).getNativeImage()));
+        //$$ dynamicTextureManager.register(this, generatedId, new NativeImageBackedTexture(
+            //#if MC>=12105
+            //$$ () -> skin + " (masked)",
+            //#endif
+        //$$     toUImage(generatedTexture).getNativeImage()
+        //$$ ));
         //#else
         dynamicTextureManager.register(this, generatedId, new MaskedSkinTexture(toUImage(generatedTexture)));
         //#endif

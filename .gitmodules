@@ -1,3 +1,6 @@
 [submodule "loader"]
 	path = loader
 	url = ../../EssentialGG/EssentialLoader.git
+[submodule "subprojects/pseudotcp/upstream"]
+	path = subprojects/pseudotcp/upstream
+	url = https://github.com/jitsi/jitsi-pseudotcp

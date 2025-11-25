@@ -47,9 +47,9 @@ class WearablesManager(
                 .map { (cosmetic, bedrockModel) ->
                     val wearable = oldModels[cosmetic]
                     if (wearable == null) {
-                        ModelInstance(bedrockModel, entity, animationTargets) { onAnimation(cosmetic, it) }
+                        ModelInstance(bedrockModel, entity, animationTargets, newState) { onAnimation(cosmetic, it) }
                     } else {
-                        wearable.switchModel(bedrockModel)
+                        wearable.switchModel(bedrockModel, newState)
                         wearable
                     }
                 }
@@ -79,53 +79,76 @@ class WearablesManager(
         updateState(state.copyWithout(slot))
     }
 
-    /** @see ModelInstance.update */
+    private var lastUpdateTime = Float.NEGATIVE_INFINITY
+
+    /**
+     * Updates the state of the models for the current frame prior to rendering.
+     *
+     * Note that new animation events are emitted into [ModelAnimationState.pendingEvents] and the caller needs to
+     * collect them from there and forward them to the actual particle/sound/etc system at the appropriate time.
+     *
+     * Also note that this does **not** yet update the locators bound to these model instances. For that one must call
+     * [updateLocators] after rendering.
+     * This is because the position and rotation of locators depends on the final rendered player pose, which is only
+     * available after rendering.
+     * Because particle events may depend on the position of locators, they should however ideally be updated before
+     * particles are updated, rendered, and/or spawned.
+     */
     fun update() {
-        for ((_, model) in models) {
-            model.update()
+        if (models.isEmpty()) return
+
+        val now = entity.lifeTime
+        if (lastUpdateTime == now) return // was already updated this frame
+        lastUpdateTime = now
+
+        val modelInstances = models.values
+
+        // update animations
+        modelInstances.forEach {
+            it.essentialAnimationSystem.maybeFireTextureAnimationStartEvent()
+            it.essentialAnimationSystem.updateAnimationState()
         }
+
+        // trigger any animations that are supposed to be triggered in other models
+        // run after all models have already updated without this interference
+        modelInstances.forEach { it.essentialAnimationSystem.triggerPendingAnimationsForOtherModels(modelInstances) }
+
+        // update effects after all animations have been updated
+        modelInstances.forEach { it.animationState.updateEffects() }
     }
 
     /** @see ModelInstance.updateLocators */
-    fun updateLocators(renderedPose: PlayerPose?) {
+    fun updateLocators(renderedPose: PlayerPose) {
         for ((_, model) in models) {
-            model.updateLocators(renderedPose)
+            model.updateLocators(renderedPose, state)
         }
     }
 
     fun render(
         matrixStack: UMatrixStack,
-        vertexConsumerProvider: RenderBackend.VertexConsumerProvider,
+        queue: RenderBackend.CommandQueue,
         pose: PlayerPose,
         skin: RenderBackend.Texture,
         parts: Set<EnumPart> = EnumPart.values().toSet(),
     ) {
-        for ((_, model) in models) {
-            if (model.model.translucent && translucentTextureAtlas != null) {
-                continue // will do these later in a single final pass
-            }
-            render(matrixStack, vertexConsumerProvider, model, pose, skin, parts)
-        }
-
         val atlas = translucentTextureAtlas
-        if (atlas != null) {
-            vertexConsumerProvider.provide(atlas.atlasTexture, false) { vertexConsumer ->
-                val atlasVertexConsumerProvider = RenderBackend.VertexConsumerProvider { texture, emissive, block ->
-                    assert(!emissive)
-                    block(atlas.offsetVertexConsumer(texture, vertexConsumer))
-                }
-                for ((_, model) in models) {
-                    if (model.model.translucent) {
-                        render(matrixStack, atlasVertexConsumerProvider, model, pose, skin, parts)
+        for ((_, model) in models) {
+            val modelQueue = if (model.model.translucent && atlas != null) {
+                RenderBackend.CommandQueue { texture, translucent, emissive, render ->
+                    queue.submit(atlas.atlasTexture, translucent, emissive) { vertexConsumer ->
+                        render(atlas.offsetVertexConsumer(texture, vertexConsumer))
                     }
                 }
+            } else {
+                queue
             }
+            render(matrixStack, modelQueue, model, pose, skin, parts)
         }
     }
 
     fun render(
         matrixStack: UMatrixStack,
-        vertexConsumerProvider: RenderBackend.VertexConsumerProvider,
+        queue: RenderBackend.CommandQueue,
         model: ModelInstance,
         pose: PlayerPose,
         skin: RenderBackend.Texture,
@@ -137,13 +160,12 @@ class WearablesManager(
             pose,
             skin,
             0,
-            1 / 16f,
             state.sides[cosmetic.id],
             state.hiddenBones[cosmetic.id] ?: emptySet(),
             state.getPositionAdjustment(cosmetic),
             parts - state.hiddenParts.getOrDefault(cosmetic.id, emptySet()),
         )
-        model.render(matrixStack, vertexConsumerProvider, state.rootBones.getValue(cosmetic.id), renderMetadata)
+        model.render(matrixStack, queue, state.renderGeometries.getValue(cosmetic.id), renderMetadata)
     }
 
     fun collectEvents(consumer: (ModelAnimationState.Event) -> Unit) {

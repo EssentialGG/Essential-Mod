@@ -7,7 +7,7 @@ modId="essential"
 version="${file.jarVersion}"
 displayName="Essential"
 displayURL="https://essential.gg/"
-description="Provides essential features to Minecraft and our Partners."
+description="Enhances your Minecraft with powerful features. Host worlds for free. Chat with friends. Create custom outfits. React with emotes. And many quality of life improvements!"
 
 [[dependencies.essential]]
     modId="forge"

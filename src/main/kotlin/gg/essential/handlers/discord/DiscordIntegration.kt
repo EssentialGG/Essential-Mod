@@ -14,7 +14,6 @@ package gg.essential.handlers.discord
 import dev.cbyrne.kdiscordipc.KDiscordIPC
 import dev.cbyrne.kdiscordipc.core.error.ConnectionError
 import dev.cbyrne.kdiscordipc.core.event.DiscordEvent
-import dev.cbyrne.kdiscordipc.core.event.impl.ActivityInviteEvent
 import dev.cbyrne.kdiscordipc.core.event.impl.ActivityJoinEvent
 import dev.cbyrne.kdiscordipc.core.event.impl.ErrorEvent
 import dev.cbyrne.kdiscordipc.core.event.impl.ReadyEvent
@@ -24,21 +23,12 @@ import dev.cbyrne.kdiscordipc.data.activity.party
 import dev.cbyrne.kdiscordipc.data.activity.secrets
 import dev.cbyrne.kdiscordipc.data.activity.smallImage
 import gg.essential.Essential
-import gg.essential.api.gui.NotificationType
-import gg.essential.api.gui.Slot
 import gg.essential.config.EssentialConfig
 import gg.essential.data.VersionData
 import gg.essential.event.client.PostInitializationEvent
 import gg.essential.event.client.ReAuthEvent
-import gg.essential.gui.EssentialPalette
 import gg.essential.gui.elementa.state.v2.ReferenceHolderImpl
-import gg.essential.gui.layoutdsl.Modifier
-import gg.essential.gui.layoutdsl.color
-import gg.essential.gui.layoutdsl.hoverColor
-import gg.essential.gui.layoutdsl.shadow
-import gg.essential.gui.notification.Notifications
-import gg.essential.gui.notification.markdownBody
-import gg.essential.gui.notification.toastButton
+import gg.essential.gui.elementa.state.v2.memo
 import gg.essential.handlers.discord.activity.ActivityState
 import gg.essential.handlers.discord.activity.provider.ActivityStateProvider
 import gg.essential.handlers.discord.activity.provider.impl.GameActivityStateProvider
@@ -46,10 +36,10 @@ import gg.essential.handlers.discord.activity.provider.impl.GuiActivityStateProv
 import gg.essential.handlers.discord.extensions.fullUsername
 import gg.essential.handlers.discord.party.PartyInformation
 import gg.essential.handlers.discord.party.PartyManager
+import gg.essential.network.connectionmanager.skins.PlayerSkinLookup
 import gg.essential.universal.UMinecraft
 import gg.essential.util.ServerType
 import gg.essential.util.USession
-import gg.essential.util.colored
 import gg.essential.util.kdiscordipc.KDiscordIPCLoader
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -57,7 +47,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import me.kbrewster.eventbus.Subscribe
-import java.awt.Color
 import java.util.*
 import kotlin.concurrent.fixedRateTimer
 
@@ -155,6 +144,7 @@ object DiscordIntegration {
                 discordAllowAskToJoinState,
                 discordShowUsernameAndAvatarState,
                 discordShowCurrentServerState,
+                memo { PlayerSkinLookup.getSkin(USession.active().uuid)()?.hash }
             )
         }.forEach { state ->
             state.onSetValue(referenceHolder) { _ ->
@@ -191,28 +181,6 @@ object DiscordIntegration {
                     hostJoinSecret = data.secret
                 } catch (e: Exception) {
                     Essential.logger.error("Failed to join party $data: $e", e)
-                }
-            }
-
-            ipc.on<ActivityInviteEvent> {
-                // We only want to show the world join request toast if you are Discord friends with the sender.
-                val relationships = ipc.relationshipManager.getRelationships()
-                if (relationships.any { it.user.id == data.user.id }) {
-                    Notifications.pushPersistentToast("Discord Game Invite", "", {}, {}) {
-                        type = NotificationType.DISCORD
-                        withCustomComponent(Slot.ICON, EssentialPalette.ENVELOPE_9X7.create())
-                        val colouredUsername = data.user.fullUsername.colored(EssentialPalette.TEXT_HIGHLIGHT)
-                        markdownBody("$colouredUsername sent you an invite to join their world.")
-                        val button = toastButton(
-                            "Join",
-                            backgroundModifier = Modifier.color(EssentialPalette.BLUE_BUTTON).hoverColor(EssentialPalette.BLUE_BUTTON_HOVER).shadow(
-                                Color.BLACK),
-                            textModifier = Modifier.color(EssentialPalette.TEXT_HIGHLIGHT).shadow(EssentialPalette.TEXT_SHADOW)
-                        ) {
-                            scope.launch { ipc.activityManager.acceptInvite(data) }
-                        }
-                        withCustomComponent(Slot.ACTION, button)
-                    }
                 }
             }
 
@@ -271,7 +239,10 @@ object DiscordIntegration {
             largeImage("icon")
 
             if (EssentialConfig.discordShowUsernameAndAvatar) {
-                smallImage("https://crafthead.net/helm/${session.uuid}", session.username)
+                val skin = PlayerSkinLookup.getSkin(session.uuid).getUntracked()
+                if (skin != null) {
+                    smallImage("https://crafthead.net/helm/${skin.hash.padStart(64, '0')}", session.username)
+                }
             }
 
             if (EssentialConfig.discordAllowAskToJoin) {

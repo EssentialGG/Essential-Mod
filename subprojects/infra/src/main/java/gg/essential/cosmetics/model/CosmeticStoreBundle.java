@@ -12,7 +12,9 @@
 package gg.essential.cosmetics.model;
 
 import gg.essential.cosmetics.CosmeticSlot;
+import gg.essential.lib.gson.annotations.SerializedName;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
@@ -23,12 +25,13 @@ public class CosmeticStoreBundle {
 
     private final @NotNull String name;
 
-    private final @NotNull CosmeticStoreBundleSkin skin;
+    private final @Nullable CosmeticStoreBundleSkin skin;
 
     private final @NotNull CosmeticTier tier;
 
     private final float discount;
 
+    @SerializedName("rotate_on_preview")
     private final boolean rotateOnPreview;
 
     private final @NotNull Map<@NotNull CosmeticSlot, @NotNull String> cosmetics;
@@ -39,7 +42,7 @@ public class CosmeticStoreBundle {
     public CosmeticStoreBundle(
         @NotNull String id,
         @NotNull String name,
-        @NotNull CosmeticStoreBundleSkin skin,
+        @Nullable CosmeticStoreBundleSkin skin,
         @NotNull CosmeticTier tier,
         float discount,
         boolean rotateOnPreview,
@@ -64,7 +67,7 @@ public class CosmeticStoreBundle {
         return name;
     }
 
-    public @NotNull CosmeticStoreBundleSkin getSkin() {
+    public @Nullable CosmeticStoreBundleSkin getSkin() {
         return skin;
     }
 

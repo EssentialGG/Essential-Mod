@@ -36,7 +36,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -44,8 +46,9 @@ import java.util.function.Consumer;
 
 public class ConnectionCodec {
     private static final String PACKET_PACKAGE = "gg.essential.connectionmanager.common.packet.";
-    private static final byte[] EMPTY_BYTE_ARRAY = new byte[]{};
     private static final boolean LOG_PACKETS = System.getProperty("essential.logPackets", "false").equals("true");
+
+    private final Consumer<Connection.IOConsumer<PrintStream>> log;
 
     @NotNull
     private final AtomicInteger packetTypeId = new AtomicInteger();
@@ -69,6 +72,10 @@ public class ConnectionCodec {
         this.outgoingPacketTypeIds.put(packetName, 0);
     }
 
+    ConnectionCodec(Consumer<Connection.IOConsumer<PrintStream>> log) {
+        this.log = log;
+    }
+
     @Nullable
     public Packet decode(byte[] array) {
         final Packet packet;
@@ -81,6 +88,7 @@ public class ConnectionCodec {
 
             if (packetName == null) {
                 Essential.logger.warn("Unknown packet type id {} from connection manager.", packetTypeId);
+                log.accept(out -> out.printf("-- protocol error: unknown packet type id %d --\n", packetTypeId));
                 return null;
             }
 
@@ -102,10 +110,12 @@ public class ConnectionCodec {
             if (LOG_PACKETS) {
                 Essential.debug.info("IN " + packetId + " - " + packetName + " " + jsonString);
             }
+            log.accept(out -> out.printf("{\"type\": \"RECV\", \"name\": \"%s\", \"payload\": %s, \"id\": \"%s\"}\n", packetName, jsonString, packetIdString));
             try {
                 packet = gson.fromJson(jsonString, packetClass);
             } catch (final JsonParseException e) {
                 Essential.logger.error("Error when deserialising json '{}' for '{}'.", jsonString, packetClass, e);
+                log.accept(out -> out.print("-- protocol error: failed to parse above json --\n"));
                 return null;
             }
 
@@ -114,6 +124,7 @@ public class ConnectionCodec {
             }
         } catch (final IOException e) {
             Essential.logger.error("Error when reading byte buffer data '{}'.", array, e);
+            log.accept(out -> out.printf("-- protocol error: failed to read %s --\n", Arrays.toString(array)));
             return null;
         }
 
@@ -127,9 +138,10 @@ public class ConnectionCodec {
     }
 
     public void encode(Packet packet, Consumer<byte[]> send) {
+        String packetName = splitPacketPackage(packet.getClass());
         final int packetTypeId = this.outgoingPacketTypeIds.computeIfAbsent(
-            this.splitPacketPackage(packet.getClass()),
-            packetName -> {
+            packetName,
+            packetName_ -> {
                 final int newId = this.packetTypeId.incrementAndGet();
 
                 encode(new ConnectionRegisterPacketTypeIdPacket(packetName, newId), send);
@@ -139,14 +151,15 @@ public class ConnectionCodec {
 
         final UUID packetId = packet.getPacketUniqueId();
 
-        final byte[]
-            packetBytes = gson.toJson(packet).getBytes(StandardCharsets.UTF_8),
-            /* Construct a unique packet id for the packet we are sending if we need to. */
-            packetIdBytes = (packetId != null ? packetId.toString().getBytes(StandardCharsets.UTF_8) : EMPTY_BYTE_ARRAY);
+        String packetJson = gson.toJson(packet);
+        byte[] packetBytes = packetJson.getBytes(StandardCharsets.UTF_8);
+        String packetIdString = packetId != null ? packetId.toString() : "";
+        byte[] packetIdBytes = packetIdString.getBytes(StandardCharsets.UTF_8);
 
         if (LOG_PACKETS) {
-            Essential.debug.info("OUT " + packetId + " - " + splitPacketPackage(packet.getClass()) + " " + new String(packetBytes));
+            Essential.debug.info("OUT " + packetId + " - " + packetName + " " + packetJson);
         }
+        log.accept(out -> out.printf("{\"type\": \"SEND\", \"name\": \"%s\", \"payload\": %s, \"id\": \"%s\"}\n", packetName, packetJson, packetIdString));
         try (
             final ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
             final DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream)

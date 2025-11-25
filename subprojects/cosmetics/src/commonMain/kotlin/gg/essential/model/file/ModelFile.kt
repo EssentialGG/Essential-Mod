@@ -21,6 +21,8 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 import kotlinx.serialization.builtins.FloatArraySerializer
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonContentPolymorphicSerializer
@@ -75,10 +77,10 @@ data class ModelFile(
     @Serializable(with = UvsSerializer::class)
     sealed class Uvs {
         @Serializable(with = UvBoxSerializer::class)
-        class Box(val uv: FloatArray) : Uvs()
+        data class Box(val uv: List<Float>) : Uvs()
 
         @Serializable
-        class PerFace(
+        data class PerFace(
             val north: UvFace? = null,
             val east: UvFace? = null,
             val south: UvFace? = null,
@@ -89,10 +91,10 @@ data class ModelFile(
     }
 
     @Serializable
-    class UvFace(
-        val uv: FloatArray,
+    data class UvFace(
+        val uv: List<Float>,
         @SerialName("uv_size")
-        val size: FloatArray,
+        val size: List<Float>,
     )
 }
 
@@ -114,7 +116,7 @@ private class UvsSerializer : JsonContentPolymorphicSerializer<ModelFile.Uvs>(Mo
 }
 
 private class UvBoxSerializer : KSerializer<ModelFile.Uvs.Box> {
-    private val inner = FloatArraySerializer()
+    private val inner = ListSerializer(Float.serializer())
     override val descriptor = inner.descriptor
     override fun deserialize(decoder: Decoder): ModelFile.Uvs.Box = ModelFile.Uvs.Box(inner.deserialize(decoder))
     override fun serialize(encoder: Encoder, value: ModelFile.Uvs.Box) = inner.serialize(encoder, value.uv)

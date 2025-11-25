@@ -13,6 +13,7 @@ package gg.essential.gui.layoutdsl
 
 import gg.essential.elementa.components.UIContainer
 import gg.essential.elementa.components.Window
+import gg.essential.elementa.components.inspector.Inspector
 import gg.essential.gui.elementa.state.v2.MutableState
 import gg.essential.gui.elementa.state.v2.mutableStateOf
 import gg.essential.universal.UMatrixStack
@@ -32,6 +33,8 @@ fun LayoutScope.lazyBox(modifier: Modifier = Modifier.fillParent(), block: Layou
         } `else` {
             LazyComponent(initialized)(Modifier.fillParent())
         }
+    }.apply {
+        automaticComponentName("lazyBox")
     }
 }
 
@@ -43,4 +46,9 @@ private class LazyComponent(private val initialized: MutableState<Boolean>) : UI
             initialized.set(true)
         }
     }
+}
+
+@Suppress("unused")
+private val init = run {
+    Inspector.registerComponentFactory(null)
 }

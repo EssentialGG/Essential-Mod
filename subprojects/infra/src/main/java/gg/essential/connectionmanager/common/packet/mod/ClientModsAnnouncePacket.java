@@ -113,7 +113,7 @@ public class ClientModsAnnouncePacket extends Packet {
 
     public static enum Platform {
 
-        FORGE, FABRIC
+        FORGE, FABRIC, NEOFORGE
 
     }
 

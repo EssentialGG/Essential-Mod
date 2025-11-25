@@ -17,6 +17,7 @@ import gg.essential.elementa.components.Window
 import gg.essential.elementa.constraints.*
 import gg.essential.elementa.dsl.*
 import gg.essential.elementa.effects.ScissorEffect
+import gg.essential.elementa.utils.roundToRealPixels
 import gg.essential.gui.EssentialPalette
 import gg.essential.gui.elementa.lazyHeight
 import gg.essential.gui.elementa.state.v2.*
@@ -30,9 +31,10 @@ import java.awt.Color
 class EssentialDropDown<T>(
     initialSelection: T,
     private val items: ListState<Option<T>>,
-    var maxHeight: Float = Float.MAX_VALUE,
+    val maxHeight: Float = Float.MAX_VALUE,
     val compact: State<Boolean> = stateOf(false),
     val disabled: State<Boolean> = stateOf(false),
+    val isPopupMenu: Boolean = false,
 ) : UIBlock() {
 
     private val mutableExpandedState: MutableState<Boolean> = mutableStateOf(false)
@@ -45,24 +47,35 @@ class EssentialDropDown<T>(
     private val mainButtonTextHoverColor = disabled.map { if(it) EssentialPalette.TEXT_DISABLED else EssentialPalette.TEXT_HIGHLIGHT }
 
 
-    private val dropdownColorState = stateBy {
+    private val dropdownColorState = memo {
         when {
             disabled() -> EssentialPalette.COMPONENT_BACKGROUND
             mutableExpandedState() -> highlightedColor
             else -> EssentialPalette.COMPONENT_BACKGROUND_HIGHLIGHT
         }
-    }.toV1(this@EssentialDropDown)
-    private val dropdownHoverColorState = disabled.map { if(it) EssentialPalette.COMPONENT_BACKGROUND else highlightedColor }.toV1(this@EssentialDropDown)
+    }
+    private val dropdownHoverColorState = disabled.map { if(it) EssentialPalette.COMPONENT_BACKGROUND else highlightedColor }
 
     private val optionTextPadding = 5f
     private val iconContainerWidth = 15f
-    private val maxItemWidthState = stateBy { items().maxOfOrNull { it.textState().width() + 2 * optionTextPadding + iconContainerWidth } ?: 50f }
+    private val maxItemWidthState = memo { items().maxOfOrNull { it.textState().width() + 2 * optionTextPadding + iconContainerWidth } ?: 50f }
 
     /** Public States **/
-    val selectedOption: MutableState<Option<T>> = mutableStateOf(items.get().first { it.value == initialSelection })
+    val selectedOption: MutableState<Option<T>> = mutableStateOf(items.getUntracked().first { it.value == initialSelection })
     val expandedState: State<Boolean> = mutableExpandedState
 
     init {
+        if (isPopupMenu) {
+            layoutAsPopup()
+        } else {
+            layoutAsDropDown()
+        }
+    }
+
+    private fun Modifier.customWidth() =
+        this then BasicWidthModifier { basicWidthConstraint { maxItemWidthState.getUntracked() } }
+
+    private fun LayoutScope.menuContent() {
 
         fun LayoutScope.option(option: Option<T>) {
             val colorModifier = Modifier
@@ -73,7 +86,7 @@ class EssentialDropDown<T>(
 
             row(Modifier.height(15f).fillWidth().color(componentBackgroundColor).hoverColor(componentBackgroundHighlightColor).hoverScope(), Arrangement.SpaceBetween) {
                 box(Modifier.childBasedWidth(optionTextPadding)) {
-                    text(option.textState.toV1(this@EssentialDropDown), colorModifier, centeringContainsShadow = false)
+                    text(option.textState, colorModifier, centeringContainsShadow = false)
                 }
                 box(Modifier.width(iconContainerWidth)) {
                     if_(selectedOption.map { it == option }) {
@@ -81,7 +94,7 @@ class EssentialDropDown<T>(
                     }
                 }
             }.onLeftClick {
-                if(disabled.get())
+                if(disabled.getUntracked())
                     return@onLeftClick
 
                 USound.playButtonPress()
@@ -90,8 +103,6 @@ class EssentialDropDown<T>(
             }
 
         }
-
-        fun Modifier.customWidth() = this then BasicWidthModifier { basicWidthConstraint { maxItemWidthState.get() } }
 
         fun Modifier.maxSiblingHeight() = this then BasicHeightModifier {
             basicHeightConstraint { it.parent.children.maxOfOrNull { child -> if (child === it) 0f else child.getHeight() } ?: 1f }
@@ -116,49 +127,68 @@ class EssentialDropDown<T>(
             return@then { constraints.height = originalHeightConstraint }
         }
 
-        val arrowIconState = mutableExpandedState.map {
-            if (it) {
-                EssentialPalette.ARROW_UP_7X4
-            } else {
-                EssentialPalette.ARROW_DOWN_7X4
+        val scrollBar: UIComponent
+        val scrollComponent = scrollable(Modifier.fillWidth(padding = 2f).limitHeight(), vertical = true) {
+            column(
+                Modifier.childBasedHeight(3f).fillWidth().color(componentBackgroundColor),
+                Arrangement.spacedBy(0f, FloatPosition.CENTER)
+            ) {
+                forEach(items) {
+                    option(it)
+                }
             }
-        }.toV1(this@EssentialDropDown)
+        }
+        box(Modifier.maxSiblingHeight().width(2f).alignHorizontal(Alignment.End)) {
+            scrollBar = box(Modifier.fillWidth().color(EssentialPalette.TEXT_DISABLED))
+        }
+        scrollComponent.setVerticalScrollBarComponent(scrollBar, true)
+    }
 
+    private fun LayoutScope.dropdownButton() {
+        val iconState = if (isPopupMenu) {
+            stateOf(EssentialPalette.ARROW_UP_DOWN_5X7)
+        } else {
+            mutableExpandedState.map { if (it) EssentialPalette.ARROW_UP_7X4 else EssentialPalette.ARROW_DOWN_7X4 }
+        }
+        box(Modifier.fillParent().color(dropdownColorState).hoverColor(dropdownHoverColorState).shadow().hoverScope()) {
+            if_(compact) {
+                icon(
+                    EssentialPalette.FILTER_6X5,
+                    Modifier.color(EssentialPalette.TEXT).hoverColor(EssentialPalette.TEXT_HIGHLIGHT).shadow()
+                )
+            } `else` {
+                text(
+                    { selectedOption().textState() },
+                    Modifier
+                        .alignHorizontal(Alignment.Start(7f))
+                        .color(mainButtonTextColor).hoverColor(mainButtonTextHoverColor)
+                        .shadow(EssentialPalette.TEXT_SHADOW),
+                    centeringContainsShadow = false,
+                )
+                icon(iconState, Modifier.alignVertical(Alignment.Center(true))
+                    .alignHorizontal(Alignment.End(if (isPopupMenu) 6f else 7f))
+                    .color(mainButtonTextColor).hoverColor(mainButtonTextHoverColor))
+            }
+        }.onLeftClick { event ->
+            if (disabled.getUntracked())
+                return@onLeftClick
+
+            USound.playButtonPress()
+            event.stopPropagation()
+
+            if (mutableExpandedState.getUntracked()) {
+                collapse()
+            } else {
+                expand()
+            }
+        }
+    }
+
+    private fun layoutAsDropDown() {
         componentName = "dropdown"
-
         this.layout(Modifier.height(17f).whenTrue(compact, Modifier.widthAspect(1f), Modifier.customWidth())) {
             column(Modifier.fillParent(), Arrangement.spacedBy(0f, FloatPosition.START), Alignment.Start) {
-                box(Modifier.fillParent().color(dropdownColorState).hoverColor(dropdownHoverColorState).shadow().hoverScope()) {
-                    if_(compact) {
-                        icon(
-                            EssentialPalette.FILTER_6X5,
-                            Modifier.color(EssentialPalette.TEXT).hoverColor(EssentialPalette.TEXT_HIGHLIGHT).shadow()
-                        )
-                    } `else` {
-                        text(
-                            stateBy { selectedOption().textState() }.toV1(this@EssentialDropDown),
-                            Modifier
-                                .alignHorizontal(Alignment.Start(7f))
-                                .color(mainButtonTextColor).hoverColor(mainButtonTextHoverColor)
-                                .shadow(EssentialPalette.TEXT_SHADOW),
-                            centeringContainsShadow = false,
-                        )
-                        icon(arrowIconState, Modifier.alignVertical(Alignment.Center(true)).alignHorizontal(Alignment.End(7f))
-                            .color(mainButtonTextColor).hoverColor(mainButtonTextHoverColor))
-                    }
-                }.onLeftClick { event ->
-                    if (disabled.get())
-                        return@onLeftClick
-
-                    USound.playButtonPress()
-                    event.stopPropagation()
-
-                    if (mutableExpandedState.get()) {
-                        collapse()
-                    } else {
-                        expand()
-                    }
-                }
+                dropdownButton()
 
                 if_(compact) {
                     spacer(height = 2f)
@@ -172,7 +202,7 @@ class EssentialDropDown<T>(
                     }
                 }
 
-                val heightModifierState = stateBy {
+                val heightModifierState = memo {
                     if (compact()) {
                         BasicHeightModifier(heightConstraintState())
                     } else {
@@ -185,21 +215,43 @@ class EssentialDropDown<T>(
                         .color(highlightedColor).shadow().effect { ScissorEffect() }
                         .then(heightModifierState)
                 ) {
-                    val scrollBar: UIComponent
-                    val scrollComponent = scrollable(Modifier.fillWidth(padding = 2f).limitHeight(), vertical = true) {
-                        column(
-                            Modifier.childBasedHeight(3f).fillWidth().color(componentBackgroundColor),
-                            Arrangement.spacedBy(0f, FloatPosition.CENTER)
-                        ) {
-                            forEach(items) {
-                                option(it)
-                            }
-                        }
+                    menuContent()
+                }
+            }
+        }
+    }
+
+    private fun layoutAsPopup() {
+        effect(this) {
+            if (compact()) TODO() // `compact` is not yet supported by the popup menu
+        }
+        if (maxHeight != Float.MAX_VALUE) TODO() // `maxHeight` is not yet supported by the popup menu
+
+        componentName = "dropdownPopup"
+        this.layout(Modifier.height(17f).customWidth()) {
+            dropdownButton()
+            val contentPadding = 5
+            val optionHeight = 15f
+            val contentAbove = memo { contentPadding + items().indexOf(selectedOption()) * optionHeight }
+            val contentBelow = memo { items().let { it.size - it.indexOf(selectedOption()) - 1 } * optionHeight + contentPadding }
+            val targetAbove = State { if (mutableExpandedState()) contentAbove() else 0f }
+            val targetBelow = State { if (mutableExpandedState()) contentBelow() else 0f }
+            val animatedAbove = targetAbove.animateTransitions(this@EssentialDropDown, 0.25f).map { it.roundToRealPixels() }
+            val animatedBelow = targetBelow.animateTransitions(this@EssentialDropDown, 0.25f).map { it.roundToRealPixels() }
+            val scissorSize = State { animatedAbove() + optionHeight + animatedBelow() }
+            val scissorOffset = State { -animatedAbove() }
+            val innerOffset = State { -scissorOffset() - contentAbove() }
+            val scissorHeightAndAlignment = State { Modifier.height(scissorSize()).alignVertical(Alignment.Start(1f + scissorOffset())) }
+            val innerAlignment = State { Modifier.alignVertical(Alignment.Start(innerOffset())) }
+            if_(expandedState) {
+                floatingBox(
+                    Modifier.fillWidth()
+                        .color(highlightedColor).shadow().effect { ScissorEffect() }
+                        .then(scissorHeightAndAlignment)
+                ) {
+                    box(Modifier.fillWidth().childBasedMaxHeight(2f).then(innerAlignment)) {
+                        menuContent()
                     }
-                    box(Modifier.maxSiblingHeight().width(2f).alignHorizontal(Alignment.End)) {
-                        scrollBar = box(Modifier.fillWidth().color(EssentialPalette.TEXT_DISABLED))
-                    }
-                    scrollComponent.setVerticalScrollBarComponent(scrollBar, true)
                 }
             }
         }

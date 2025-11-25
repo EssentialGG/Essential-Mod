@@ -11,24 +11,24 @@
  */
 package gg.essential.cosmetics.boxmask
 
-import gg.essential.model.Bone
 import gg.essential.model.Box3
+import gg.essential.model.Cube
 import gg.essential.model.Face
+import gg.essential.model.RenderGeometry
 import kotlin.math.min
 
 // TODO clean up
 class ModelClipperImpl : ModelClipper {
-    override fun compute(bone: Bone, masks: List<Box3>): Bone {
+    override fun compute(geometry: RenderGeometry, masks: List<Box3>): RenderGeometry {
         if (masks.isEmpty()) {
-            return bone
+            return geometry
         }
-        val modifiedBone = bone.deepCopy()
-        apply(modifiedBone, masks)
-        return modifiedBone
+        return geometry.map { apply(it, masks) }
     }
 
-    private fun apply(bone: Bone, renderExclusions: List<Box3>) {
-        for (cube in bone.cubeList) {
+    private fun apply(cubeList: List<Cube>, renderExclusions: List<Box3>): List<Cube> {
+        return cubeList.map { orgCube ->
+            val cube = orgCube.deepCopy()
             val iterator = cube.getQuadList().iterator()
             val newFaces = mutableListOf<Face>()
             //We detect if this face enters a region that we don't want to cosmetics inside of.
@@ -75,9 +75,7 @@ class ModelClipperImpl : ModelClipper {
                 }
             }
             cube.getQuadList().addAll(newFaces)
-        }
-        for (childModel in bone.childModels) {
-            apply(childModel, renderExclusions)
+            cube
         }
     }
 

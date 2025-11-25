@@ -15,6 +15,7 @@ import gg.essential.Essential;
 import gg.essential.event.gui.GuiDrawScreenEvent;
 import gg.essential.universal.UMatrixStack;
 import gg.essential.universal.UMouse;
+import gg.essential.util.UDrawContext;
 import net.minecraft.client.MinecraftClient;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
@@ -41,7 +42,7 @@ public class Mixin_FancyMainMenu_2_14_10_GuiDrawScreenEvent_Pre extends Mixin_Fa
 
         Essential.EVENT_BUS.post(new GuiDrawScreenEvent(
             event.invokeGetGui(),
-            new UMatrixStack(event.invokeGetDrawContext().getMatrices()),
+            new UDrawContext(event.invokeGetDrawContext(), new UMatrixStack(event.invokeGetDrawContext().getMatrices())),
             (int) UMouse.Scaled.getX(),
             (int) UMouse.Scaled.getY(),
             MinecraftClient.getInstance().getLastFrameDuration(),

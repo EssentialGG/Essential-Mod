@@ -36,7 +36,7 @@ private fun CosmeticsDataWithChanges.updateCosmetic(cosmeticId: CosmeticId, func
  */
 fun CosmeticsDataWithChanges.removeCosmeticProperty(cosmeticId: CosmeticId, property: CosmeticProperty) {
     updateCosmetic(cosmeticId) {
-        copy(properties = properties - property)
+        copy(allProperties = allProperties - property)
     }
 }
 
@@ -46,7 +46,7 @@ fun CosmeticsDataWithChanges.removeCosmeticProperty(cosmeticId: CosmeticId, prop
  */
 fun CosmeticsDataWithChanges.addCosmeticProperty(cosmeticId: CosmeticId, property: CosmeticProperty) {
     updateCosmetic(cosmeticId) {
-        copy(properties = properties.removeSingletonPropertyType(property.type) + property)
+        copy(allProperties = allProperties.removeSingletonPropertyType(property.type) + property)
     }
 }
 
@@ -69,10 +69,11 @@ fun CosmeticsDataWithChanges.setCosmeticSingletonPropertyEnabled(
     enabled: Boolean,
 ) {
     updateCosmetic(cosmeticId) {
-        val existingProperty = properties.find { it.type == type }
+        val existingProperty = allProperties.find { it.type == type }
         if (existingProperty != null) {
             val updatedProperty = when (existingProperty) {
                 is CosmeticProperty.ArmorHandling -> existingProperty.copy(enabled = enabled)
+                is CosmeticProperty.ArmorHandlingV2 -> existingProperty.copy(enabled = enabled)
                 is CosmeticProperty.PositionRange -> existingProperty.copy(enabled = enabled)
                 is CosmeticProperty.InterruptsEmote -> existingProperty.copy(enabled = enabled)
                 is CosmeticProperty.Localization -> existingProperty.copy(enabled = enabled)
@@ -82,18 +83,26 @@ fun CosmeticsDataWithChanges.setCosmeticSingletonPropertyEnabled(
                 is CosmeticProperty.Variants -> existingProperty.copy(enabled = enabled)
                 is CosmeticProperty.DefaultSide -> existingProperty.copy(enabled = enabled)
                 is CosmeticProperty.MutuallyExclusive -> existingProperty.copy(enabled = enabled)
+                is CosmeticProperty.HidesAllOtherCosmeticsOrItems -> existingProperty.copy(enabled = enabled)
+                is CosmeticProperty.LocksPlayerRotation -> existingProperty.copy(enabled = enabled)
 
                 is CosmeticProperty.CosmeticBoneHiding,
                 is CosmeticProperty.ExternalHiddenBone,
                 is CosmeticProperty.Unknown -> throw IllegalArgumentException("$type is not a singleton property")
             }
-            copy(properties = properties - existingProperty + updatedProperty)
+            copy(allProperties = allProperties - existingProperty + updatedProperty)
         } else {
             val newProperty = when (type) {
                 CosmeticPropertyType.ARMOR_HANDLING -> CosmeticProperty.ArmorHandling(
-                    "UNUSED",
+                    cosmeticId,
                     enabled,
                     CosmeticProperty.ArmorHandling.Data()
+                )
+
+                CosmeticPropertyType.ARMOR_HANDLING_V2 -> CosmeticProperty.ArmorHandlingV2(
+                    cosmeticId,
+                    enabled,
+                    CosmeticProperty.ArmorHandlingV2.Data()
                 )
 
                 CosmeticPropertyType.POSITION_RANGE -> CosmeticProperty.PositionRange(
@@ -106,6 +115,17 @@ fun CosmeticsDataWithChanges.setCosmeticSingletonPropertyEnabled(
                     "UNUSED",
                     enabled,
                     CosmeticProperty.InterruptsEmote.Data()
+                )
+                CosmeticPropertyType.ALL_OTHER_COSMETIC_OR_ITEM_HIDING -> CosmeticProperty.HidesAllOtherCosmeticsOrItems(
+                    "UNUSED",
+                    enabled,
+                    CosmeticProperty.HidesAllOtherCosmeticsOrItems.Data()
+                )
+
+                CosmeticPropertyType.LOCKS_PLAYER_ROTATION -> CosmeticProperty.LocksPlayerRotation(
+                    "UNUSED",
+                    enabled,
+                    CosmeticProperty.LocksPlayerRotation.Data()
                 )
 
                 CosmeticPropertyType.LOCALIZATION -> CosmeticProperty.Localization(
@@ -158,7 +178,7 @@ fun CosmeticsDataWithChanges.setCosmeticSingletonPropertyEnabled(
                 CosmeticPropertyType.EXTERNAL_HIDDEN_BONE -> throw IllegalArgumentException("$type is not a singleton property")
 
             }
-            copy(properties = properties + newProperty)
+            copy(allProperties = allProperties + newProperty)
         }
     }
 }
@@ -209,9 +229,9 @@ fun CosmeticsDataWithChanges.setCosmeticTags(cosmeticId: CosmeticId, tags: Set<S
 /**
  * Sets the availability window of the cosmetic with id [cosmeticId] to [availableAfter] and [availableUntil]
  */
-fun CosmeticsDataWithChanges.setCosmeticAvailable(cosmeticId: CosmeticId, availableAfter: Instant?, availableUntil: Instant?) {
+fun CosmeticsDataWithChanges.setCosmeticAvailable(cosmeticId: CosmeticId, availableAfter: Instant?, availableUntil: Instant?, showTimerAfter: Instant?) {
     updateCosmetic(cosmeticId) {
-        copy(availableAfter = availableAfter, availableUntil = availableUntil)
+        copy(availableAfter = availableAfter, availableUntil = availableUntil, showTimerAfter = showTimerAfter)
     }
 }
 

@@ -11,6 +11,7 @@
  */
 package gg.essential.network.connectionmanager.handler.cosmetics;
 
+import gg.essential.config.EssentialConfig;
 import gg.essential.connectionmanager.common.packet.cosmetic.ServerCosmeticsUserEquippedVisibilityPacket;
 import gg.essential.network.connectionmanager.ConnectionManager;
 import gg.essential.network.connectionmanager.handler.PacketHandler;
@@ -20,7 +21,7 @@ public class ServerCosmeticsUserEquippedVisibilityPacketHandler extends PacketHa
 
     @Override
     protected void onHandle(@NotNull final ConnectionManager connectionManager, @NotNull final ServerCosmeticsUserEquippedVisibilityPacket packet) {
-        connectionManager.getCosmeticsManager().setOwnCosmeticsVisible(packet.getState());
+        EssentialConfig.INSTANCE.getOwnCosmeticsVisibleStateWithSource().set(new kotlin.Pair<>(packet.getState(), EssentialConfig.CosmeticsVisibilitySource.System));
     }
 
 }

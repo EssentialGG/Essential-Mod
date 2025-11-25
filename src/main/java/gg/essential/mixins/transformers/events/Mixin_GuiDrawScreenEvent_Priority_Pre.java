@@ -16,6 +16,7 @@ import com.llamalad7.mixinextras.sugar.ref.LocalIntRef;
 import gg.essential.Essential;
 import gg.essential.event.gui.GuiDrawScreenEvent;
 import gg.essential.universal.UMatrixStack;
+import gg.essential.util.UDrawContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.renderer.EntityRenderer;
@@ -81,11 +82,11 @@ public abstract class Mixin_GuiDrawScreenEvent_Priority_Pre {
         GuiDrawScreenEvent.Priority event = new GuiDrawScreenEvent.Priority(
             screen,
             //#if MC>=12000
-            //$$ new UMatrixStack(context.getMatrices()),
+            //$$ new UDrawContext(context, new UMatrixStack(context.getMatrices())),
             //#elseif MC>=11600
-            //$$ new UMatrixStack(vMatrixStack),
+            //$$ new UDrawContext(new UMatrixStack(vMatrixStack)),
             //#else
-            new UMatrixStack(),
+            new UDrawContext(new UMatrixStack()),
             //#endif
             mouseX.get(),
             mouseY.get(),

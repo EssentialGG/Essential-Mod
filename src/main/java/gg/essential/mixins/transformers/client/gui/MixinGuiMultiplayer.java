@@ -15,8 +15,10 @@ import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import gg.essential.config.EssentialConfig;
 import gg.essential.gui.multiplayer.EssentialMultiplayerGui;
 import gg.essential.mixins.ext.client.gui.GuiMultiplayerExt;
+import gg.essential.mixins.impl.client.gui.EssentialPostScreenDrawHook;
 import gg.essential.universal.UMatrixStack;
 import gg.essential.universal.UMinecraft;
+import gg.essential.util.UDrawContext;
 import kotlin.collections.CollectionsKt;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiMultiplayer;
@@ -38,6 +40,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.List;
 
+//#if MC>=12109
+//$$ import net.minecraft.client.gui.widget.Positioner;
+//$$ import net.minecraft.client.gui.widget.ThreePartsLayoutWidget;
+//#endif
+
 //#if MC>=12000
 //$$ import net.minecraft.client.gui.DrawContext;
 //#endif
@@ -54,7 +61,7 @@ import java.util.List;
 //#endif
 
 @Mixin(GuiMultiplayer.class)
-public abstract class MixinGuiMultiplayer extends GuiScreen implements GuiMultiplayerExt {
+public abstract class MixinGuiMultiplayer extends GuiScreen implements GuiMultiplayerExt, EssentialPostScreenDrawHook {
 
     //#if MC>=12004
     //$$ private static final String LIST_WIDGET_INIT = "Lnet/minecraft/client/gui/screen/multiplayer/MultiplayerServerListWidget;";
@@ -117,6 +124,18 @@ public abstract class MixinGuiMultiplayer extends GuiScreen implements GuiMultip
         );
     }
 
+    //#if MC>=12109
+    //$$ @Inject(method = "refreshWidgetPositions", at = @At("RETURN"))
+    //$$ private void essential$updateButtonPositions(CallbackInfo ci) {
+    //$$     essentialGui.initGui((MultiplayerScreen) (Object) this);
+    //$$     essentialGui.setupButtons(
+    //$$             CollectionsKt.filterIsInstance(this.children(), ButtonWidget.class),
+    //$$             this::addDrawableChild,
+    //$$             this::removeButton
+    //$$     );
+    //$$ }
+    //#endif
+
     @Inject(method = "refreshServerList", at = @At("HEAD"))
     private void essential$markRefresh(CallbackInfo ci) {
         EssentialMultiplayerGui.Companion.setRefreshing(true);
@@ -141,7 +160,28 @@ public abstract class MixinGuiMultiplayer extends GuiScreen implements GuiMultip
         return button;
     }
 
-    //#if MC>=12004
+    //#if MC>=12109
+    //$$ @ModifyArg(method = "<init>", index = 1, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/widget/ThreePartsLayoutWidget;<init>(Lnet/minecraft/client/gui/screen/Screen;II)V"))
+    //$$ private int shiftListDown$threePartsLayout(int headerHeight) {
+    //$$     if (EssentialConfig.INSTANCE.getEssentialEnabled()) {
+    //$$         headerHeight += 32;
+    //$$     }
+    //$$     return headerHeight;
+    //$$ }
+    //$$ @Shadow @Final private ThreePartsLayoutWidget field_62178;
+    //$$ @Inject(method = "<init>", at = @At("RETURN"))
+    //$$ private void shiftListDown$title(CallbackInfo ci) {
+    //$$     if (EssentialConfig.INSTANCE.getEssentialEnabled()) {
+    //$$         Positioner positioner = ((ThreePartsLayoutWidgetAccessor) this.field_62178)
+    //$$             .getHeader()
+    //$$             .getMainPositioner();
+    //$$         // Old versions had the title at 20 from the top of the screen. Now it is centered within the header.
+    //$$         // This math results in the new title position being consistent with those versions.
+    //$$         int titleOffset = 20 + 9 + 20 - 32;
+    //$$         positioner.marginBottom(positioner.toImpl().marginBottom + 32 - titleOffset);
+    //$$     }
+    //$$ }
+    //#elseif MC>=12004
     //$$ @WrapOperation(method = "init", at = @At(value = "NEW", target = LIST_WIDGET_INIT))
     //$$ private MultiplayerServerListWidget shiftListDown$new(MultiplayerScreen screen, MinecraftClient client, int width, int height, int y, int itemHeight, Operation<MultiplayerServerListWidget> original) {
     //$$     if (EssentialConfig.INSTANCE.getEssentialEnabled()) {
@@ -179,7 +219,9 @@ public abstract class MixinGuiMultiplayer extends GuiScreen implements GuiMultip
         return EssentialConfig.INSTANCE.getCurrentMultiplayerTab() == 0;
     }
 
-    //#if MC>=11600
+    //#if MC>=12109
+    //$$ @Inject(method = "updateButtonActivationStates", at = @At("RETURN"))
+    //#elseif MC>=11600
     //$$ @Inject(method = "func_214287_a", at = @At("RETURN"))
     //#else
     @Inject(method = "selectServer", at = @At("RETURN"))
@@ -195,16 +237,21 @@ public abstract class MixinGuiMultiplayer extends GuiScreen implements GuiMultip
     }
     //#endif
 
+    //#if MC>=12109
+    //$$ @Override
+    //$$ public void essential$afterDraw(UDrawContext drawContext, int mouseX, int mouseY, float partialTicks) {
+    //#else
     @Inject(method = "drawScreen", at = @At("RETURN"))
     //#if MC>=12000
     //$$ private void drawEssentialGui(DrawContext context, int mouseX, int mouseY, float partialTicks, CallbackInfo ci) {
-    //$$     UMatrixStack matrixStack = new UMatrixStack(context.getMatrices());
+    //$$     UDrawContext drawContext = new UDrawContext(context, new UMatrixStack(context.getMatrices()));
     //#elseif MC>=11600
     //$$ private void drawEssentialGui(MatrixStack vMatrixStack, int mouseX, int mouseY, float partialTicks, CallbackInfo ci) {
-    //$$     UMatrixStack matrixStack = new UMatrixStack(vMatrixStack);
+    //$$     UDrawContext drawContext = new UDrawContext(new UMatrixStack(vMatrixStack));
     //#else
     private void drawEssentialGui(int mouseX, int mouseY, float partialTicks, CallbackInfo ci) {
-        UMatrixStack matrixStack = new UMatrixStack();
+        UDrawContext drawContext = new UDrawContext(new UMatrixStack());
+    //#endif
     //#endif
 
         //#if MC<11600
@@ -214,7 +261,7 @@ public abstract class MixinGuiMultiplayer extends GuiScreen implements GuiMultip
         GlStateManager.disableDepth();
         //#endif
 
-        essentialGui.draw(matrixStack);
+        essentialGui.draw(drawContext);
     }
 
     @Inject(method = "connectToServer", at = @At("HEAD"), cancellable = true)

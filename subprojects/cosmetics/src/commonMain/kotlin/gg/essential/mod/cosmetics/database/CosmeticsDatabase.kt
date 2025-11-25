@@ -16,6 +16,8 @@ import gg.essential.cosmetics.CosmeticCategoryId
 import gg.essential.cosmetics.CosmeticId
 import gg.essential.cosmetics.CosmeticTypeId
 import gg.essential.cosmetics.FeaturedPageCollectionId
+import gg.essential.cosmetics.ImplicitOwnership
+import gg.essential.cosmetics.ImplicitOwnershipId
 import gg.essential.mod.cosmetics.CosmeticBundle
 import gg.essential.mod.cosmetics.CosmeticCategory
 import gg.essential.mod.cosmetics.CosmeticType
@@ -35,6 +37,9 @@ interface CosmeticsDatabase {
 
     suspend fun getFeaturedPageCollection(id: FeaturedPageCollectionId): FeaturedPageCollection?
     suspend fun getFeaturedPageCollections(): List<FeaturedPageCollection>
+
+    suspend fun getImplicitOwnership(id: ImplicitOwnershipId): ImplicitOwnership?
+    suspend fun getImplicitOwnerships(): List<ImplicitOwnership>
 
     suspend fun getCosmetic(id: CosmeticId): Cosmetic?
     suspend fun getCosmetics(): List<Cosmetic>

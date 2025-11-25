@@ -14,6 +14,9 @@ package gg.essential.model.util
 import java.security.MessageDigest
 import java.util.*
 
+// Ideally we'd be using kotlin-multiplatform, but we have moved away from it for the time being because it was too
+// unreliable.
+/*
 internal actual fun cbrt(value: Float): Float = Math.cbrt(value.toDouble()).toFloat()
 
 internal actual fun base64Encode(value: ByteArray): String =
@@ -21,4 +24,13 @@ internal actual fun base64Encode(value: ByteArray): String =
 internal actual fun base64Decode(value: String): ByteArray =
     Base64.getDecoder().decode(value)
 internal actual fun md5Hex(value: ByteArray): String =
+    MessageDigest.getInstance("MD5").digest(value).joinToString("") { "%02x".format(it) }
+ */
+internal fun cbrt(value: Float): Float = Math.cbrt(value.toDouble()).toFloat()
+
+internal fun base64Encode(value: ByteArray): String =
+    Base64.getEncoder().encodeToString(value)
+internal fun base64Decode(value: String): ByteArray =
+    Base64.getDecoder().decode(value)
+internal fun md5Hex(value: ByteArray): String =
     MessageDigest.getInstance("MD5").digest(value).joinToString("") { "%02x".format(it) }

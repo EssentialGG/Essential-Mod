@@ -11,6 +11,8 @@
  */
 package gg.essential.config
 
+import com.sparkuniverse.toolbox.relationships.enums.FriendRequestPrivacySetting
+import gg.essential.config.EssentialConfig
 import gg.essential.api.config.EssentialConfig as EssentialConfigApi
 
 @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
@@ -25,7 +27,9 @@ object EssentialConfigApiImpl : EssentialConfigApi {
     override var showEssentialIndicatorOnTab: Boolean by EssentialConfig::showEssentialIndicatorOnTab
     override var showEssentialIndicatorOnNametag: Boolean by EssentialConfig::showEssentialIndicatorOnNametag
     override var sendServerUpdates: Boolean by EssentialConfig::sendServerUpdates
-    override var friendRequestPrivacy: Int by EssentialConfig::friendRequestPrivacy
+    override var friendRequestPrivacy: Int
+        get() = EssentialConfig.friendRequestPrivacy.ordinal
+        set(value) { EssentialConfig.friendRequestPrivacy = FriendRequestPrivacySetting.entries.getOrNull(value) ?: FriendRequestPrivacySetting.ANY_ONE }
     override var currentMultiplayerTab: Int by EssentialConfig::currentMultiplayerTab
     override var modCoreWarning: Boolean by EssentialConfig::modCoreWarning
     override var linkWarning: Boolean by EssentialConfig::linkWarning
@@ -52,7 +56,9 @@ object EssentialConfigApiImpl : EssentialConfigApi {
     override var screenshotSounds: Boolean by EssentialConfig::screenshotSounds
     override var enableVanillaScreenshotMessage: Boolean by EssentialConfig::enableVanillaScreenshotMessage
     override var cosmeticArmorSetting: Int = 0
-    override var timeFormat: Int by EssentialConfig::timeFormat
+    override var timeFormat: Int
+        get() = EssentialConfig.timeFormat.ordinal
+        set(value) { EssentialConfig.timeFormat = if (value == 0) EssentialConfig.TimeFormat.AM_PM else EssentialConfig.TimeFormat.REGULAR }
     override var overrideGuiScale: Boolean
         get() = essentialGuiScale != 5
         set(value) {}

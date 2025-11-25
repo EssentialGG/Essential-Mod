@@ -11,9 +11,9 @@
  */
 package gg.essential.cosmetics.boxmask
 
-import gg.essential.model.Bone
 import gg.essential.model.Box3
+import gg.essential.model.RenderGeometry
 
 interface ModelClipper {
-    fun compute(bone: Bone, masks: List<Box3>): Bone
+    fun compute(geometry: RenderGeometry, masks: List<Box3>): RenderGeometry
 }

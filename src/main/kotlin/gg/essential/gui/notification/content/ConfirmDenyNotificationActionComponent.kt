@@ -19,9 +19,8 @@ import gg.essential.elementa.constraints.SiblingConstraint
 import gg.essential.elementa.dsl.boundTo
 import gg.essential.elementa.dsl.childOf
 import gg.essential.elementa.dsl.constrain
+import gg.essential.elementa.dsl.minus
 import gg.essential.elementa.dsl.percent
-import gg.essential.elementa.dsl.pixels
-import gg.essential.elementa.dsl.plus
 import gg.essential.elementa.dsl.provideDelegate
 import gg.essential.elementa.state.BasicState
 import gg.essential.gui.EssentialPalette
@@ -38,6 +37,7 @@ class ConfirmDenyNotificationActionComponent(
     val timerEnabledState: BasicState<Boolean> = BasicState(false),
     dismissNotification: () -> Unit,
 ) : UIContainer() {
+
     private val confirmButton = IconButton(
         EssentialPalette.CHECKMARK_7X5,
         tooltipText = confirmTooltip,
@@ -76,8 +76,8 @@ class ConfirmDenyNotificationActionComponent(
 
     init {
         constrain {
-            width = ChildBasedSizeConstraint() + 1.pixels // To account for the shadow
-            height = ChildBasedMaxSizeConstraint() + 1.pixels // To account for the shadow
+            width = ChildBasedSizeConstraint()
+            height = ChildBasedMaxSizeConstraint()
         }
     }
 }

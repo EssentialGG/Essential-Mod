@@ -18,6 +18,7 @@ import gg.essential.commands.engine.CommandParser
 import gg.essential.commands.impl.*
 import gg.essential.config.EssentialConfig
 import gg.essential.event.network.chat.SendCommandEvent
+import gg.essential.gui.elementa.state.v2.ReferenceHolderImpl
 import gg.essential.universal.ChatColor
 import gg.essential.util.MinecraftUtils
 import gg.essential.util.Multithreading
@@ -26,6 +27,8 @@ import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
 object EssentialCommandRegistry : CommandRegistry {
+    private val refHolder = ReferenceHolderImpl()
+
     internal val commands = ConcurrentHashMap<String, Pair<Command, Boolean>>()
     private val friends = CommandMcFriends()
     private val message = CommandMessage()

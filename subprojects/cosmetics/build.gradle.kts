@@ -13,16 +13,15 @@ import gg.essential.gradle.util.*
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("multiplatform")
+    kotlin("jvm")
     kotlin("plugin.serialization")
     id("java-library")
     id("gg.essential.defaults")
 }
 
 kotlin {
-    jvm("minecraft")
-
-    sourceSets["commonMain"].dependencies {
+    // Common dependencies
+    dependencies {
         implementation("org.jetbrains.kotlin:kotlin-stdlib:1.5.30")
         implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.5.0")
         implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.3.2")
@@ -31,14 +30,31 @@ kotlin {
         api(project(":utils"))
     }
 
-    sourceSets["commonTest"].dependencies {
-        implementation(kotlin("test"))
+    // Common test dependencies
+    dependencies {
+        testImplementation(kotlin("test"))
     }
 
-    sourceSets["minecraftMain"].dependencies {
+    // Minecraft dependencies
+    dependencies {
         compileOnly("gg.essential:universalcraft-1.8.9-forge:228") { isTransitive = false }
     }
 }
 
 kotlin.jvmToolchain(8)
 tasks.withType(KotlinCompile::class) { setJvmDefault("all") }
+
+// Using src dirs matching what kotlin-multiplatform would do because we ideally want to be using that,
+// but have moved away from it for the time being because it was too unreliable.
+sourceSets.main {
+    java.srcDir("src/commonMain/java")
+    java.srcDir("src/minecraftMain/java")
+    kotlin.srcDir("src/commonMain/kotlin")
+    kotlin.srcDir("src/minecraftMain/kotlin")
+}
+sourceSets.test {
+    java.srcDir("src/commonTest/java")
+    java.srcDir("src/minecraftTest/java")
+    kotlin.srcDir("src/commonTest/kotlin")
+    kotlin.srcDir("src/minecraftTest/kotlin")
+}

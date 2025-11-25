@@ -11,7 +11,6 @@
  */
 package gg.essential.api.utils
 
-import gg.essential.universal.wrappers.message.UTextComponent
 import net.minecraft.util.ResourceLocation
 import java.awt.image.BufferedImage
 
@@ -23,7 +22,10 @@ interface MinecraftUtils {
     /**
      * Queues a message component to be displayed to the player in chat, client-side only.
      */
-    fun sendMessage(message: UTextComponent)
+    //#if MC<12105
+    @Deprecated("Use `UChat.chat` instead.")
+    fun sendMessage(message: gg.essential.universal.wrappers.message.UTextComponent)
+    //#endif
 
     /**
      * Queues a message to be displayed to the player in chat, client-side only. The input message is also

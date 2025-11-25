@@ -57,4 +57,7 @@ public interface AbstractClientPlayerExt {
 
     @Nullable PlayerPose getRenderedPose();
     void setRenderedPose(PlayerPose pose);
+
+    float essential$getCosmeticFrozenYaw();
+    void essential$setCosmeticFrozenYaw(float frozenYaw);
 }

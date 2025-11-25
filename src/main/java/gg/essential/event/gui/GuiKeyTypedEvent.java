@@ -44,4 +44,20 @@ public class GuiKeyTypedEvent extends CancellableEvent {
     public int getKeyCode() {
         return keyCode;
     }
+
+    public static class Post extends GuiKeyTypedEvent {
+
+        /**
+         * Fired after the vanilla Screen key typed handling has run, in later versions this will also not be fired if the
+         * key event was handled, early returns out of the vanilla method can also be considered "handled" and not trigger this.
+         * NOTE: By default, this will not be fired from a screen that fully overrides the Screen keyTyped method without calling super, check usages!
+         *
+         * @param screen    Current GuiScreen of where the key was typed
+         * @param typedChar character that was typed
+         * @param keyCode   keycode for the character that was typed
+         */
+        public Post(final GuiScreen screen, final char typedChar, final int keyCode) {
+            super(screen, typedChar, keyCode);
+        }
+    }
 }

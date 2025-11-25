@@ -81,7 +81,9 @@ object VersionData : VersionInfo() {
     }
 
     fun getMinecraftPlatform(): ClientModsAnnouncePacket.Platform {
-        //#if FORGE
+        //#if NEOFORGE
+        //$$ return ClientModsAnnouncePacket.Platform.NEOFORGE
+        //#elseif FORGE
         return ClientModsAnnouncePacket.Platform.FORGE
         //#elseif FABRIC
         //$$ return ClientModsAnnouncePacket.Platform.FABRIC

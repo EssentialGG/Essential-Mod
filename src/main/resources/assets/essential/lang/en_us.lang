@@ -77,6 +77,7 @@ keybind.feedback.notfriendedmessage=You cannot message a player unless you are E
 keybind.feedback.openconversationmessage=Attempting to open conversation with %s
 
 ## Keybinds
+key.category.essential.general=Essential
 keybind.name.ESSENTIAL_FRIENDS=Open Friends Gui
 keybind.name.COSMETIC_STUDIO=Open Wardrobe
 Open Cosmetic Studio=Open Wardrobe
@@ -86,6 +87,7 @@ Cosmetic Visibility Toggle=Show/Hide My Cosmetics
 keybind.name.CHAT_PEEK=Chat Peek
 keybind.name.INVITE_FRIENDS=Invite Friends
 keybind.name.SCREENSHOT_MANAGER=Screenshot Manager
+keybind.name.MENU_ACCESS=Open Quick Access Menu
 # Emote Keybinds
 keybind.name.EMOTE_WHEEL=Open Emote Wheel
 keybind.name.EMOTE_SLOT_1=Play Top Left Emote
@@ -352,3 +354,10 @@ gamerule.category.chat=Chat
 gamerule.category.miscellaneous=Miscellaneous
 gamerule.category.other=Other
 gamerule.category.pinned=Pinned
+
+## Window titles
+title.singleplayer=Singleplayer
+title.multiplayer.realms=Multiplayer (Realms)
+title.multiplayer.lan=Multiplayer (LAN)
+title.multiplayer.other=Multiplayer (3rd-party Server)
+title.multiplayer.hosted=Multiplayer (Hosted World)

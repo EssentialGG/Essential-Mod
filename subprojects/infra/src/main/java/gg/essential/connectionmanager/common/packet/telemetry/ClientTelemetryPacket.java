@@ -15,6 +15,7 @@ import gg.essential.connectionmanager.common.packet.Packet;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 
 public class ClientTelemetryPacket extends Packet {
@@ -42,6 +43,17 @@ public class ClientTelemetryPacket extends Packet {
     @NotNull
     public Map<String, Object> getMetadata() {
         return this.metadata;
+    }
+
+    public static ClientTelemetryPacket forAction(String name) {
+        return forAction(name, null);
+    }
+
+    public static ClientTelemetryPacket forAction(String name, String context) {
+        return new ClientTelemetryPacket("CLIENT_ACTION", new HashMap<String, Object>() {{
+            put("action", name);
+            put("context", context == null ? "" : context); // Null context is sent as empty string due to schema restrictions on the CM
+        }});
     }
 
 }

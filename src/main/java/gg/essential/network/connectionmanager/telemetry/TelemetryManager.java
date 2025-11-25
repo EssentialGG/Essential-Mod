@@ -13,11 +13,14 @@ package gg.essential.network.connectionmanager.telemetry;
 
 import gg.essential.Essential;
 import gg.essential.connectionmanager.common.packet.telemetry.ClientTelemetryPacket;
+import gg.essential.connectionmanager.common.packet.telemetry.ServerRecognizedTelemetryPacket;
 import gg.essential.elementa.state.v2.ReferenceHolder;
 import gg.essential.event.client.InitializationEvent;
 import gg.essential.event.essential.TosAcceptedEvent;
+import gg.essential.event.gui.InitGuiEvent;
 import gg.essential.event.network.server.ServerJoinEvent;
 import gg.essential.gui.elementa.state.v2.ReferenceHolderImpl;
+import gg.essential.gui.elementa.state.v2.StateKt;
 import gg.essential.lib.gson.Gson;
 import gg.essential.lib.gson.JsonElement;
 import gg.essential.lib.gson.JsonObject;
@@ -25,8 +28,13 @@ import gg.essential.lib.gson.JsonPrimitive;
 import gg.essential.network.connectionmanager.ConnectionManager;
 import gg.essential.network.connectionmanager.NetworkedManager;
 import gg.essential.network.connectionmanager.queue.SequentialPacketQueue;
+import gg.essential.sps.SpsAddress;
 import gg.essential.universal.UMinecraft;
+import gg.essential.universal.UResolution;
+import gg.essential.util.ModLoaderUtil;
 import gg.essential.util.Multithreading;
+import kotlin.jvm.functions.Function0;
+import kotlin.Unit;
 import me.kbrewster.eventbus.Subscribe;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
@@ -39,6 +47,7 @@ import oshi.hardware.Processor;
 //$$ import oshi.hardware.CentralProcessor;
 //#endif
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -48,7 +57,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static gg.essential.network.connectionmanager.telemetry.TelemetryManagerKt.*;
@@ -60,8 +68,14 @@ public class TelemetryManager implements NetworkedManager {
     private final SequentialPacketQueue telemetryQueue;
     @NotNull
     private final List<ClientTelemetryPacket> packetList = new ArrayList<>();
+    @Nullable
+    private  List<String> recognizedTelemetryKeys = null;
     @NotNull
     private final ReferenceHolder referenceHolder = new ReferenceHolderImpl();
+    @Nullable
+    private Function0<Unit> modPartnerEffect = null;
+    @Nullable
+    private Map<String, Object> previousDisplayMetadata = null;
 
     public TelemetryManager(@NotNull final ConnectionManager connectionManager) {
         this.connectionManager = connectionManager;
@@ -69,6 +83,10 @@ public class TelemetryManager implements NetworkedManager {
         telemetryQueue = new SequentialPacketQueue.Builder(connectionManager)
             .onTimeoutSkip()
             .create();
+        connectionManager.registerPacketHandler(ServerRecognizedTelemetryPacket.class, (packet)->{
+                setRecognizedTelemetryKeys(packet.getRecognizedTelemetry());
+                return Unit.INSTANCE;
+        });
         Essential.EVENT_BUS.register(this);
 
         final String bytes = System.getProperty("essential.stage2.downloaded.bytes");
@@ -89,11 +107,26 @@ public class TelemetryManager implements NetworkedManager {
         }
     }
 
-    // Adds the packet to a SequentialPacketQueue if the user is connected and authenticated
-    // Otherwise, adds the packet to a list to be processed when a connection is established
+    private void setRecognizedTelemetryKeys(@NotNull List<String> keys) {
+        recognizedTelemetryKeys = keys;
+
+        // Send all pending packets now that they can be filtered by recognizedTelemetryKeys
+        if (!packetList.isEmpty()) {
+            // New list to iterate, as enqueue() may result in packetList.add(), if the connection was somehow lost
+            List<ClientTelemetryPacket> pendingPackets = new ArrayList<>(packetList);
+            packetList.clear();
+            pendingPackets.forEach(this::enqueue);
+        }
+    }
+
+    // Adds the packet to a SequentialPacketQueue if the user is connected, authenticated, and recognizedTelemetryKeys is set and matching
+    // Otherwise, adds the packet to a list to be processed when the recognizedTelemetryKeys are received after connection
     public void enqueue(@NotNull ClientTelemetryPacket packet) {
-        if (connectionManager.isOpen() && connectionManager.isAuthenticated()) {
-            telemetryQueue.enqueue(packet);
+        if (connectionManager.isOpen() && connectionManager.isAuthenticated() && recognizedTelemetryKeys != null) {
+            // Only enqueue the packet if it has a server recognized telemetry key
+            if (recognizedTelemetryKeys.contains(packet.getKey())){
+                telemetryQueue.enqueue(packet);
+            }
         } else {
             packetList.add(packet);
         }
@@ -101,8 +134,25 @@ public class TelemetryManager implements NetworkedManager {
 
     @Override
     public void onConnected() {
-        packetList.forEach(telemetryQueue::enqueue);
-        packetList.clear();
+        recognizedTelemetryKeys = null; // The ServerRecognizedTelemetryPacket will be sent by the server after connection to set this
+        modPartnerEffect = StateKt.effect(referenceHolder, observer -> {
+            List<String> loadedPartnerModIds = ModLoaderUtil.loadedPartnerModIds.get(observer);
+            if (loadedPartnerModIds == null) {
+                return Unit.INSTANCE;
+            }
+            enqueue(new ClientTelemetryPacket("PARTNERED_MODS", new HashMap<String, Object>() {{
+                put("partnered_mod_ids", loadedPartnerModIds);
+            }}));
+            return Unit.INSTANCE;
+        });
+    }
+
+    @Override
+    public void onDisconnect() {
+        if (modPartnerEffect != null) {
+            modPartnerEffect.invoke();
+            modPartnerEffect = null;
+        }
     }
 
     @Subscribe
@@ -110,11 +160,13 @@ public class TelemetryManager implements NetworkedManager {
         setupAbFeatureTracking(this, referenceHolder);
         setupSettingsTracking(this, referenceHolder);
         ImpressionTelemetryManager.INSTANCE.initialize();
+        FPSTelemetryManager.INSTANCE.initialize();
 
         enqueue(new ClientTelemetryPacket("LANGUAGE", new HashMap<String, Object>(){{
             put("lang", UMinecraft.getMinecraft().gameSettings.language);
         }}));
         queueInstallerTelemetryPacket();
+        queueIntegrationModTelemetryPacket();
     }
 
     /**
@@ -133,10 +185,7 @@ public class TelemetryManager implements NetworkedManager {
      * @param context the action context (e.g. the emote activated)
      */
     public void clientActionPerformed(@NotNull Actions action, @Nullable String context) {
-        enqueue(new ClientTelemetryPacket("CLIENT_ACTION", new HashMap<String, Object>() {{
-            put("action", action.name());
-            put("context", context == null ? "" : context); // Null context is sent as empty string due to schema restrictions on the CM
-        }}));
+        enqueue(ClientTelemetryPacket.forAction(action.name(), context));
     }
 
     /**
@@ -154,10 +203,10 @@ public class TelemetryManager implements NetworkedManager {
 
     @Subscribe
     public void onServerJoin(ServerJoinEvent event) {
-        UUID spsHost = connectionManager.getSpsManager().getHostFromSpsAddress(event.getServerData().serverIP);
-        if (spsHost != null) {
+        SpsAddress spsAddress = SpsAddress.parse(event.getServerData().serverIP);
+        if (spsAddress != null) {
             enqueue(new ClientTelemetryPacket("SPS_JOIN", new HashMap<String, Object>() {{
-                put("host", spsHost);
+                put("host", spsAddress.getHost());
             }}));
         }
     }
@@ -197,6 +246,18 @@ public class TelemetryManager implements NetworkedManager {
         enqueue(new ClientTelemetryPacket("HARDWARE_V2", hardwareMap));
     }
 
+    @Subscribe
+    public void sendDisplayData(@NotNull final InitGuiEvent event) {
+        final Map<String, Object> displayMetadata = new HashMap<>();
+        displayMetadata.put("windowWidth", UResolution.getWindowWidth());
+        displayMetadata.put("windowHeight", UResolution.getWindowHeight());
+        displayMetadata.put("guiSize", UResolution.getScaleFactor());
+        if (!displayMetadata.equals(previousDisplayMetadata)) {
+            enqueue(new ClientTelemetryPacket("DISPLAY_DATA", displayMetadata));
+            this.previousDisplayMetadata = displayMetadata;
+        }
+    }
+
     private void queueInstallerTelemetryPacket() {
         // We go async, since we are reading a file
         Multithreading.runAsync(() -> {
@@ -215,15 +276,9 @@ public class TelemetryManager implements NetworkedManager {
                 }
                 String pathChecksum = pathChecksumBuilder.toString();
 
-                // Grab the raw JSON object from the telemetry file
+                // Grab the raw JSON data from the telemetry file
                 // This is to allow installer to add telemetry fields without having to update the mod
-                String rawFile = new String(Files.readAllBytes(installerMetadataPath), StandardCharsets.UTF_8);
-                JsonObject telemetryObject = new Gson().fromJson(rawFile, JsonObject.class);
-                // Convert to map
-                HashMap<String, Object> telemetryMap = new HashMap<>();
-                for (Map.Entry<String, JsonElement> entry : telemetryObject.entrySet()) {
-                    telemetryMap.put(entry.getKey(), entry.getValue());
-                }
+                HashMap<String, Object> telemetryMap = getHashMapFromJsonFile(installerMetadataPath);
                 // Check if the game folder has been moved
                 boolean hasBeenMoved = false;
                 Object installPathChecksum = telemetryMap.get("installPathChecksum");
@@ -241,6 +296,38 @@ public class TelemetryManager implements NetworkedManager {
                 Essential.logger.warn("Error when trying to parse installer telemetry!", e);
             }
         });
+    }
+
+    private void queueIntegrationModTelemetryPacket() {
+        // We go async, since we are reading a file
+        Multithreading.runAsync(() -> {
+            try {
+                Path integrationModMetadataPath = Essential.getInstance().getBaseDir().toPath().resolve("partner-integration-mod-metadata.json");
+
+                if (Files.notExists(integrationModMetadataPath))
+                    return;
+
+                // Send telemetry file as-is
+                HashMap<String, Object> telemetryMap = getHashMapFromJsonFile(integrationModMetadataPath);
+                // Then queue the packet on the main thread again
+                Multithreading.scheduleOnMainThread(() -> enqueue(new ClientTelemetryPacket("PARTNER_INTEGRATION_MOD", telemetryMap)), 0, TimeUnit.SECONDS);
+                // Delete file after enqueueing, to ensure we only send this packet once.
+                Files.deleteIfExists(integrationModMetadataPath);
+            } catch (Exception e) {
+                Essential.logger.warn("Error when trying to parse partner integration mod telemetry!", e);
+            }
+        });
+    }
+
+    private HashMap<String, Object> getHashMapFromJsonFile(Path path) throws IOException {
+        String rawFile = new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
+        JsonObject telemetryObject = new Gson().fromJson(rawFile, JsonObject.class);
+        // Convert to map
+        HashMap<String, Object> telemetryMap = new HashMap<>();
+        for (Map.Entry<String, JsonElement> entry : telemetryObject.entrySet()) {
+            telemetryMap.put(entry.getKey(), entry.getValue());
+        }
+        return telemetryMap;
     }
 
 }

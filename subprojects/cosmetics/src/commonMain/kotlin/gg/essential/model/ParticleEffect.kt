@@ -15,19 +15,19 @@ import gg.essential.model.backend.RenderBackend
 import gg.essential.model.file.ParticleEffectComponents
 import gg.essential.model.file.ParticlesFile
 
-class ParticleEffect(
+data class ParticleEffect(
     val file: String,
     val identifier: String,
     val material: ParticlesFile.Material,
     val components: ParticleEffectComponents,
     val curves: Map<String, ParticlesFile.Curve>,
     val events: Map<String, ParticlesFile.Event>,
-    val texture: RenderBackend.Texture?,
-    /** All effects referenced by events of this effect. May contain more events than actually referenced. */
-    val referencedEffects: Map<String, ParticleEffect>,
-    /** All sounds referenced by events of this effect. May contain more sounds than actually referenced. */
-    val referencedSounds: Map<String, SoundEffect>,
 ) {
-    val renderPass = texture?.let { RenderPass(material, it) }
+
+    // used as a key to group particles by material and texture for render
+    // take care to only call once per usage as this value will vary with the input texture
+    fun renderPass(textureSource: () -> RenderBackend.Texture?): RenderPass? {
+        return textureSource()?.let { RenderPass(material, it) }
+    }
     data class RenderPass(val material: ParticlesFile.Material, val texture: RenderBackend.Texture)
 }

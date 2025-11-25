@@ -43,6 +43,11 @@ public class ClientChatChannelMessagesRetrievePacket extends Packet {
     }
 
     @Nullable
+    public Long getBefore() {
+        return this.before;
+    }
+
+    @Nullable
     public Long getAfter() {
         return this.after;
     }

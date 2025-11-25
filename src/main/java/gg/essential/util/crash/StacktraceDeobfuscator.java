@@ -12,8 +12,9 @@
 package gg.essential.util.crash;
 
 import gg.essential.Essential;
+import gg.essential.util.HttpUtils;
 import gg.essential.util.Multithreading;
-import gg.essential.util.WebUtil;
+import kotlin.Unit;
 import org.apache.commons.io.FileUtils;
 
 import java.io.File;
@@ -95,7 +96,10 @@ public class StacktraceDeobfuscator {
         try {
             Path zipFile = Files.createTempFile("mappings", ".zip");
 
-            WebUtil.downloadToFile(mappingsLink, zipFile.toFile(), "Mozilla/4.76 (Essential)");
+            HttpUtils.httpGetToFileBlocking(mappingsLink, zipFile, builder -> {
+                builder.addHeader("User-Agent", "Mozilla/4.76 (Essential)");
+                return Unit.INSTANCE;
+            });
 
             try (FileSystem zipFileSystem = FileSystems.newFileSystem(zipFile, (ClassLoader) null)) {
                 Files.copy(zipFileSystem.getPath("methods.csv"), file.toPath());

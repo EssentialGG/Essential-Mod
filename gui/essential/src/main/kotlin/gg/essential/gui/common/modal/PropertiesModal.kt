@@ -34,7 +34,7 @@ class PropertiesModal(
 ) : EssentialModal2(modalManager) {
     override fun LayoutScope.layoutTitle() = title("Image Properties")
 
-    override fun LayoutScope.layoutContent(modifier: Modifier) = layoutContentImpl(modifier.width(201f))
+    override fun LayoutScope.layoutContent(modifier: Modifier) = layoutContentImpl(modifier.width(233f))
 
     override fun LayoutScope.layoutBody() {
         row(Modifier.fillWidth(), Arrangement.spacedBy(21f)) {

@@ -20,6 +20,7 @@ import gg.essential.elementa.dsl.*
 import gg.essential.elementa.events.UIClickEvent
 import gg.essential.gui.EssentialPalette
 import gg.essential.gui.elementa.state.v2.*
+import gg.essential.gui.elementa.state.v2.ListState
 import gg.essential.gui.elementa.state.v2.combinators.map
 import gg.essential.gui.image.ImageFactory
 import gg.essential.gui.layoutdsl.*
@@ -28,13 +29,19 @@ import gg.essential.universal.USound
 import gg.essential.vigilance.utils.onLeftClick
 import java.awt.Color
 
-
 class ContextOptionMenu(
     posX: Float,
     posY: Float,
-    vararg options: Item,
+    val optionsListState: ListState<Item>,
     val maxHeight: Float = Float.POSITIVE_INFINITY,
 ) : UIBlock() {
+
+    constructor(
+        posX: Float,
+        posY: Float,
+        vararg options: Item,
+        maxHeight: Float = Float.POSITIVE_INFINITY,
+    ) : this(posX, posY, listStateOf(*options), maxHeight)
 
     private val optionColumnPadding: Float = 3f
 
@@ -43,6 +50,7 @@ class ContextOptionMenu(
     private val outlineColor = EssentialPalette.BUTTON_HIGHLIGHT
 
     private val closeActions = mutableListOf<() -> Unit>()
+    private var closed = false
 
     init {
         fun LayoutScope.divider() {
@@ -61,10 +69,15 @@ class ContextOptionMenu(
 
             box(Modifier.height(15f).fillWidth().color(componentBackgroundColor).hoverColor(componentBackgroundHighlightColor).hoverScope()) {
                 row(Modifier.fillHeight().alignBoth(Alignment.Start)) {
-                    box(Modifier.fillHeight().width(20f)) {
-                        icon(option.image, colorModifier)
+                    ifNotNull(option.image) {
+                        box(Modifier.fillHeight().width(20f)) {
+                            icon(it, colorModifier)
+                        }
+                    } `else` {
+                        spacer(width = 10f)
                     }
                     text(option.textState, colorModifier, centeringContainsShadow = false)
+                    spacer(width = 10f)
                 }
             }.onLeftClick {
                 USound.playButtonPress()
@@ -76,7 +89,7 @@ class ContextOptionMenu(
         }
 
         fun Modifier.customOptionMenuWidth() = this then BasicWidthModifier {
-            basicWidthConstraint { it.children.maxOfOrNull { child -> ChildBasedSizeConstraint().getWidth(child) } ?: 1f } + 10.pixels
+            basicWidthConstraint { it.children.maxOfOrNull { child -> ChildBasedSizeConstraint().getWidth(child) } ?: 1f }
         }
 
         fun Modifier.maxSiblingHeight() = this then BasicHeightModifier {
@@ -90,14 +103,13 @@ class ContextOptionMenu(
             return@then { constraints.height = originalHeightConstraint }
         }
 
-        val listState = stateOf(options.toMutableList()).toListState()
         val scrollComponent: ScrollComponent
         val scrollBar: UIComponent
 
         this.layoutAsBox(Modifier.childBasedMaxSize(2f).color(outlineColor).shadow(Color.BLACK)) {
             scrollComponent = scrollable(Modifier.limitHeight(), vertical = true) {
                 column(Modifier.customOptionMenuWidth().childBasedHeight(optionColumnPadding).color(componentBackgroundColor), Arrangement.spacedBy(0f, FloatPosition.CENTER)) {
-                    forEach(listState) {
+                    forEach(optionsListState) {
                         when (it) {
                             is Divider -> divider()
                             is Option -> option(it)
@@ -115,20 +127,24 @@ class ContextOptionMenu(
         reposition(posX, posY)
 
         onFocusLost {
-            handleClose(releaseFocus = false)
+            close()
         }
         onKeyType { _, keyCode ->
             if (keyCode == UKeyboard.KEY_ESCAPE) {
-                handleClose()
+                close()
             }
         }
+
+        isFloating = true
     }
 
-    private fun handleClose(releaseFocus: Boolean = true) {
+    fun close() {
+        if (closed) return
+        closed = true
         for (closeAction in closeActions) {
             closeAction()
         }
-        if (releaseFocus) {
+        if (hasFocus()) {
             releaseWindowFocus()
         }
         parent.removeChild(this)
@@ -156,7 +172,7 @@ class ContextOptionMenu(
 
     data class Option(
         val textState: State<String>,
-        val image: State<ImageFactory>,
+        val image: State<ImageFactory?>,
         val disabled: State<Boolean> = stateOf(false),
         val color: Color = EssentialPalette.TEXT,
         val hoveredColor: Color = EssentialPalette.TEXT_HIGHLIGHT,
@@ -166,7 +182,7 @@ class ContextOptionMenu(
     ) : Item {
         constructor(
             text: String,
-            image: ImageFactory,
+            image: ImageFactory?,
             disabled: State<Boolean> = stateOf(false),
             textColor: Color = EssentialPalette.TEXT,
             hoveredColor: Color = EssentialPalette.TEXT_HIGHLIGHT,
@@ -202,6 +218,18 @@ class ContextOptionMenu(
 
     companion object {
 
+        fun create(
+            boundTo: UIComponent,
+            optionsListState: ListState<Item>,
+            maxHeight: Float = Float.POSITIVE_INFINITY,
+            onClose: () -> Unit = {}
+        ) = create(
+            Position(boundTo, true),
+            Window.of(boundTo),
+            optionsListState = optionsListState,
+            maxHeight = maxHeight,
+            onClose = onClose
+        )
 
         fun create(
             boundTo: UIComponent,
@@ -222,16 +250,25 @@ class ContextOptionMenu(
             vararg option: Item,
             maxHeight: Float = Float.POSITIVE_INFINITY,
             onClose: () -> Unit = {}
-        ) {
+        ) = create(position, window, listStateOf(*option), maxHeight, onClose)
+
+        fun create(
+            position: Position,
+            window: Window,
+            optionsListState: ListState<Item>,
+            maxHeight: Float = Float.POSITIVE_INFINITY,
+            onClose: () -> Unit = {}
+        ): ContextOptionMenu {
             val menu = ContextOptionMenu(
                 0f,
                 0f,
-                *option,
+                optionsListState,
                 maxHeight = maxHeight,
             ) childOf window
             menu.reposition(position.xConstraint, position.yConstraint)
             menu.init()
             menu.onClose(onClose)
+            return menu
         }
 
     }

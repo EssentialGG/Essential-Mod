@@ -18,6 +18,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonEncoder
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.math.PI
 import kotlin.math.abs
@@ -30,9 +31,50 @@ import kotlin.math.truncate
 import kotlin.random.Random
 
 @Serializable(MolangSerializer::class)
-interface MolangExpression {
-    fun eval(context: MolangContext): Float
+data class Molang(val expression: MolangExpression) {
+    private val compiled: MolangEvalImpl =
+        if (expression is StatementsExpr && expression.statements.last() is ReturnExpr) {
+            // Complex molang expressions require a `return` statement to return a value other than 0.
+            // In most cases that'll be the last expression, so we can easily optimize it to not have to emit a
+            // [ReturnExpr.Return] exception in this case.
+            StatementsWithResult(expression.statements.dropLast(1), expression.statements.last())
+        } else if (expression is ReturnExpr) {
+            expression.inner
+        } else {
+            expression
+        }
 
+    fun eval(context: MolangContext): Float {
+        return try {
+            compiled.eval(context)
+        } catch (e: ReturnExpr.Return) {
+            e.value
+        }
+    }
+
+    private class StatementsWithResult(val statements: List<MolangExpression>, val result: MolangExpression) : MolangEvalImpl {
+        override fun eval(context: MolangContext): Float {
+            for (statement in statements) {
+                statement.eval(context)
+            }
+            return result.eval(context)
+        }
+    }
+
+    companion object {
+        val ZERO = Molang(MolangExpression.ZERO)
+        val ONE = Molang(MolangExpression.ONE)
+
+        fun literal(value: Float): Molang = Molang(LiteralExpr(value))
+    }
+}
+
+// Private interface which can't be actually private because `MolangExpression` inherits from it
+interface MolangEvalImpl {
+    fun eval(context: MolangContext): Float
+}
+
+sealed interface MolangExpression : MolangEvalImpl {
     companion object {
         val ZERO = LiteralExpr(0f)
         val ONE = LiteralExpr(1f)
@@ -40,6 +82,7 @@ interface MolangExpression {
 }
 
 interface MolangVariable {
+    val name: String
     fun assign(context: MolangContext, value: Float)
 }
 
@@ -51,16 +94,20 @@ data class NegExpr(val inner: MolangExpression) : MolangExpression {
     override fun eval(context: MolangContext): Float = -inner.eval(context)
 }
 
-data class InvExpr(val inner: MolangExpression) : MolangExpression {
-    override fun eval(context: MolangContext): Float = 1 / inner.eval(context)
-}
-
 data class AddExpr(val left: MolangExpression, val right: MolangExpression) : MolangExpression {
     override fun eval(context: MolangContext): Float = left.eval(context) + right.eval(context)
 }
 
+data class SubExpr(val left: MolangExpression, val right: MolangExpression) : MolangExpression {
+    override fun eval(context: MolangContext): Float = left.eval(context) - right.eval(context)
+}
+
 data class MulExpr(val left: MolangExpression, val right: MolangExpression) : MolangExpression {
     override fun eval(context: MolangContext): Float = left.eval(context) * right.eval(context)
+}
+
+data class DivExpr(val left: MolangExpression, val right: MolangExpression) : MolangExpression {
+    override fun eval(context: MolangContext): Float = left.eval(context) / right.eval(context)
 }
 
 data class SinExpr(val inner: MolangExpression) : MolangExpression {
@@ -105,13 +152,13 @@ data class RandomExpr(val low: MolangExpression, val high: MolangExpression) : M
     }
 }
 
-data class QueryExpr(val f: MolangQuery.() -> Float) : MolangExpression {
+abstract class QueryExpr(val name: String, val f: MolangQuery.() -> Float) : MolangExpression {
     override fun eval(context: MolangContext): Float = context.query.run(f)
 
-    companion object {
-        inline operator fun <reified T : MolangQuery> invoke(crossinline f: T.() -> Float) =
-            QueryExpr { (this as? T)?.let(f) ?: 0f }
-    }
+    object AnimTime : QueryExpr("anim_time", { (this as? MolangQueryAnimation)?.animTime ?: 0f })
+    object LifeTime : QueryExpr("life_time", { (this as? MolangQueryEntity)?.lifeTime ?: 0f })
+    object ModifiedMoveSpeed : QueryExpr("modified_move_speed", { (this as? MolangQueryEntity)?.modifiedMoveSpeed ?: 0f })
+    object ModifiedDistanceMoved : QueryExpr("modified_distance_moved", { (this as? MolangQueryEntity)?.modifiedDistanceMoved ?: 0f })
 }
 
 data class ComparisonExpr(val left: MolangExpression, val right: MolangExpression, val op: Op) : MolangExpression {
@@ -148,10 +195,10 @@ data class TernaryExpr(
     }
 }
 
-data class VariableExpr(val key: String) : MolangExpression, MolangVariable {
-    override fun eval(context: MolangContext): Float = context.variables[key]
+data class VariableExpr(override val name: String) : MolangExpression, MolangVariable {
+    override fun eval(context: MolangContext): Float = context.variables[name]
     override fun assign(context: MolangContext, value: Float) {
-        context.variables[key] = value
+        context.variables[name] = value
     }
 }
 
@@ -162,12 +209,12 @@ data class AssignmentExpr(val variable: MolangVariable, val inner: MolangExpress
     }
 }
 
-data class StatementsExpr(val statements: List<MolangExpression>, val result: MolangExpression = MolangExpression.ZERO) : MolangExpression {
+data class StatementsExpr(val statements: List<MolangExpression>) : MolangExpression {
     override fun eval(context: MolangContext): Float {
         for (statement in statements) {
             statement.eval(context)
         }
-        return result.eval(context)
+        return 0f
     }
 }
 
@@ -179,22 +226,67 @@ data class ReturnExpr(val inner: MolangExpression) : MolangExpression {
     internal class Return(val value: Float) : Throwable()
 }
 
-data class ComplexExpr(val inner: MolangExpression) : MolangExpression {
-    override fun eval(context: MolangContext): Float {
-        return try {
-            inner.eval(context)
-        } catch (e: ReturnExpr.Return) {
-            e.value
+fun MolangExpression.serializeToString(): String {
+    fun StringBuilder.appendExpr(expr: MolangExpression, inStatements: Boolean = false): StringBuilder {
+        when (expr) {
+            is LiteralExpr -> when (expr.value) {
+                PI.toFloat() -> append("math.pi")
+                else -> append(expr.value)
+            }
+            is NegExpr -> append('-').appendExpr(expr.inner)
+            is AddExpr -> append('(').appendExpr(expr.left).append('+').appendExpr(expr.right).append(')')
+            is SubExpr -> append('(').appendExpr(expr.left).append('-').appendExpr(expr.right).append(')')
+            is MulExpr -> append('(').appendExpr(expr.left).append('*').appendExpr(expr.right).append(')')
+            is DivExpr -> append('(').appendExpr(expr.left).append('/').appendExpr(expr.right).append(')')
+            is SinExpr -> append("math.sin(").appendExpr(expr.inner).append(')')
+            is CosExpr -> append("math.cos(").appendExpr(expr.inner).append(')')
+            is FloorExpr -> append("math.floor(").appendExpr(expr.inner).append(')')
+            is CeilExpr -> append("math.ceil(").appendExpr(expr.inner).append(')')
+            is RoundExpr -> append("math.round(").appendExpr(expr.inner).append(')')
+            is TruncExpr -> append("math.trunc(").appendExpr(expr.inner).append(')')
+            is AbsExpr -> append("math.abs(").appendExpr(expr.inner).append(')')
+            is ClampExpr -> append("math.clamp(").appendExpr(expr.value).append(',').appendExpr(expr.min).append(',').appendExpr(expr.max).append(')')
+            is RandomExpr -> append("math.random(").appendExpr(expr.low).append(',').appendExpr(expr.high).append(')')
+            is QueryExpr -> append("q.").append(expr.name)
+            is ComparisonExpr -> append('(').appendExpr(expr.left).append(when (expr.op) {
+                ComparisonExpr.Op.Equal -> "=="
+                ComparisonExpr.Op.NotEqual -> "!="
+                ComparisonExpr.Op.LessThan -> "<"
+                ComparisonExpr.Op.LessThanOrEqual -> "<="
+                ComparisonExpr.Op.GreaterThan -> ">"
+                ComparisonExpr.Op.GreaterThanOrEqual -> ">="
+            }).appendExpr(expr.right).append(')')
+            is LogicalOrExpr -> append('(').appendExpr(expr.left).append("||").appendExpr(expr.right).append(')')
+            is LogicalAndExpr -> append('(').appendExpr(expr.left).append("&&").appendExpr(expr.right).append(')')
+            is TernaryExpr -> append('(').appendExpr(expr.condition).append('?').appendExpr(expr.trueCase).append(':').appendExpr(expr.falseCase).append(')')
+            is VariableExpr -> append("variable.").append(expr.name)
+            is AssignmentExpr -> {
+                if (!inStatements) append('{')
+                append("v.").append(expr.variable.name).append('=').appendExpr(expr.inner)
+                if (!inStatements) append('}')
+            }
+            is StatementsExpr -> {
+                append("{")
+                for (statement in expr.statements) {
+                    appendExpr(statement, inStatements = true).append(';')
+                }
+                append("}")
+            }
+            is ReturnExpr -> {
+                if (!inStatements) append('{')
+                append("return ").appendExpr(expr.inner)
+                if (!inStatements) append('}')
+            }
         }
+        return this
     }
+
+    return StringBuilder().appendExpr(this).toString()
 }
 
 private fun Float.toRadians() = this / 180 * PI.toFloat()
 
 private class Parser(str: String) {
-    /** How many return expressions there are. Need to wrap the entire expression in a try-catch if any remain. */
-    private var returns: Int = 0
-
     val str = str.lowercase()
     var i = 0
 
@@ -222,7 +314,7 @@ private class Parser(str: String) {
 
     @Suppress("ControlFlowWithEmptyBody")
     fun skipWhitespace() {
-        while (reads(' '));
+        while (reads { it.isWhitespace() });
     }
 
     @Suppress("ControlFlowWithEmptyBody")
@@ -240,36 +332,69 @@ private class Parser(str: String) {
         val start = i
         @Suppress("ControlFlowWithEmptyBody")
         while (reads { it.isLetterOrDigit() || it == '_' });
-        return str.slice(start until i).replace(" ", "")
+        return str.slice(start until i).dropLastWhile { it.isWhitespace() }
     }
 
     fun parseSimpleExpression(): MolangExpression = when {
         reads('(') -> parseExpression().also { reads(')') }
+        reads('{') -> parseStatements().also { reads('}') }
         curr in '0'..'9' -> parseLiteral()
         curr == '-' -> {
             reads('-')
             NegExpr(parseSimpleExpression())
         }
-        reads("math.pi") -> LiteralExpr(PI.toFloat())
-        reads("math.cos(") -> CosExpr(parseExpression()).also { reads(')') }
-        reads("math.sin(") -> SinExpr(parseExpression()).also { reads(')') }
-        reads("math.floor(") -> FloorExpr(parseExpression()).also { reads(')') }
-        reads("math.ceil(") -> CeilExpr(parseExpression()).also { reads(')') }
-        reads("math.round(") -> RoundExpr(parseExpression()).also { reads(')') }
-        reads("math.trunc(") -> TruncExpr(parseExpression()).also { reads(')') }
-        reads("math.abs(") -> AbsExpr(parseExpression()).also { reads(')') }
-        reads("math.clamp(") -> ClampExpr(
-            parseExpression().also { reads(',') },
-            parseExpression().also { reads(',') },
-            parseExpression(),
-        ).also { reads(')') }
-        reads("math.random(") -> RandomExpr(parseExpression().also { reads(',') }, parseExpression()).also { reads(')') }
-        reads("query.anim_time") -> QueryExpr<MolangQueryAnimation> { animTime }
-        reads("query.life_time") -> QueryExpr<MolangQueryEntity> { lifeTime }
-        reads("query.modified_move_speed") -> QueryExpr<MolangQueryEntity> { modifiedMoveSpeed }
-        reads("query.modified_distance_moved") -> QueryExpr<MolangQueryEntity> { modifiedDistanceMoved }
-        reads("variable.") -> VariableExpr(parseIdentifier())
-        else -> throw IllegalArgumentException("Unexpected character at index $i")
+        else -> {
+            val qualifier = parseIdentifier()
+            if (qualifier.isEmpty()) throw IllegalArgumentException("Unexpected identifier at index $i")
+            if (!reads(".")) throw IllegalArgumentException("Expected `.` at index $i")
+
+            val qualified = parseIdentifier()
+            if (qualified.isEmpty()) throw IllegalArgumentException("Unexpected identifier at index $i")
+
+            val args = mutableListOf<MolangExpression>()
+            if (reads('(')) {
+                do {
+                    args.add(parseExpression())
+                } while (reads(','))
+                reads(')')
+            }
+            fun checkArgs(count: Int) {
+                if (args.size != count) {
+                    throw IllegalArgumentException("`$qualifier.$qualified` takes $count arguments but ${args.size} were given")
+                }
+            }
+
+            when (qualifier) {
+                "math" -> when (qualified) {
+                    "pi" -> { checkArgs(0); LiteralExpr(PI.toFloat()) }
+                    "cos" -> { checkArgs(1); CosExpr(args[0]) }
+                    "sin" -> { checkArgs(1); SinExpr(args[0]) }
+                    "floor" -> { checkArgs(1); FloorExpr(args[0]) }
+                    "ceil" -> { checkArgs(1); CeilExpr(args[0]) }
+                    "round" -> { checkArgs(1); RoundExpr(args[0]) }
+                    "trunc" -> { checkArgs(1); TruncExpr(args[0]) }
+                    "abs" -> { checkArgs(1); AbsExpr(args[0]) }
+                    "clamp" -> { checkArgs(3); ClampExpr(args[0], args[1], args[2]) }
+                    "random" -> { checkArgs(2); RandomExpr(args[0], args[1]) }
+                    else -> throw IllegalArgumentException("Unknown math function `$qualified`")
+                }
+                "query", "q" -> {
+                    checkArgs(0)
+                    when (qualified) {
+                        "anim_time" -> QueryExpr.AnimTime
+                        "life_time" -> QueryExpr.LifeTime
+                        "modified_move_speed" -> QueryExpr.ModifiedMoveSpeed
+                        "modified_distance_moved" -> QueryExpr.ModifiedDistanceMoved
+                        else -> throw IllegalArgumentException("Unknown query `$qualified`")
+                    }
+                }
+                "variable", "v" -> {
+                    checkArgs(0)
+                    VariableExpr(qualified)
+                }
+                else -> throw IllegalArgumentException("Unknown qualifier `$qualifier`")
+            }
+        }
     }
 
     fun parseProduct(): MolangExpression {
@@ -277,7 +402,7 @@ private class Parser(str: String) {
         while (true) {
             left = when {
                 reads('*') -> MulExpr(left, parseSimpleExpression())
-                reads('/') -> MulExpr(left, InvExpr(parseSimpleExpression()))
+                reads('/') -> DivExpr(left, parseSimpleExpression())
                 else -> return left
             }
         }
@@ -288,7 +413,7 @@ private class Parser(str: String) {
         while (true) {
             left = when {
                 reads('+') -> AddExpr(left, parseProduct())
-                reads('-') -> AddExpr(left, NegExpr(parseProduct()))
+                reads('-') -> SubExpr(left, parseProduct())
                 else -> return left
             }
         }
@@ -308,8 +433,8 @@ private class Parser(str: String) {
     fun parseEqualityChecks(): MolangExpression {
         val left = parseComparisons()
         return when {
-            reads("==") -> ComparisonExpr(left, parseSum(), ComparisonExpr.Op.Equal)
-            reads("!=") -> ComparisonExpr(left, parseSum(), ComparisonExpr.Op.NotEqual)
+            reads("==") -> ComparisonExpr(left, parseComparisons(), ComparisonExpr.Op.Equal)
+            reads("!=") -> ComparisonExpr(left, parseComparisons(), ComparisonExpr.Op.NotEqual)
             else -> left
         }
     }
@@ -351,13 +476,7 @@ private class Parser(str: String) {
     }
 
     fun parseExpression(): MolangExpression {
-        return if (reads('{')) {
-            parseStatements().also {
-                reads('}')
-            }
-        } else {
-            parseNullCoalescing()
-        }
+        return parseNullCoalescing()
     }
 
     fun parseAssignment(): MolangExpression {
@@ -374,7 +493,7 @@ private class Parser(str: String) {
 
     fun parseStatement(): MolangExpression {
         return when {
-            reads("return") -> ReturnExpr(parseExpression()).also { returns++ }
+            reads("return") -> ReturnExpr(parseExpression())
             else -> parseAssignment()
         }
     }
@@ -393,25 +512,8 @@ private class Parser(str: String) {
     }
 
     fun parseMolang(): MolangExpression {
-        var expr = parseStatements()
-
-        // Complex molang expressions require a `return` statement to return a value other than 0.
-        // In most cases that'll be the last expression, so we can easily optimize it into a regular expression result.
-        if (expr is StatementsExpr && expr.result == MolangExpression.ZERO) {
-            val lastExpr = expr.statements.last()
-            if (lastExpr is ReturnExpr) {
-                expr = StatementsExpr(expr.statements.dropLast(1), lastExpr.inner)
-                returns--
-            }
-        }
-
-        // If there's still a `return` expression somewhere in this molang expression, we need to wrap the entire thing
-        // in a try-catch to handle it.
-        if (returns > 0) {
-            expr = ComplexExpr(expr)
-        }
-
-        return expr
+        skipWhitespace()
+        return parseStatements()
     }
 
     fun fullyParseMolang(): MolangExpression {
@@ -432,17 +534,27 @@ private class Parser(str: String) {
 class MolangParserException(message: String, cause: Throwable?) : Exception(message, cause)
 
 fun String.parseMolangExpression(): MolangExpression = Parser(this).tryFullyParseMolang()
-fun JsonPrimitive.parseMolangExpression(): MolangExpression = when {
-    isString -> content.parseMolangExpression()
-    else -> LiteralExpr(content.toFloat())
-}
 
-internal object MolangSerializer : KSerializer<MolangExpression> {
+object MolangSerializer : KSerializer<Molang> {
     override val descriptor: SerialDescriptor = JsonElement.serializer().descriptor
 
-    override fun deserialize(decoder: Decoder): MolangExpression = parse((decoder as JsonDecoder).decodeJsonElement())
-    override fun serialize(encoder: Encoder, value: MolangExpression) = throw UnsupportedOperationException()
+    override fun deserialize(decoder: Decoder): Molang {
+        override.get()?.let { return it.deserialize(decoder) }
+        val json = (decoder as JsonDecoder).decodeJsonElement() as JsonPrimitive
+        return when {
+            json.isString -> Molang(json.content.parseMolangExpression())
+            else -> Molang.literal(json.content.toFloat())
+        }
+    }
 
-    private fun parse(json: JsonElement): MolangExpression =
-        (json as JsonPrimitive).parseMolangExpression()
+    override fun serialize(encoder: Encoder, value: Molang) {
+        override.get()?.let { return it.serialize(encoder, value) }
+        return (encoder as JsonEncoder).encodeJsonElement(when (val expression = value.expression) {
+            is LiteralExpr -> JsonPrimitive(expression.value)
+            else -> JsonPrimitive(expression.serializeToString())
+        })
+    }
+
+    @PublishedApi
+    internal val override = ThreadLocal<KSerializer<Molang>>()
 }

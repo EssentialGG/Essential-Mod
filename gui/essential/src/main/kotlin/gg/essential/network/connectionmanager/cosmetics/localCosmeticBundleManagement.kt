@@ -25,7 +25,7 @@ fun CosmeticsDataWithChanges.registerBundle(
     tier: CosmeticTier,
     discount: Float,
     rotateOnPreview: Boolean,
-    skin: CosmeticBundle.Skin,
+    skin: CosmeticBundle.Skin?,
     cosmetics: Map<CosmeticSlot, CosmeticId>,
     settings: Map<CosmeticId, List<CosmeticSetting>>,
 ) {

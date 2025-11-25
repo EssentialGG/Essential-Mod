@@ -14,6 +14,7 @@ package gg.essential.gui.wardrobe
 import gg.essential.Essential
 import gg.essential.api.gui.GuiRequiresTOS
 import gg.essential.config.EssentialConfig
+import gg.essential.connectionmanager.common.packet.telemetry.ClientTelemetryPacket
 import gg.essential.elementa.ElementaVersion
 import gg.essential.elementa.UIComponent
 import gg.essential.elementa.components.ScrollComponent
@@ -26,7 +27,7 @@ import gg.essential.gui.InternalEssentialGUI
 import gg.essential.gui.common.ContextOptionMenu
 import gg.essential.gui.common.EssentialCollapsibleSearchbar
 import gg.essential.gui.common.EssentialDropDown
-import gg.essential.gui.common.MenuButton
+import gg.essential.gui.common.OutlineButtonStyle
 import gg.essential.gui.common.modal.ConfirmDenyModal
 import gg.essential.gui.common.modal.configure
 import gg.essential.gui.common.onSetValueAndNow
@@ -37,10 +38,13 @@ import gg.essential.gui.elementa.state.v2.*
 import gg.essential.gui.elementa.state.v2.combinators.*
 import gg.essential.gui.elementa.state.v2.stateBy
 import gg.essential.gui.layoutdsl.*
+import gg.essential.gui.overlay.ModalManager
 import gg.essential.gui.util.pollingStateV2
 import gg.essential.gui.wardrobe.components.*
 import gg.essential.gui.wardrobe.configuration.*
 import gg.essential.gui.wardrobe.configuration.DiagnosticsMenu
+import gg.essential.gui.wardrobe.configuration.FeaturedPageCollectionConfiguration
+import gg.essential.gui.wardrobe.configuration.ImplicitOwnershipConfiguration
 import gg.essential.gui.wardrobe.modals.SkinModal
 import gg.essential.network.connectionmanager.telemetry.TelemetryManager
 import gg.essential.universal.UKeyboard
@@ -79,13 +83,24 @@ class Wardrobe(
         skinsManager,
         emoteWheelManager,
         coinsManager,
-        connectionManager.noticesManager.saleNoticeManager.saleState.map {
+        connectionManager.saleNoticeManager.saleState.map {
             it.filter { it.discountPercent > 0 } // Sales with 0% discount are used to display on the main menu and should be ignored here
         }.toListState(),
+        connectionManager.cosmeticNotices,
+        connectionManager.noticeBannerManager,
         guiScaleState,
     )
     init {
         state.inEmoteWheel.set(initialEmoteWheel)
+
+        var previousColumnCount = -1
+        effect(window) {
+            val columnCount = state.featuredPageLayout().second?.key ?: return@effect
+            if (previousColumnCount != columnCount) {
+                connectionManager.telemetryManager.enqueue(ClientTelemetryPacket("WARDROBE_LAYOUT", mapOf("columnCount" to columnCount)))
+                previousColumnCount = columnCount
+            }
+        }
     }
 
     private val searchbar = EssentialCollapsibleSearchbar(activateOnType = false).apply {
@@ -100,6 +115,7 @@ class Wardrobe(
     private val cosmeticTypeConfiguration by lazy { CosmeticTypeConfiguration(state) }
     private val cosmeticBundleConfiguration by lazy { CosmeticBundleConfiguration(state) }
     private val featuredPageCollectionConfiguration by lazy { FeaturedPageCollectionConfiguration(state) }
+    private val implicitOwnershipConfiguration by lazy { ImplicitOwnershipConfiguration(state) }
 
     private val currentConfigurationComponent = stateBy {
         val diagnosticsFor = state.showingDiagnosticsFor()
@@ -116,12 +132,15 @@ class Wardrobe(
             state.currentlyEditingCosmeticType() != null -> cosmeticTypeConfiguration
             state.currentlyEditingCosmeticCategory() != null -> cosmeticCategoryConfiguration
             state.currentlyEditingFeaturedPageCollection() != null -> featuredPageCollectionConfiguration
+            state.currentlyEditingImplicitOwnership() != null -> implicitOwnershipConfiguration
             state.editingMenuOpen() -> configurationMenu
             else -> null
         }
     }
 
     private val mainContainerWidthState = stateDelegatingTo(stateOf(0f))
+
+    private val collapseTopBarButtonsWidth = 350f
 
     init {
         lateinit var mainContainer: UIComponent
@@ -272,8 +291,9 @@ class Wardrobe(
                 //#if MC>=11602
                 //$$ keyCode == UKeyboard.KEY_ESCAPE -> restorePreviousScreen()
                 //#endif
-                Essential.getInstance().keybindingRegistry.toggleCosmetics.isKeyCode(keyCode) -> {
-                    Essential.getInstance().connectionManager.cosmeticsManager.toggleOwnCosmeticVisibility(true)
+                Essential.getInstance().keybindingRegistry.toggleCosmetics.isKeyCode(keyCode)
+                        && !EssentialConfig.disableCosmetics -> {
+                    EssentialConfig.ownCosmeticsVisibleStateWithSource.set { !it.first to EssentialConfig.CosmeticsVisibilitySource.UserWithNotification }
                 }
                 else -> {
                     defaultKeyBehavior(typedChar, keyCode)
@@ -298,7 +318,7 @@ class Wardrobe(
         dropDown = EssentialDropDown(
             state.filterSort.get(),
             mutableListStateOf(*WardrobeState.FilterSort.values().map { EssentialDropDown.Option(it.displayName, it) }.toTypedArray()),
-            compact = mainContainerWidthState.map { it < 350f },
+            compact = mainContainerWidthState.map { it < collapseTopBarButtonsWidth },
         )
         dropDown.selectedOption.onSetValue(dropDown) { state.filterSort.set(it.value) }
 
@@ -356,35 +376,37 @@ class Wardrobe(
 
         outfitManager.cleanUpUnusedSettingsOnOutfits()
 
+        Essential.getInstance().connectionManager.noticesManager.flushDismissNotices()
+
         super.onScreenClose()
     }
 
     private fun displayCartWarningModal() {
-        GuiUtil.pushModal { manager -> 
-            val modal = ConfirmDenyModal(manager, false).configure {
-                titleText = "Unowned items equipped..."
-                titleTextColor = EssentialPalette.MODAL_WARNING
-                contentText = "Unowned items will\nnot be visible in-game."
-                contentTextColor = EssentialPalette.TEXT
-                primaryButtonText = "Okay!"
-                primaryButtonStyle = MenuButton.DARK_GRAY
-                primaryButtonHoverStyle = MenuButton.GRAY
-                cancelButtonText = "Back"
-            }
+        GuiUtil.pushModal { manager ->
+            val modal = UnownedItemsEquippedModal(manager)
 
             modal.onPrimaryAction {
-                val emotes = state.emoteWheel.get().toMutableList() // Copy list to avoid concurrent modification
-                emotes.forEachIndexed { index, s ->
-                    if (s != null && s !in state.cosmeticsManager.unlockedCosmetics.get()) {
-                        state.emoteWheelManager.setEmote(index, null)
-                    }
-                }
                 restorePreviousScreen()
             }
 
             connectionManager.telemetryManager.clientActionPerformed(TelemetryManager.Actions.CART_NOT_EMPTY_WARNING)
 
             modal
+        }
+    }
+
+    class UnownedItemsEquippedModal(manager: ModalManager) : ConfirmDenyModal(manager, false) {
+        init {
+            configure {
+                titleText = "Unowned items equipped..."
+                titleTextColor = EssentialPalette.MODAL_WARNING
+                contentText = "Unowned items will\nnot be visible in-game."
+                contentTextColor = EssentialPalette.TEXT
+                primaryButtonText = "Okay!"
+                primaryButtonStyle = OutlineButtonStyle.GRAY.defaultStyle
+                primaryButtonHoverStyle = OutlineButtonStyle.GRAY.hoveredStyle
+                cancelButtonText = "Back"
+            }
         }
     }
 

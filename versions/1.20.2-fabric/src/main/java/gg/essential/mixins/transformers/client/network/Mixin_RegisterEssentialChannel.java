@@ -56,6 +56,8 @@ public abstract class Mixin_RegisterEssentialChannel extends ClientCommonNetwork
                 return new Identifier("register");
             }
         }));
+        //#elseif NEOFORGE
+        //$$ // NeoForge 20.4.234 rejects this. Given 1.20.6+ works differently, we'll just not bother with this one.
         //#else
         //$$ FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
         //$$ buf.writeBytes("essential:".getBytes(StandardCharsets.UTF_8));

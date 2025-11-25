@@ -16,8 +16,13 @@ import gg.essential.api.gui.NotificationType
 import gg.essential.api.gui.Slot
 import gg.essential.elementa.UIComponent
 import gg.essential.elementa.components.UIContainer
+import gg.essential.elementa.constraints.ChildBasedSizeConstraint
 import gg.essential.elementa.constraints.FillConstraint
+import gg.essential.elementa.dsl.childOf
 import gg.essential.elementa.dsl.constrain
+import gg.essential.elementa.dsl.minus
+import gg.essential.elementa.dsl.percent
+import gg.essential.elementa.dsl.pixel
 import gg.essential.elementa.effects.ScissorEffect
 import gg.essential.gui.EssentialPalette
 import gg.essential.gui.elementa.essentialmarkdown.EssentialMarkdown
@@ -85,7 +90,16 @@ fun NotificationBuilder.markdownBody(
 ) {
     withCustomComponent(
         Slot.LARGE_PREVIEW,
-        EssentialMarkdown(message, markdownConfig, disableSelection = true).constrain { width = FillConstraint() }
+        UIContainer().apply {
+            EssentialMarkdown(message, markdownConfig, disableSelection = true).constrain {
+                width = FillConstraint()
+            } childOf this
+
+            constrain {
+                width = 100.percent
+                height = ChildBasedSizeConstraint() - 1.pixel
+            }
+        }
     )
 }
 
@@ -113,7 +127,16 @@ fun NotificationBuilder.iconAndMarkdownBody(
                     }
                 }
             }
-            EssentialMarkdown(message, markdownConfig, disableSelection = true)(Modifier.fillRemainingWidth())
+            UIContainer().apply {
+                EssentialMarkdown(message, markdownConfig, disableSelection = true).constrain {
+                    width = FillConstraint()
+                } childOf this
+
+                constrain {
+                    width = 100.percent
+                    height = ChildBasedSizeConstraint() - 1.pixel
+                }
+            }(Modifier.fillRemainingWidth())
         }
     }
     withCustomComponent(Slot.LARGE_PREVIEW, uiContainer)

@@ -14,6 +14,18 @@ package gg.essential.gui.notification
 import gg.essential.api.gui.NotificationType
 import gg.essential.api.gui.Slot
 import gg.essential.gui.EssentialPalette
+import gg.essential.gui.layoutdsl.Modifier
+import gg.essential.gui.layoutdsl.color
+import gg.essential.gui.layoutdsl.hoverColor
+import gg.essential.gui.layoutdsl.shadow
+import gg.essential.sps.SpsAddress
+import gg.essential.util.CachedAvatarImage
+import gg.essential.util.GuiEssentialPlatform.Companion.platform
+import gg.essential.util.UuidNameLookup
+import gg.essential.util.colored
+import gg.essential.util.thenAcceptOnMainThread
+import java.awt.Color
+import java.util.UUID
 
 fun sendTosNotification(viewButtonAction: () -> Unit) {
     Notifications.pushPersistentToast(
@@ -36,5 +48,32 @@ fun sendCheckoutFailedNotification() {
         {},
     ) {
         type = NotificationType.ERROR
+    }
+}
+
+fun sendSpsInviteNotification(uuid: UUID) =
+    UuidNameLookup.getName(uuid).thenAcceptOnMainThread { name ->
+        sendSpsInviteNotification(uuid, name)
+    }
+
+fun sendSpsInviteNotification(uuid: UUID, name: String) {
+    Notifications.pushPersistentToast(name, "Sent you an invite\nto their world.", {}, {}) {
+        withCustomComponent(Slot.ICON, CachedAvatarImage.create(uuid))
+
+        val button = toastButton(
+            "Join",
+            backgroundModifier = Modifier.color(EssentialPalette.BLUE_BUTTON).hoverColor(EssentialPalette.BLUE_BUTTON_HOVER).shadow(Color.BLACK),
+            textModifier = Modifier.color(EssentialPalette.TEXT_HIGHLIGHT).shadow(EssentialPalette.TEXT_SHADOW)
+        ) {
+            dismissNotification()
+            platform.connectToServer(name, SpsAddress(uuid).toString())
+        }
+        withCustomComponent(Slot.ACTION, button)
+    }
+}
+
+fun sendOutgoingSpsInviteNotification(name: String) {
+    Notifications.push("", "") {
+        iconAndMarkdownBody(EssentialPalette.ENVELOPE_9X7.create(), "${name.colored(EssentialPalette.TEXT_HIGHLIGHT)} invited")
     }
 }

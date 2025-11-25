@@ -30,40 +30,34 @@ import gg.essential.gui.elementa.state.v2.State as StateV2
 val UIComponent.hasWindow: Boolean
     get() = this is Window || hasParent && parent.hasWindow
 
+inline fun <reified T : Effect> UIComponent.get() =
+    effects.firstNotNullOfOrNull { it as? T }
+inline fun <reified T : Effect> UIComponent.getOrPut(init: () -> T) =
+    get<T>() ?: init().also { enableEffect(it) }
+
+@Deprecated("Use StateV2 instead", ReplaceWith("pollingStateV2(initialValue, getter)"))
 fun <T> UIComponent.pollingState(initialValue: T? = null, getter: () -> T): State<T> {
     val state = BasicState(initialValue ?: getter())
-    enableEffect(object : Effect() {
-        override fun animationFrame() {
-            state.set(getter())
-        }
-    })
+    addUpdateFunc { _, _ -> state.set(getter()) }
     return state
 }
 
+/**
+ * Turns some impure computation into a pure [StateV2] by evaluating it before every frame.
+ *
+ * This should be avoided in favor of pure State-based computations where possible, but may be necessary when
+ * interfacing with third-party code.
+ * If the impure part of your computation is the current time, [Observer.systemTime] can likely replace this method.
+ */
 fun <T> UIComponent.pollingStateV2(initialValue: T? = null, getter: () -> T): StateV2<T> {
     val state = mutableStateOf(initialValue ?: getter())
-    enableEffect(object : Effect() {
-        override fun animationFrame() {
-            state.set(getter())
-        }
-    })
+    addUpdateFunc { _, _ -> state.set(getter()) }
     return state
 }
 
+@Deprecated("pollingState is now layout-safe by default", ReplaceWith("pollingStateV2(initialValue, getter)"))
 fun <T> UIComponent.layoutSafePollingState(initialValue: T? = null, getter: () -> T): StateV2<T> {
-    val state = mutableStateOf(initialValue ?: getter())
-    enableEffect(object : Effect() {
-        override fun animationFrame() {
-            val window = Window.of(boundComponent)
-            // Start one-shot timer which will trigger immediately once the current `animationFrame` is complete
-            window.startTimer(0) { timerId ->
-                window.stopTimer(timerId)
-
-                state.set(getter())
-            }
-        }
-    })
-    return state
+    return pollingStateV2(initialValue, getter)
 }
 
 /**
@@ -132,98 +126,50 @@ fun UIComponent.onAnimationFrame(block: () -> Unit) =
 
 /**
  * Returns a state representing whether this UIComponent is hovered
- *
- * [hitTest] will perform a hit test to make sure the user is actually hovered over this component
- * as compared to the mouse just being within its content bounds while being hovered over another
- * component rendered above this.
- *
- * [layoutSafe] will delay the state change until a time in which it is safe to make layout changes.
- * This option will induce an additional delay of one frame because the state is updated during the next
- * [Window.enqueueRenderOperation] after the hoverState changes.
  */
-fun UIComponent.hoveredStateV2(hitTest: Boolean = true, layoutSafe: Boolean = true): StateV2<Boolean> {
-    // "Unsafe" means that it is not safe to depend on this for layout changes
-    val unsafeHovered = mutableStateOf(false)
+fun UIComponent.hoveredStateV2(): StateV2<Boolean> {
+    return getOrPut { ComponentHoveredState() }.state
+}
 
-    // "Safe" because layout changes can directly happen when this changes (ie in onSetValue)
-    val safeHovered = mutableStateOf(false)
+private class WindowHoveredState : Effect() {
+    private var oldHovered = listOf<UIComponent>()
 
-    // Performs a hit test based on the current mouse x / y
-    fun hitTestHovered(): Boolean {
+    init { addUpdateFunc { _, _ -> update() } }
+    private fun update() {
+        val window = boundComponent as Window
+
         // Positions the mouse in the center of pixels so isPointInside will
         // pass for items 1 pixel wide objects. See ElementaVersion v2 for more details
         val halfPixel = 0.5f / UResolution.scaleFactor.toFloat()
         val mouseX = UMouse.Scaled.x.toFloat() + halfPixel
         val mouseY = UMouse.Scaled.y.toFloat() + halfPixel
-        return if (isPointInside(mouseX, mouseY)) {
 
-            val window = Window.of(this)
-            val hit = (window.hoveredFloatingComponent?.hitTest(mouseX, mouseY)) ?: window.hitTest(mouseX, mouseY)
-
-            hit.isComponentInParentChain(this) || hit == this
-        } else {
-            false
-        }
-    }
-
-    if (hitTest) {
-        // It's possible the animation framerate will exceed that of the actual frame rate
-        // Therefore, in order to avoid redundantly performing the hit test multiple times
-        // in the same frame, this boolean is used to ensure that hit testing is performed
-        // at most only a single time each frame
-        var registerHitTest = true
-
-        onAnimationFrame {
-            if (registerHitTest) {
-                registerHitTest = false
-                Window.enqueueRenderOperation {
-                    // The next animation frame should register another renderOperation
-                    registerHitTest = true
-
-                    // It is possible that this component or a component in its parent tree
-                    // was removed from the component tree between the last call to animationFrame
-                    // and this evaluation in enqueueRenderOperation. If that is the case, we should not
-                    // perform the hit test because it will throw an exception.
-                    if (!this.isInComponentTree()) {
-                        // Unset the hovered state because a component can no longer
-                        // be hovered if it is not in the component tree
-                        unsafeHovered.set(false)
-                        return@enqueueRenderOperation
-                    }
-
-                    // Since enqueueRenderOperation will keep polling the queue until there are no more items,
-                    // the forwarding of any update to the safeHovered state will still happen this frame
-                    unsafeHovered.set(hitTestHovered())
-                }
+        val hit = (window.hoveredFloatingComponent?.hitTest(mouseX, mouseY)) ?: window.hitTest(mouseX, mouseY)
+        val newHovered = hit.selfAndParents().toList()
+        for (component in oldHovered) {
+            if (component !in newHovered) {
+                component.get<ComponentHoveredState>()?.state?.set(false)
             }
         }
-    }
-    onMouseEnter {
-        if (hitTest) {
-            unsafeHovered.set(hitTestHovered())
-        } else {
-            unsafeHovered.set(true)
-        }
-    }
-
-    onMouseLeave {
-        unsafeHovered.set(false)
-    }
-
-    return if (layoutSafe) {
-        unsafeHovered.onChange(this) { hovered ->
-            Window.enqueueRenderOperation {
-                safeHovered.set(hovered)
+        for (component in newHovered) {
+            if (component !in oldHovered) {
+                component.get<ComponentHoveredState>()?.state?.set(true)
             }
         }
-        safeHovered
-    } else {
-        unsafeHovered
+        oldHovered = newHovered
     }
 }
 
-fun UIComponent.hoveredState(hitTest: Boolean = true, layoutSafe: Boolean = true): State<Boolean> =
-    hoveredStateV2(hitTest, layoutSafe).toV1(this)
+private class ComponentHoveredState : Effect() {
+    val state = mutableStateOf(false)
+
+    override fun setup() {
+        Window.of(boundComponent).getOrPut { WindowHoveredState() }
+    }
+}
+
+fun UIComponent.hoveredState(): State<Boolean> =
+    hoveredStateV2().toV1(this)
 
 /** Marker effect for [makeHoverScope]/[hoverScope]. */
 private class HoverScope(val state: StateV2<Boolean>) : Effect()
@@ -286,6 +232,7 @@ fun UIComponent.hoverScopeV2(parentOnly: Boolean = false): StateV2<Boolean> {
     return consumer.state
 }
 
+@Deprecated("Use StateV2 instead", ReplaceWith("hoverScopeV2(parentOnly)"))
 fun UIComponent.hoverScope(parentOnly: Boolean = false): State<Boolean> =
     hoverScopeV2(parentOnly).toV1(this)
 
@@ -422,6 +369,7 @@ fun UIComponent.isComponentInParentChain(target: UIComponent): Boolean {
 fun UIComponent.isInComponentTree(): Boolean =
     this is Window || hasParent && this in parent.children && parent.isInComponentTree()
 
+@Deprecated("ObservableList should be replaced with StateV2's `ListState`")
 fun <E> ObservableList<E>.onItemRemoved(callback: (E) -> Unit) {
     addObserver { _, arg ->
         if (arg is ObservableRemoveEvent<*>) {
@@ -430,6 +378,7 @@ fun <E> ObservableList<E>.onItemRemoved(callback: (E) -> Unit) {
     }
 }
 
+@Deprecated("ObservableList should be replaced with StateV2's `ListState`")
 fun <E> ObservableList<E>.onItemAdded(callback: (E) -> Unit) {
     addObserver { _, arg ->
         if (arg is ObservableAddEvent<*>) {
@@ -438,6 +387,7 @@ fun <E> ObservableList<E>.onItemAdded(callback: (E) -> Unit) {
     }
 }
 
+@Deprecated("ObservableList should be replaced with StateV2's `ListState`")
 @Suppress("UNCHECKED_CAST")
 fun <E> ObservableList<E>.toStateV2List(): ListStateV2<E> {
     val stateList = mutableStateOf(MutableTrackedList(this.toMutableList()))

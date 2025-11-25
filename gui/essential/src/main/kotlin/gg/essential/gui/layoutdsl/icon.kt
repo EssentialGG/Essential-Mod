@@ -12,6 +12,7 @@
 package gg.essential.gui.layoutdsl
 
 import gg.essential.elementa.components.UIImage
+import gg.essential.elementa.components.inspector.Inspector
 import gg.essential.gui.EssentialPalette
 import gg.essential.gui.common.AutoImageSize
 import gg.essential.gui.elementa.state.v2.State
@@ -23,6 +24,9 @@ fun LayoutScope.image(icon: ImageFactory, modifier: Modifier = Modifier): UIImag
     return image(modifier)
 }
 
+fun LayoutScope.image(icon: State<ImageFactory>, modifier: Modifier = Modifier) =
+    bind(icon) { image(it, modifier) }
+
 /** Like [image] but with a default [EssentialPalette.TEXT_SHADOW] shadow. */
 fun LayoutScope.icon(icon: ImageFactory, modifier: Modifier = Modifier) =
     image(icon, Modifier.shadow(EssentialPalette.TEXT_SHADOW).then(modifier))
@@ -33,3 +37,8 @@ fun LayoutScope.icon(icon: State<ImageFactory>, modifier: Modifier = Modifier) =
 @Deprecated("Using StateV1 is discouraged, use StateV2 instead")
 fun LayoutScope.icon(icon: gg.essential.elementa.state.State<ImageFactory>, modifier: Modifier = Modifier) =
     bind(icon) { icon(it, modifier) }
+
+@Suppress("unused")
+private val init = run {
+    Inspector.registerComponentFactory(null)
+}

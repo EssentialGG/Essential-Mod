@@ -17,11 +17,11 @@ import gg.essential.mod.cosmetics.CAPE_DISABLED_COSMETIC_ID
 import gg.essential.model.EnumPart
 import gg.essential.model.backend.PlayerPose
 import gg.essential.model.backend.RenderBackend
+import gg.essential.model.backend.minecraft.MinecraftRenderBackend
 import gg.essential.model.util.UMatrixStack
 import gg.essential.network.cosmetics.Cosmetic
 
 //#if MC>=11600
-//$$ import gg.essential.model.backend.minecraft.MinecraftRenderBackend
 //$$ import net.minecraft.client.renderer.IRenderTypeBuffer
 //#endif
 
@@ -37,26 +37,30 @@ fun WearablesManager.renderForHoverOutline(
     vertexConsumerProvider.flush()
 
     for ((cosmetic, model) in models) {
-        outlineEffect.allocOutlineBuffer(cosmetic).use {
-            render(matrixStack, vertexConsumerProvider, model, pose, skin, parts)
-            vertexConsumerProvider.flush()
-        }
+        outlineEffect.beginOutlineRender(cosmetic)
+        val queue = MinecraftRenderBackend.CommandQueue()
+        render(matrixStack, queue, model, pose, skin, parts)
+        queue.render(vertexConsumerProvider)
+        vertexConsumerProvider.flush()
+        outlineEffect.endOutlineRender(cosmetic)
     }
 }
 
 // Used for fallback renderer, for MC renderer see Mixin_CosmeticHoverOutline_Cape
 // `cape` may be null in case of third-party capes
-fun renderCapeForHoverOutline(vertexConsumerProvider: RenderBackend.VertexConsumerProvider, cape: Cosmetic?, render: () -> Unit) {
+fun renderCapeForHoverOutline(vertexConsumerProvider: RenderBackend.VertexConsumerProvider, cape: Cosmetic?, render: (RenderBackend.CommandQueue) -> Unit) {
     val outlineEffect = CosmeticHoverOutlineEffect.active ?: return
     val cosmeticsData = Essential.getInstance().connectionManager.cosmeticsManager.cosmeticsData
     val cosmetic = cape ?: cosmeticsData.getCosmetic(CAPE_DISABLED_COSMETIC_ID) ?: return
 
     vertexConsumerProvider.flush()
 
-    outlineEffect.allocOutlineBuffer(cosmetic).use {
-        render()
-        vertexConsumerProvider.flush()
-    }
+    outlineEffect.beginOutlineRender(cosmetic)
+    val queue = MinecraftRenderBackend.CommandQueue()
+    render(queue)
+    queue.render(vertexConsumerProvider)
+    vertexConsumerProvider.flush()
+    outlineEffect.endOutlineRender(cosmetic)
 }
 
 fun RenderBackend.VertexConsumerProvider.flush() {

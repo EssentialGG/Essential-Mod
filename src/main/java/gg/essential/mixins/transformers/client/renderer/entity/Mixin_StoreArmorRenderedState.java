@@ -33,7 +33,9 @@ import net.minecraft.inventory.EntityEquipmentSlot;
 @Mixin(value = LayerArmorBase.class, priority = 900)
 public class Mixin_StoreArmorRenderedState {
 
-    //#if MC>=12102
+    //#if MC>=12109
+    //$$ private static final String RENDER = "render(Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/command/OrderedRenderCommandQueue;ILnet/minecraft/client/render/entity/state/BipedEntityRenderState;FF)V";
+    //#elseif MC>=12102
     //$$ private static final String RENDER = "render(Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;ILnet/minecraft/client/render/entity/state/BipedEntityRenderState;FF)V";
     //#elseif MC>=11600
     //$$ private static final String RENDER = "render(Lcom/mojang/blaze3d/matrix/MatrixStack;Lnet/minecraft/client/renderer/IRenderTypeBuffer;ILnet/minecraft/entity/LivingEntity;FFFFFF)V";

@@ -81,7 +81,7 @@ class Notification(
     private var didTriggerAction = false
 
     val content by UIContainer().apply {
-            layout { notificationContent(title, text, type, trimTitle, trimMessage, components) }
+            layout { notificationContent(title, text, type, trimTitle, trimMessage, components, persistent) }
         }.constrain {
         x = 7.pixels
         y = 7.pixels

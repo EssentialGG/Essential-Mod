@@ -39,9 +39,9 @@ data class PlayerPose(
     override val entries: Set<Map.Entry<EnumPart, Part>>
         get() = keys.mapTo(mutableSetOf()) { MapEntry(it, get(it)) }
     override val keys: Set<EnumPart>
-        get() = EnumPart.values().toSet()
+        get() = enumPartsForPosing
     override val size: Int
-        get() = EnumPart.values().size
+        get() = enumPartsForPosing.size
     override val values: Collection<Part>
         get() = entries.map { it.value }
 
@@ -61,9 +61,36 @@ data class PlayerPose(
         EnumPart.RIGHT_WING -> rightWing
         EnumPart.LEFT_WING -> leftWing
         EnumPart.CAPE -> cape
+        EnumPart.ROOT -> Part.ZERO
     }
 
     override fun isEmpty(): Boolean = false
+
+    fun mapParts(transform: (EnumPart, Part) -> Part): PlayerPose {
+        return PlayerPose(
+            head = transform(EnumPart.HEAD, head),
+            body = transform(EnumPart.BODY, body),
+            rightArm = transform(EnumPart.RIGHT_ARM, rightArm),
+            leftArm = transform(EnumPart.LEFT_ARM, leftArm),
+            rightLeg = transform(EnumPart.RIGHT_LEG, rightLeg),
+            leftLeg = transform(EnumPart.LEFT_LEG, leftLeg),
+            rightShoulderEntity = transform(EnumPart.RIGHT_SHOULDER_ENTITY, rightShoulderEntity),
+            leftShoulderEntity = transform(EnumPart.LEFT_SHOULDER_ENTITY, leftShoulderEntity),
+            rightWing = transform(EnumPart.RIGHT_WING, rightWing),
+            leftWing = transform(EnumPart.LEFT_WING, leftWing),
+            cape = transform(EnumPart.CAPE, cape),
+            child = child,
+        )
+    }
+
+    fun withoutAttachments() = copy(
+        rightShoulderEntity = Part.MISSING,
+        leftShoulderEntity = Part.MISSING,
+        rightWing = Part.MISSING,
+        leftWing = Part.MISSING,
+        cape = Part.MISSING,
+    )
+
 
     data class Part(
         val pivotX: Float = 0f,
@@ -90,13 +117,17 @@ data class PlayerPose(
 
         companion object {
             // Parts that weren't rendered, we'll just draw far away so they'll appear is if they weren't there
-            val MISSING = Part(pivotY = -10000f)
+            val MISSING = Part(pivotY = 160000f)
+            val ZERO = Part()
         }
     }
 
     private data class MapEntry<K, V>(override val key: K, override val value: V) : Map.Entry<K, V>
 
     companion object {
+        // EnumPart.ROOT is not posed
+        private val enumPartsForPosing = EnumPart.values().filterNot { it == EnumPart.ROOT }.toSet()
+
         fun fromMap(map: Map<EnumPart, Part>, child: Boolean) =
             PlayerPose(
                 head = map.getValue(EnumPart.HEAD),

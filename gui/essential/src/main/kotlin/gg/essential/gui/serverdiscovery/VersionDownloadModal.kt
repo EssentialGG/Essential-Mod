@@ -12,7 +12,7 @@
 package gg.essential.gui.serverdiscovery
 
 import gg.essential.gui.EssentialPalette
-import gg.essential.gui.common.StyledButton
+import gg.essential.gui.common.OutlineButtonStyle
 import gg.essential.gui.common.modal.EssentialModal2
 import gg.essential.gui.common.textStyle
 import gg.essential.gui.layoutdsl.Arrangement
@@ -45,10 +45,9 @@ class VersionDownloadModal(modalManager: ModalManager, private val recommendedVe
     override fun LayoutScope.layoutButtons() {
         row(Arrangement.spacedBy(8f)) {
             cancelButton("Cancel")
-
-            styledButton(
+            outlineButton(
                 Modifier.width(91f).tag(PrimaryAction),
-                style = StyledButton.Style.BLUE,
+                style = OutlineButtonStyle.BLUE,
                 action = {
                     openInBrowser(URI.create("https://essential.gg/download"))
                 }

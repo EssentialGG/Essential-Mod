@@ -12,17 +12,19 @@
 package gg.essential.gui.modals.select.component
 
 import gg.essential.elementa.dsl.effect
+import gg.essential.gui.EssentialPalette
 import gg.essential.gui.common.shadow.ShadowEffect
 import gg.essential.gui.layoutdsl.LayoutScope
 import gg.essential.gui.layoutdsl.Modifier
 import gg.essential.gui.layoutdsl.text
 import gg.essential.util.CachedAvatarImage
 import gg.essential.util.UuidNameLookup
+import java.awt.Color
 import java.util.*
 
-fun LayoutScope.playerAvatar(uuid: UUID, modifier: Modifier = Modifier) {
+fun LayoutScope.playerAvatar(uuid: UUID, modifier: Modifier = Modifier, shadowColor: Color = EssentialPalette.COMPONENT_BACKGROUND) {
     val image = CachedAvatarImage.create(uuid)
-        .effect(ShadowEffect())
+        .effect(ShadowEffect(shadowColor))
 
     image(modifier)
 }

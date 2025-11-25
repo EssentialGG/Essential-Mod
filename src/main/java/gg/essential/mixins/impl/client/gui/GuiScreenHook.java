@@ -14,7 +14,7 @@ package gg.essential.mixins.impl.client.gui;
 import gg.essential.Essential;
 import gg.essential.event.gui.*;
 import gg.essential.mixins.impl.ClassHook;
-import gg.essential.universal.UMatrixStack;
+import gg.essential.util.UDrawContext;
 import net.minecraft.client.gui.GuiScreen;
 import gg.essential.mixins.transformers.client.gui.GuiScreenAccessor;
 
@@ -103,8 +103,8 @@ public class GuiScreenHook extends ClassHook<GuiScreen> {
         Essential.EVENT_BUS.post(event);
     }
 
-    public GuiDrawScreenEvent drawScreen(UMatrixStack matrixStack, int mouseX, int mouseY, float partialTicks, boolean post) {
-        GuiDrawScreenEvent event = new GuiDrawScreenEvent(instance, matrixStack, mouseX, mouseY, partialTicks, post);
+    public GuiDrawScreenEvent drawScreen(UDrawContext drawContext, int mouseX, int mouseY, float partialTicks, boolean post) {
+        GuiDrawScreenEvent event = new GuiDrawScreenEvent(instance, drawContext, mouseX, mouseY, partialTicks, post);
         Essential.EVENT_BUS.post(event);
         return event;
     }

@@ -15,15 +15,22 @@ import com.sparkuniverse.toolbox.util.DateTime
 import gg.essential.Essential
 import gg.essential.config.LoadsResources
 import gg.essential.config.McEssentialConfig
-import gg.essential.elementa.components.UIImage
-import gg.essential.elementa.components.Window
-import gg.essential.gui.common.ImageLoadCallback
 import gg.essential.gui.elementa.essentialmarkdown.EssentialMarkdown
+import gg.essential.gui.elementa.state.v2.ListState
+import gg.essential.gui.elementa.state.v2.State
+import gg.essential.gui.elementa.state.v2.mapEach
+import gg.essential.gui.elementa.state.v2.memo
+import gg.essential.gui.elementa.state.v2.toListState
 import gg.essential.gui.friends.SocialMenu
 import gg.essential.gui.screenshot.LocalScreenshot
-import gg.essential.gui.screenshot.components.ScreenshotBrowser
+import gg.essential.gui.screenshot.RemoteScreenshot
+import gg.essential.gui.screenshot.ScreenshotId
+import gg.essential.gui.screenshot.ScreenshotInfo
 import gg.essential.gui.screenshot.components.ScreenshotProperties
-import gg.essential.universal.UDesktop
+import gg.essential.gui.screenshot.getImageTime
+import gg.essential.gui.screenshot.handler.ScreenshotMetadataManager
+import gg.essential.handlers.screenshot.ClientScreenshotMetadata
+import gg.essential.media.model.Media
 import gg.essential.universal.UMinecraft
 import gg.essential.util.resource.EssentialAssetResourcePack
 import net.minecraft.client.gui.GuiOptions
@@ -33,12 +40,8 @@ import net.minecraft.client.resources.IResourcePack
 import net.minecraft.util.ResourceLocation
 import net.minecraft.util.Session
 import org.apache.logging.log4j.LogManager
-import java.awt.Desktop
-import java.awt.HeadlessException
-import java.awt.image.BufferedImage
 import java.io.File
 import java.io.IOException
-import java.lang.reflect.InvocationTargetException
 import java.net.URI
 import java.net.URL
 import java.nio.file.FileSystems
@@ -46,9 +49,9 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.util.*
-import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.function.Consumer
+import kotlin.io.path.exists
 import kotlin.io.path.toPath
 
 //#if MC >= 11602
@@ -110,6 +113,25 @@ fun findCodeSource(javaClass: Class<*>): CodeSource? {
     //$$ }
     //#endif
 
+    // With ModLauncher (LexForge edition) + JarJar 0.3 (used by Forge 1.20.6+), nested jars are are wrapped in both a
+    // `jij` and a `union` pseudo file system, we need to unwrap the outer one and turn the inner one from a `jij` to a
+    // regular `jar` to get at the jar file instead of its content, however the outer one file system has mangled the
+    // inner path, and isn't accessible directly because it's not exported, so we need to do some string manipulation
+    // and pray.
+    // This probably won't work for deeply nested jars, but we haven't yet run into one we'd need.
+    // union:/jij:file:///home/user/.minecraft/instances/1.20.6-forge/mods/kotlin-for-forge-5.7.0.jar_/META-INF/jarjar/kotlin-stdlib-2.1.0.jar%2313!/
+    if (url.protocol == "union" && url.toURI().path.startsWith("/jij:")) {
+        var str = url.toURI().path
+        // Remove the union and jij wrapping
+        str = str.substring(1 until str.lastIndexOf("#"))
+        // Restore the `!` which the union file system replaced with `_`
+        str = str.replace(".jar_/META-INF/jarjar/", ".jar!/META-INF/jarjar/")
+        // Turn `jij` into regular `jar` path
+        str = "jar:" + str.removePrefix("jij:")
+        // Pray this works out
+        url = URI(str).toURL()
+    }
+
     // With ModLauncher (1.17+ edition), mod jars are wrapped into a "union" pseudo file system, we need to unwrap
     // them to get our actual jar file.
     // union:/home/user/.minecraft/instances/1.17.1%20Forge/mods/Essential%201.17.1-forge-master-SNAPSHOT.jar%2359!
@@ -119,6 +141,13 @@ fun findCodeSource(javaClass: Class<*>): CodeSource? {
         val originalScheme = "file" // I can't see any way to get hold of this, so let's just assume "file" for now
         val originalPath = unionPath.substring(0 until unionPath.lastIndexOf("#"))
         url = URI(originalScheme, null, originalPath, null).toURL()
+        // With NeoForge's JarInJar, these can also be nested (although the protocol is only given once):
+        // Raw:   union:/home/user/.minecraft/minecraft/mods/kotlin-for-forge-5.7.0.jar%23186_/META-INF/jarjar/kotlin-stdlib-2.1.0.jar%23203!/
+        // By now: file:/home/user/.minecraft/minecraft/mods/kotlin-for-forge-5.7.0.jar%23186_/META-INF/jarjar/kotlin-stdlib-2.1.0.jar
+        val nestedRegex = Regex("\\.jar%23\\d+_/META-INF/jarjar/")
+        if (url.path.contains(nestedRegex)) {
+            url = URL("jar:" + url.toString().replace(nestedRegex, ".jar!/META-INF/jarjar/"))
+        }
     }
 
     // With ModLauncher (LexForge flavour, used by Forge 1.20.4+), mod jars are no longer wrapped in a "union"
@@ -164,11 +193,6 @@ fun findCodeSource(javaClass: Class<*>): CodeSource? {
     }
 }
 
-sealed interface CodeSource {
-    data class Jar(val path: Path) : CodeSource
-    data class Directory(val path: Path) : CodeSource
-}
-
 fun addEssentialResourcePack(consumer: Consumer<IResourcePack>) {
     consumer.accept(EssentialAssetResourcePack(Essential.getInstance().connectionManager.cosmeticsManager.assetLoader))
 
@@ -177,25 +201,32 @@ fun addEssentialResourcePack(consumer: Consumer<IResourcePack>) {
     //#endif
 
     val pack = when (val source = findCodeSource(Essential::class.java)) {
-        //#if MC>=11903
-        //$$ is CodeSource.Jar ->
+        is CodeSource.Jar -> {
             //#if MC>=12005
             //$$ ZipResourcePack.ZipBackedFactory(source.path.toFile()).open(info)
             //#elseif MC>=12002
             //$$ ZipResourcePack.ZipBackedFactory(source.path.toFile(), true).open("essential")
-            //#else
+            //#elseif MC>=11903
             //$$ ZipResourcePack("essential", source.path.toFile(), true)
-            //#endif
-        //$$ is CodeSource.Directory ->
-            //#if MC>=12005
-            //$$ DirectoryResourcePack(info, source.path)
             //#else
-            //$$ DirectoryResourcePack("essential", source.path, true)
+            FileResourcePack(source.path.toFile())
             //#endif
-        //#else
-        is CodeSource.Jar -> FileResourcePack(source.path.toFile())
-        is CodeSource.Directory -> FolderResourcePack(source.path.toFile())
-        //#endif
+        }
+        is CodeSource.Directory -> {
+            var path = source.path
+            if (!path.resolve("pack.mcmeta").exists()) {
+                // When running via Gradle, `path` will be versions/1.12.2-forge/build/classes/java/main
+                // but resources are stored separately at versions/1.12.2-forge/build/resources/main
+                path = path.resolve("../../../resources/main")
+            }
+            //#if MC>=12005
+            //$$ DirectoryResourcePack(info, path)
+            //#elseif MC>=11903
+            //$$ DirectoryResourcePack("essential", path, true)
+            //#else
+            FolderResourcePack(path.toFile())
+            //#endif
+        }
         null -> return
     }
     //#if MC>=11400
@@ -314,64 +345,6 @@ fun setPerspective(perspective: Int) {
     UMinecraft.getMinecraft().renderGlobal.setDisplayListEntitiesDirty()
 }
 
-fun getImageTime(properties: ScreenshotProperties, useEditIfPresent: Boolean): DateTime {
-    val (id, metadata) = properties
-    return if (metadata != null) {
-        if (useEditIfPresent) {
-            metadata.editTime ?: metadata.time
-        } else {
-            metadata.time
-        }
-    } else if (id is LocalScreenshot) {
-        val path = id.path
-        val name = path.fileName.toString()
-            // If multiple screenshots were taken on this second, trim the trailing counter
-            .split("_").take(2).joinToString("_")
-            // and in any case, remove the file extension
-            .removeSuffix(".png")
-        val millis = try {
-            ScreenshotBrowser.DATE_FORMAT.parse(name).time
-        } catch (e: Exception) {
-            try {
-                Files.getLastModifiedTime(path).toMillis()
-            } catch (e: Exception) {
-                0
-            }
-        }
-        DateTime(millis)
-    } else {
-        DateTime(0)
-    }
-}
-
-fun openFileInDirectory(path: Path) {
-    {
-        val declaredMethod = Desktop::class.java.getDeclaredMethod("browseFileDirectory", File::class.java)
-        declaredMethod.invoke(Desktop.getDesktop(), path.toFile())
-        Unit
-    }.catch(NoSuchMethodException::class, InvocationTargetException::class, HeadlessException::class) { throwable ->
-        if (throwable is InvocationTargetException && throwable.cause !is UnsupportedOperationException) {
-            throwable.printStackTrace()
-        }
-        fun command(vararg command: String): Boolean {
-            return try {
-                Runtime.getRuntime().exec(command).let {
-                    it != null && it.isAlive
-                }
-            } catch (e: IOException) {
-                false
-            }
-        }
-        //On Windows and Mac we can implement browseFileDirectory on older java versions using commands
-        //Adding quotes to the Windows command causes it to fail to work. The , after select is required
-        if (!((UDesktop.isWindows && command("explorer.exe", "/select,", path.toAbsolutePath().toString()))
-                || (UDesktop.isMac && command("open", "-R", "${path.toAbsolutePath()}")))
-        ) {
-            UDesktop.open(path.toFile().parentFile)
-        }
-    }
-}
-
 val screenshotFolder: File by lazy {
     var folder = File(UMinecraft.getMinecraft().mcDataDir, "screenshots")
 
@@ -437,7 +410,9 @@ fun USession.toMC() =
         //#if MC>=11800
         //$$ Optional.empty(),
         //$$ Optional.empty(),
+        //#if MC<12109
         //$$ Session.AccountType.MSA,
+        //#endif
         //#else
         "Xbox"
         //#endif
@@ -459,30 +434,39 @@ fun getOrderedPaths(files: Set<String>, rootPath: Path, timeExtractor: (Path) ->
     )
 }
 
-/**
- * Loads [image] as a [UIImage], calling [whenReady] on the UI thread once it is fully loaded.
- * May be called from any thread.
- * If [image] is `null`, no [UIImage] is created and [whenReady] will be called with `null`.
- */
-fun maybeLoadUIImage(image: BufferedImage?, whenReady: (UIImage?) -> Unit) {
-    if (image == null) {
-        Window.enqueueRenderOperation { whenReady(null) }
-    } else {
-        loadUIImage(image, whenReady)
+fun combinedOrderedScreenshotsState(
+    metadataManager: ScreenshotMetadataManager,
+    rootPath: Path,
+    localScreenshots: ListState<Pair<String, String>>,
+    remoteScreenshots: ListState<Media>,
+): ListState<ScreenshotInfo> {
+    data class UnresolvedScreenshotInfo(val id: ScreenshotId, val checksumOrUid: String, val time: State<DateTime>, val metadata: State<ClientScreenshotMetadata?>)
+    val localWithTime = localScreenshots.mapEach { (name, checksum) ->
+        val id = LocalScreenshot(rootPath.resolve(name))
+        val metadata = metadataManager.metadata(checksum)
+        val time = memo { getImageTime(ScreenshotProperties(id, metadata()), true) }
+        UnresolvedScreenshotInfo(id, checksum, time, metadata)
     }
-}
-
-/**
- * Loads [image] as a [UIImage], calling [whenReady] on the UI thread once it is fully loaded.
- * May be called from any thread.
- */
-fun loadUIImage(image: BufferedImage, whenReady: (UIImage) -> Unit) {
-    val uiImage = UIImage(CompletableFuture.completedFuture(image))
-    Window.enqueueRenderOperation {
-        uiImage.supply(ImageLoadCallback {
-            whenReady(uiImage)
-        })
+    val remoteWithTime = remoteScreenshots.mapEach { media ->
+        val id = RemoteScreenshot(media)
+        val metadata = ClientScreenshotMetadata(media)
+        val time = getImageTime(ScreenshotProperties(id, metadata), true)
+        ScreenshotInfo(id, media.id, time, metadata)
     }
+    return State {
+        val result = mutableListOf<ScreenshotInfo>()
+        val remoteMediaIds = remoteWithTime().mapTo(mutableSetOf()) { (it.id as RemoteScreenshot).media.id }
+        localWithTime().mapTo(result) { unresolved ->
+            val metadata = unresolved.metadata()
+            ScreenshotInfo(unresolved.id, unresolved.checksumOrUid, unresolved.time(), metadata?.copy(
+                ownedMediaId = metadata.mediaIds.firstOrNull { it in remoteMediaIds },
+            ))
+        }
+        val localMediaIds = result.flatMapTo(mutableSetOf()) { it.metadata?.mediaIds ?: emptySet() }
+        remoteWithTime().filterTo(result) { (it.id as RemoteScreenshot).media.id !in localMediaIds }
+        result.sortWith(compareByDescending<ScreenshotInfo> { it.time }.thenBy { it.id.name })
+        result
+    }.toListState()
 }
 
 /** Listens for, and parses, any links pointing to custom essential protocol scheme and open associated GuiScreen */
@@ -521,14 +505,4 @@ val essentialUriListener: EssentialMarkdown.(EssentialMarkdown.LinkClickEvent) -
         }
         event.stopImmediatePropagation()
     }
-}
-
-fun createDateOnlyCalendar(time: Long = System.currentTimeMillis()): Calendar {
-    val date: Calendar = GregorianCalendar()
-    date.timeInMillis = time
-    date.set(Calendar.HOUR_OF_DAY, 0)
-    date.set(Calendar.MINUTE, 0)
-    date.set(Calendar.SECOND, 0)
-    date.set(Calendar.MILLISECOND, 0)
-    return date
 }

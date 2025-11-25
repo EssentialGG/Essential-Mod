@@ -11,6 +11,7 @@
  */
 package gg.essential.gui.layoutdsl
 
+import gg.essential.elementa.components.inspector.Inspector
 import gg.essential.elementa.state.State
 import gg.essential.gui.common.EssentialTooltip
 import gg.essential.gui.elementa.state.v2.*
@@ -105,3 +106,8 @@ fun Modifier.hoverTooltip(
     windowPadding: Float? = null,
     layout: LayoutScope.() -> Unit,
 ) = whenHovered(Modifier.tooltip(position, padding, windowPadding, layout))
+
+@Suppress("unused")
+private val init = run {
+    Inspector.registerComponentFactory(null)
+}

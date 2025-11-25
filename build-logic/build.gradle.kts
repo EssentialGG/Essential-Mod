@@ -31,12 +31,14 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinCompilerVersion")
     implementation("org.jetbrains.kotlin:kotlin-serialization:$kotlinCompilerVersion")
     implementation("org.jetbrains.dokka:dokka-gradle-plugin:1.8.10")
-    implementation("org.jetbrains.kotlinx:binary-compatibility-validator:0.13.1")
-    implementation("io.github.goooler.shadow:shadow-gradle-plugin:8.1.7")
+    implementation("org.jetbrains.kotlinx:binary-compatibility-validator:0.18.1")
+    runtimeOnly("org.jetbrains.kotlin:kotlin-metadata-jvm:2.2.0") // for binary-compatibility-validator
+    implementation("com.gradleup.shadow:com.gradleup.shadow.gradle.plugin:8.3.7")
     implementation("org.ow2.asm:asm-commons:9.3")
     implementation ("com.google.guava:guava:30.1.1-jre")
 
-    implementation("gg.essential:essential-gradle-toolkit:0.6.4")
+    implementation("gg.essential:essential-gradle-toolkit:0.6.10")
+    implementation("gg.essential.loom:gg.essential.loom.gradle.plugin:1.7.35") // TODO remove once EGT has updated
 }
 
 gradlePlugin {

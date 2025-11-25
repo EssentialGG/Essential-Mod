@@ -11,7 +11,7 @@
  */
 package gg.essential.mixins.transformers.resources;
 
-import gg.essential.mixins.ext.client.resource.FileResourcePackExt;
+import gg.essential.mixins.ext.client.resource.ResourcePackWithPath;
 import net.minecraft.resource.ZipResourcePack;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -21,12 +21,12 @@ import java.io.File;
 import java.nio.file.Path;
 
 @Mixin(ZipResourcePack.class)
-public class ZipResourcePackMixin_Ext implements FileResourcePackExt {
+public class ZipResourcePackMixin_Ext implements ResourcePackWithPath {
 
     @Shadow @Final private File backingZipFile;
 
     @Override
-    public Path getEssential$file() {
+    public Path getEssential$path() {
         File file = this.backingZipFile;
         return file != null ? file.toPath() : null;
     }

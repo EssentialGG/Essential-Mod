@@ -25,6 +25,7 @@ import gg.essential.gui.elementa.state.v2.*
 import gg.essential.gui.elementa.state.v2.combinators.*
 import gg.essential.gui.notification.Notifications
 import gg.essential.gui.notification.error
+import gg.essential.gui.overlay.ModalManager
 import gg.essential.mod.Model
 import gg.essential.mod.Skin
 import gg.essential.network.CMConnection
@@ -55,6 +56,10 @@ class SkinsManager(private val connectionManager: CMConnection) : NetworkedManag
             compareBy<SkinItem> { it.favoritedSince?.toEpochMilli() }
                 .thenByDescending { (it.lastUsedAt ?: it.createdAt).toEpochMilli() }
         )
+    }.toListState()
+
+    private val skinsOrderedByLastUsed = mutableSkins.map { skins ->
+        skins.values.sortedByDescending { (it.lastUsedAt ?: it.createdAt).toEpochMilli()  }
     }.toListState()
 
     init {
@@ -101,9 +106,7 @@ class SkinsManager(private val connectionManager: CMConnection) : NetworkedManag
         }
         val manager = platform.createModalManager()
         manager.queueModal(
-            DangerConfirmationEssentialModal(manager, "Delete", false)
-                .configure { contentText = "Are you sure you want to delete\n${skin.name}?" }
-                .onPrimaryAction { deleteSkin(skinId) }
+            DeleteSkinModal(manager, skin.name).onPrimaryAction { deleteSkin(skinId) }
         )
     }
 
@@ -139,6 +142,8 @@ class SkinsManager(private val connectionManager: CMConnection) : NetworkedManag
     }
 
     fun updateLastUsedAtState(skinId: SkinId) {
+        // Skip update if the skin is already the most recently used
+        if (skinsOrderedByLastUsed.getUntracked().first().id == skinId) return
         packetQueue.enqueue(ClientSkinUpdateLastUsedStatePacket(skinId)) { maybeResponse ->
             val response = maybeResponse.orElse(null)
             // We don't replace the skin here, since the packet handler already replaces it
@@ -156,6 +161,12 @@ class SkinsManager(private val connectionManager: CMConnection) : NetworkedManag
             if (response !is ServerSkinPopulatePacket) {
                 Notifications.push("Error updating skin", "An unexpected error has occurred. Try again.")
             }
+        }
+    }
+
+    class DeleteSkinModal(manager: ModalManager, name: String) : DangerConfirmationEssentialModal(manager, "Delete", false) {
+        init {
+            configure { contentText = "Are you sure you want to delete\n${name}?" }
         }
     }
 

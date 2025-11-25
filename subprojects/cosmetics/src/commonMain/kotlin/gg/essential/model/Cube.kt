@@ -55,7 +55,6 @@ class Cube {
     val mirror: Boolean
 
     constructor(
-        renderer: Bone,
         texU: Float,
         texV: Float,
         x: Float,
@@ -65,11 +64,11 @@ class Cube {
         dy: Float,
         dz: Float,
         delta: Float,
-        mirror: Boolean
-    ) : this(renderer, x, y, z, dx, dy, dz, delta, mirror, texU, texV, null)
+        mirror: Boolean,
+        textureWidth: Int, textureHeight: Int,
+    ) : this(x, y, z, dx, dy, dz, delta, mirror, textureWidth, textureHeight, texU, texV, null)
 
     constructor(
-        renderer: Bone,
         x: Float,
         y: Float,
         z: Float,
@@ -78,8 +77,9 @@ class Cube {
         dz: Float,
         delta: Float,
         mirror: Boolean,
+        textureWidth: Int, textureHeight: Int,
         uvData: CubeUvData?
-    ) : this(renderer, x, y, z, dx, dy, dz, delta, mirror, 0f, 0f, uvData)
+    ) : this(x, y, z, dx, dy, dz, delta, mirror, textureWidth, textureHeight, 0f, 0f, uvData)
 
     constructor(precomputedFaces: List<Face>, mirror: Boolean) {
         quadList.addAll(precomputedFaces)
@@ -87,10 +87,10 @@ class Cube {
     }
 
     private constructor(
-        renderer: Bone,
         x: Float, y: Float, z: Float,
         dx: Float, dy: Float, dz: Float,
         delta: Float, mirror: Boolean,
+        textureWidth: Int, textureHeight: Int,
         texU: Float, texV: Float, // these are only used if uvData is null
         uvData: CubeUvData?
     ) {
@@ -137,12 +137,12 @@ class Cube {
         val west = uvData?.west ?: DEFAULT_UV_WEST
         val up = uvData?.up ?: DEFAULT_UV_UP
         val down = uvData?.down ?: DEFAULT_UV_DOWN
-        quadList.add(Face(arrayOf(PositionTexVertex4, PositionTexVertex, PositionTexVertex1, PositionTexVertex5), west[0], west[1], west[2], west[3], renderer.textureWidth.toFloat(), renderer.textureHeight.toFloat())) //+x
-        quadList.add(Face(arrayOf(PositionTexVertex7, PositionTexVertex3, PositionTexVertex6, PositionTexVertex2), east[0], east[1], east[2], east[3], renderer.textureWidth.toFloat(), renderer.textureHeight.toFloat())) //-x
-        quadList.add(Face(arrayOf(PositionTexVertex4, PositionTexVertex3, PositionTexVertex7, PositionTexVertex), up[0], up[1], up[2], up[3], renderer.textureWidth.toFloat(), renderer.textureHeight.toFloat()))
-        quadList.add(Face(arrayOf(PositionTexVertex1, PositionTexVertex2, PositionTexVertex6, PositionTexVertex5), down[0], down[1], down[2], down[3], renderer.textureWidth.toFloat(), renderer.textureHeight.toFloat()))
-        quadList.add(Face(arrayOf(PositionTexVertex, PositionTexVertex7, PositionTexVertex2, PositionTexVertex1), north[0], north[1], north[2], north[3], renderer.textureWidth.toFloat(), renderer.textureHeight.toFloat()))
-        quadList.add(Face(arrayOf(PositionTexVertex3, PositionTexVertex4, PositionTexVertex5, PositionTexVertex6), south[0], south[1], south[2], south[3], renderer.textureWidth.toFloat(), renderer.textureHeight.toFloat()))
+        quadList.add(Face(arrayOf(PositionTexVertex4, PositionTexVertex, PositionTexVertex1, PositionTexVertex5), west[0], west[1], west[2], west[3], textureWidth.toFloat(), textureHeight.toFloat())) //+x
+        quadList.add(Face(arrayOf(PositionTexVertex7, PositionTexVertex3, PositionTexVertex6, PositionTexVertex2), east[0], east[1], east[2], east[3], textureWidth.toFloat(), textureHeight.toFloat())) //-x
+        quadList.add(Face(arrayOf(PositionTexVertex4, PositionTexVertex3, PositionTexVertex7, PositionTexVertex), up[0], up[1], up[2], up[3], textureWidth.toFloat(), textureHeight.toFloat()))
+        quadList.add(Face(arrayOf(PositionTexVertex1, PositionTexVertex2, PositionTexVertex6, PositionTexVertex5), down[0], down[1], down[2], down[3], textureWidth.toFloat(), textureHeight.toFloat()))
+        quadList.add(Face(arrayOf(PositionTexVertex, PositionTexVertex7, PositionTexVertex2, PositionTexVertex1), north[0], north[1], north[2], north[3], textureWidth.toFloat(), textureHeight.toFloat()))
+        quadList.add(Face(arrayOf(PositionTexVertex3, PositionTexVertex4, PositionTexVertex5, PositionTexVertex6), south[0], south[1], south[2], south[3], textureWidth.toFloat(), textureHeight.toFloat()))
 
         // TODO could skip generation of inverted faces when we know the corresponding texture to be fully opaque
         for (i in 0..5) {
@@ -161,11 +161,10 @@ class Cube {
         matrixStack: UMatrixStack,
         renderer: UVertexConsumer,
         light: Int,
-        scale: Float,
         verticalUVOffset: Float
     ) {
         for (texturedquad in quadList) {
-            texturedquad.draw(matrixStack, renderer, light, scale, verticalUVOffset)
+            texturedquad.draw(matrixStack, renderer, light, verticalUVOffset)
         }
     }
 
@@ -176,5 +175,11 @@ class Cube {
 
     fun getQuadList(): MutableList<Face> {
         return quadList
+    }
+
+    fun deepCopy(): Cube {
+        return Cube(quadList.map { face ->
+            Face(face.vertexPositions.map { it.copy() }.toTypedArray())
+        }, mirror)
     }
 }

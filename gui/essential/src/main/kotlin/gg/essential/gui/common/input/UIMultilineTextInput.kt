@@ -47,10 +47,6 @@ class UIMultilineTextInput @JvmOverloads constructor(
         this.maxHeight = maxHeight
     }
 
-    fun setMaxLines(maxLines: Int) = apply {
-        this.maxHeight = (lineHeightWithPadding * maxLines - linePadding).pixels()
-    }
-
     override fun getText() = textualLines.joinToString("\n") { it.text }
 
     override fun textToLines(text: String): List<String> {

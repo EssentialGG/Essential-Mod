@@ -11,13 +11,16 @@
  */
 package gg.essential.model
 
-import dev.folomeev.kotgl.matrix.matrices.mutables.timesSelf
 import dev.folomeev.kotgl.matrix.vectors.Vec3
 import dev.folomeev.kotgl.matrix.vectors.mutables.minus
 import dev.folomeev.kotgl.matrix.vectors.mutables.timesSelf
 import dev.folomeev.kotgl.matrix.vectors.vec3
 import dev.folomeev.kotgl.matrix.vectors.vec4
+import dev.folomeev.kotgl.matrix.vectors.vecUnitY
+import dev.folomeev.kotgl.matrix.vectors.vecUnitZ
 import dev.folomeev.kotgl.matrix.vectors.vecZero
+import gg.essential.model.backend.RenderBackend
+import gg.essential.model.bones.BakedAnimations
 import gg.essential.model.file.AnimationFile
 import gg.essential.model.file.KeyframeSerializer
 import gg.essential.model.file.KeyframesSerializer
@@ -28,11 +31,13 @@ import gg.essential.model.util.UMatrixStack
 import gg.essential.model.util.times
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import java.awt.Color
 import kotlin.math.PI
 
 class ModelAnimationState(
     val entity: MolangQueryEntity,
     val parentLocator: ParticleSystem.Locator,
+    private val parentTextureSource: () -> RenderBackend.Texture?,
 ) {
     val active: MutableList<AnimationState> = mutableListOf()
     val pendingEvents: MutableList<Event> = mutableListOf()
@@ -44,11 +49,11 @@ class ModelAnimationState(
         if (active.any { it.animation == animation }) {
             return
         }
-        active.add(AnimationState(animation))
+        active.add(AnimationState(animation, entity))
 
         animation.effects.values.forEach { list ->
             list.forEach { event ->
-                val name = (event as? Animation.LocatableEvent)?.locator?.boxName
+                val name = (event as? Animation.LocatableEvent)?.locator
                 if (name != null && name !in locators) {
                     locators[name] = BoneLocator(vec3(), Quaternion.Identity, vec3())
                 }
@@ -56,25 +61,14 @@ class ModelAnimationState(
         }
     }
 
-    private fun findAndResetBones(bone: Bone, map: MutableMap<String, Bone>) {
-        map[bone.boxName] = bone
-        bone.resetAnimationOffsets(false)
-        if (bone.childModels != null) {
-            for (childModel in bone.childModels) {
-                findAndResetBones(childModel, map)
-            }
-        }
-    }
-
-    fun apply(model: Bone, affectPose: Boolean) {
-        val bones = mutableMapOf<String, Bone>()
-        findAndResetBones(model, bones)
-
+    fun bake(bones: Bones): BakedAnimations {
+        val bakedBones = mutableListOf<BakedAnimations.BakedBone>()
 
         for (state in active) {
             for ((boneName, channels) in state.animation.bones) {
-                val bone = bones[boneName] ?: continue
-                if (bone.affectsPose != affectPose) continue
+                val id = (bones[boneName] ?: continue).id
+                val bone = bakedBones.find { it.boneId == id }
+                    ?: BakedAnimations.BakedBone(id).also { bakedBones.add(it) }
                 channels.relativeTo.rotation?.let { relativeTo ->
                     bone.gimbal = true
                     bone.worldGimbal = relativeTo == "world"
@@ -96,14 +90,20 @@ class ModelAnimationState(
                 }
             }
         }
+
+        val entityRotation =
+            if (bakedBones.any { it.worldGimbal }) entity.locator.rotation
+            else Quaternion.Identity
+
+        return BakedAnimations(bakedBones, entityRotation)
     }
 
     /** Whether there are any locators that still need to be updated via [updateLocators] for this frame. */
     fun locatorsNeedUpdating() =
         locators.isNotEmpty() && lastLocatorUpdateTime < entity.lifeTime
 
-    /** Updates the position/rotation/velocity of all locators based on the current transform of bones in [rootBone]. */
-    fun updateLocators(rootBone: Bone, scale: Float) {
+    /** Updates the position/rotation/velocity of all locators based on the current transform of bones in [bones]. */
+    fun updateLocators(bones: Bones, scale: Float) {
         if (locators.isEmpty()) {
             return // nothing to do
         }
@@ -116,34 +116,28 @@ class ModelAnimationState(
         lastLocatorUpdateTime = now
 
         // TODO maybe optimize traversal, don't need to compute subtree with only dead ends (same for retrievePose)
-        fun Bone.visit(matrixStack: UMatrixStack, parentHasScaling: Boolean) {
+        fun Bone.visit(matrixStack: UMatrixStack) {
             val locator = locators[boxName]
 
             if (locator == null && childModels.isEmpty()) {
                 return
             }
 
-            val hasScaling = parentHasScaling || animScaleX != 1f || animScaleY != 1f || animScaleZ != 1f
-
             matrixStack.push()
-            matrixStack.translate(pivotX + animOffsetX, pivotY - animOffsetY, pivotZ + animOffsetZ)
-            if (gimbal) {
-                matrixStack.rotate(parentRotation.conjugate())
-            }
-            matrixStack.rotate(rotateAngleZ + animRotZ, 0.0f, 0.0f, 1.0f, false)
-            matrixStack.rotate(rotateAngleY + animRotY, 0.0f, 1.0f, 0.0f, false)
-            matrixStack.rotate(rotateAngleX + animRotX, 1.0f, 0.0f, 0.0f, false)
+            applyTransform(matrixStack)
 
             if (locator != null) {
+                val localPosition = vec4(pivotX + userOffsetX, pivotY + userOffsetY, pivotZ + userOffsetZ, 1f)
+
                 val matrix = matrixStack.peek().model
                 val lastPosition = locator.position
-                val nextPosition = with(vec4(0f, 0f, 0f, 1f).times(matrix)) { vec3(x, y, z) }
+                val nextPosition = with(localPosition.times(matrix)) { vec3(x, y, z) }
                 locator.position = nextPosition
 
                 // LookAt is towards -1 because as per OpenGL convention the camera is looking towards negative Z.
-                val lookAt = with(vec4(0f, 0f, -1f, 1f).times(matrix)) { vec3(x, y, z) }.minus(nextPosition)
+                val lookAt = with(localPosition.minus(vecUnitZ()).times(matrix)) { vec3(x, y, z) }.minus(nextPosition)
                 // Up is towards -1 because Mojang renders models upside down, and our cosmetics have been built around that
-                val up = with(vec4(0f, -1f, 0f, 1f).times(matrix)) { vec3(x, y, z) }.minus(nextPosition)
+                val up = with(localPosition.minus(vecUnitY()).times(matrix)) { vec3(x, y, z) }.minus(nextPosition)
                 locator.rotation = Quaternion.fromLookAt(lookAt, up)
 
                 // Only update if we have a valid previous value (we cannot compute velocity from just the first frame)
@@ -151,16 +145,17 @@ class ModelAnimationState(
                 if (lastPosition != vecZero() && dt > 0f) {
                     locator.velocity = nextPosition.minus(lastPosition).timesSelf(1 / dt)
                 }
-            }
 
-            extra?.let {
-                matrixStack.peek().model.timesSelf(it)
+                locator.isVisible = isVisible
             }
-            matrixStack.scale(animScaleX, animScaleY, animScaleZ)
-            matrixStack.translate(-pivotX - userOffsetX, -pivotY - userOffsetY, -pivotZ - userOffsetZ)
 
             for (childModel in childModels) {
-                childModel.visit(matrixStack, hasScaling)
+                if (childModel.part != null) {
+                    // Special parts do not actually inherit the matrix stack, because it was already baked into their
+                    // pose, so we'll visit them separately
+                    continue
+                }
+                childModel.visit(matrixStack)
             }
 
             matrixStack.pop()
@@ -173,7 +168,10 @@ class ModelAnimationState(
         matrixStack.scale(scale)
         matrixStack.scale(-1f, -1f, 1f) // see RenderLivingBase.prepareScale
         matrixStack.scale(0.9375f) // see RenderPlayer.preRenderCallback
-        rootBone.visit(matrixStack, false)
+        bones.byPart.values.forEach { bone ->
+            bone.resetAnimationOffsets(false) // animations will have been baked into the pose already
+            bone.visit(matrixStack)
+        }
     }
 
     /** Emits effect keyframes into [pendingEvents]. */
@@ -203,15 +201,16 @@ class ModelAnimationState(
                             nextLifeTime,
                             entity,
                             event.effect,
-                            event.locator?.boxName?.let { locators[it] } ?: parentLocator,
+                            event.locator?.let { locators[it] } ?: parentLocator,
                             event.preEffectScript,
+                            parentTextureSource,
                         )
                         is Animation.SoundEvent -> SoundEvent(
                             entity,
                             nextLifeTime,
                             entity,
                             event.effect,
-                            event.locator?.boxName?.let { locators[it] } ?: parentLocator,
+                            event.locator?.let { locators[it] } ?: parentLocator,
                         )
                     })
                 }
@@ -219,24 +218,40 @@ class ModelAnimationState(
         }
     }
 
-    inner class AnimationState(
-        val animation: Animation
+    class AnimationState(
+        val animation: Animation,
+        val entity: MolangQueryEntity,
+        val animStartTime: Float = entity.lifeTime,
+        private val contextVariables: VariablesMap = VariablesMap(),
+        internal var lastEffectTime: Float = Float.NEGATIVE_INFINITY, // Effects up to and including this time have already been emitted.
+        internal var effectLoops: Int = 0,
     ) : MolangQueryAnimation, MolangQueryEntity by entity {
-        val context = MolangContext(this)
-        val animStartTime = entity.lifeTime
+        val context: MolangContext = MolangContext(this, contextVariables)
         override val animTime: Float
             get() = entity.lifeTime - animStartTime
         override val animLoopTime: Float
             get() =
                 if (animation.loop == AnimationFile.Loop.HoldOnLastFrame) animTime.coerceAtMost(animation.animationLength)
                 else animTime % animation.animationLength
+        val hasEnded: Boolean
+            get() = animation.loop == AnimationFile.Loop.False && animTime > animation.animationLength
 
-        /** Effects up to and including this time have already been emitted. */
-        internal var lastEffectTime = Float.NEGATIVE_INFINITY
-        internal var effectLoops = 0
+        fun copy(
+            animation: Animation = this.animation,
+            entity: MolangQueryEntity = this.entity,
+            animStartTime: Float = this.animStartTime,
+            contextVariables: VariablesMap = this.contextVariables.copy(),
+            lastEffectTime: Float = this.lastEffectTime,
+            effectLoops: Int = this.effectLoops,
+        ): AnimationState {
+            return AnimationState(animation, entity, animStartTime, contextVariables, lastEffectTime, effectLoops)
+        }
+
         internal val effectLoopsDuration: Float
             get() = if (animation.loop == AnimationFile.Loop.True) effectLoops * animation.animationLength else 0f
     }
+
+
 
     sealed interface Event {
         val timeSource: MolangQueryTime
@@ -248,9 +263,10 @@ class ModelAnimationState(
         override val timeSource: MolangQueryTime,
         override val time: Float,
         override val sourceEntity: MolangQueryEntity,
-        val effect: ParticleEffect,
+        val effect: ParticleEffectWithReferencedEffects,
         val locator: ParticleSystem.Locator,
-        val preEffectScript: MolangExpression?,
+        val preEffectScript: Molang?,
+        val textureSource: () -> RenderBackend.Texture?,
     ) : Event
 
     data class SoundEvent(
@@ -264,8 +280,13 @@ class ModelAnimationState(
     private inner class BoneLocator(
         override var position: Vec3,
         override var rotation: Quaternion,
-        override var velocity: Vec3
+        override var velocity: Vec3,
     ) : ParticleSystem.Locator {
+        private var innerIsVisible = true
+        override var isVisible: Boolean
+            get() = parentLocator.isVisible && innerIsVisible
+            set(value) { innerIsVisible = value }
+
         override val parent: ParticleSystem.Locator?
             get() = parentLocator
         override val isValid: Boolean
@@ -283,12 +304,11 @@ data class Animation(
 ) {
     val affectsPose: Boolean = affectsPoseParts.isNotEmpty()
 
-
     constructor(
         name: String,
         file: AnimationFile.Animation,
-        bones: List<Bone>,
-        particleEffects: Map<String, ParticleEffect>,
+        bones: Bones,
+        particleEffects: Map<String, ParticleEffectWithReferencedEffects>,
         soundEffects: Map<String, SoundEffect>,
     ) : this(
         name,
@@ -301,7 +321,7 @@ data class Animation(
                 for (config in effects) {
                     eventsAtTime.add(ParticleEvent(
                         particleEffects[config.effect] ?: continue,
-                        config.locator?.let { locatorName -> bones.find { it.boxName == locatorName } },
+                        config.locator,
                         config.preEffectScript,
                     ))
                 }
@@ -311,7 +331,7 @@ data class Animation(
                 for (config in effects) {
                     eventsAtTime.add(SoundEvent(
                         soundEffects[config.effect] ?: continue,
-                        config.locator?.let { locatorName -> bones.find { it.boxName == locatorName } },
+                        config.locator
                     ))
                 }
             }
@@ -321,21 +341,22 @@ data class Animation(
         },
     )
 
+    /** Consider deep equality of instances as [Animation.equals] has functionality in [ModelInstance.switchModel] */
     sealed interface Event
 
     sealed interface LocatableEvent : Event {
-        val locator: Bone?
+        val locator: String?
     }
 
     data class ParticleEvent(
-        val effect: ParticleEffect,
-        override val locator: Bone?,
-        val preEffectScript: MolangExpression?,
+        val effect: ParticleEffectWithReferencedEffects,
+        override val locator: String?,
+        val preEffectScript: Molang?,
     ) : Event, LocatableEvent
 
     data class SoundEvent(
         val effect: SoundEffect,
-        override val locator: Bone?,
+        override val locator: String?,
     ) : Event, LocatableEvent
 
     companion object {
@@ -391,10 +412,15 @@ data class Keyframes(
     }
 }
 
-fun Vec3.lerp(other: Vec3, alpha: Float): Vec3 =
-    vec3(x.lerp(other.x, alpha), y.lerp(other.y, alpha), z.lerp(other.z, alpha))
+fun Vec3.lerp(other: Vec3, t: Float): Vec3 =
+    vec3(x.lerp(other.x, t), y.lerp(other.y, t), z.lerp(other.z, t))
 
-fun Float.lerp(other: Float, alpha: Float) = this + (other - this) * alpha
+fun Color.lerp(other: Color, t: Float): Color =
+    Color(red.lerp(other.red, t), green.lerp(other.green, t), blue.lerp(other.blue, t), alpha.lerp(other.alpha, t))
+
+fun Float.lerp(other: Float, t: Float) = this + (other - this) * t
+
+fun Int.lerp(other: Int, t: Float) = (this.toFloat() + (other.toFloat() - this.toFloat()) * t).toInt()
 
 fun catmullRom(
     t: Float,

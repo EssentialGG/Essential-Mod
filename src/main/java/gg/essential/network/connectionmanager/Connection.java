@@ -15,6 +15,7 @@ import com.google.common.primitives.Bytes;
 import gg.essential.Essential;
 import gg.essential.connectionmanager.common.packet.Packet;
 import gg.essential.connectionmanager.common.packet.connection.ConnectionKeepAlivePacket;
+import gg.essential.data.VersionInfo;
 import gg.essential.handlers.CertChain;
 import gg.essential.network.connectionmanager.ConnectionManagerKt.CloseInfo;
 import gg.essential.network.connectionmanager.legacyjre.LegacyJre;
@@ -28,20 +29,39 @@ import org.java_websocket.client.DnsResolver;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.SSLSocketFactory;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintStream;
 import java.net.InetAddress;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.time.Instant;
+import java.util.Arrays;
 import java.util.Base64;
+import java.util.Comparator;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.zip.GZIPOutputStream;
+
+import static gg.essential.util.ExtensionsKt.getGlobalEssentialDirectory;
 
 public class Connection extends WebSocketClient {
+    private static final Logger LOGGER = LoggerFactory.getLogger(Connection.class);
 
     private static final Lazy<Function<String, SSLSocketFactory>> SSL_SOCKET_FACTORY_FACTORY = LazyKt.lazy(() -> {
         try {
@@ -73,34 +93,50 @@ public class Connection extends WebSocketClient {
         }
     });
 
+    private static URI CM_HOST_URI;
+    static {
+        String defaultUri = "wss://connect.essential.gg/v1";
+        URI uri = URI.create(
+            System.getProperty(
+                "essential.cm.host",
+                System.getenv().getOrDefault("ESSENTIAL_CM_HOST", defaultUri)
+            )
+        );
+        String[] knownHosts = {".essential.gg",".modcore.dev"};
+        boolean schemeGood = uri.getScheme().equals("wss");
+        boolean hostGood = Arrays.stream(knownHosts).anyMatch(uri.getHost()::endsWith);
+        if (!schemeGood || !hostGood) {
+            Essential.logger.error("Potentially insecure ESSENTIAL_CM_HOST found, using default instead");
+            uri = URI.create(defaultUri);
+        }
+        CM_HOST_URI = uri;
+    }
+
     @NotNull
     private final Executor sendExecutor = new LimitedExecutor(Multithreading.getPool(), 1, new ConcurrentLinkedQueue<>());
 
     //
     @NotNull
     private final Callbacks callbacks;
-    private final ConnectionCodec codec = new ConnectionCodec();
+    private final ConnectionCodec codec = new ConnectionCodec(this::log);
 
     private int usingProtocol = 1;
     private ScheduledFuture<?> timeoutTask;
 
-    private static final int MAX_PROTOCOL = 6;
+    private static final int MAX_PROTOCOL = 9;
 
     public Connection(@NotNull Callbacks callbacks) {
-        super(
-            URI.create(
-                System.getProperty(
-                    "essential.cm.host",
-                    System.getenv().getOrDefault("ESSENTIAL_CM_HOST", "wss://connect.essential.gg/v1")
-                )
-            )
-        );
+        super(CM_HOST_URI);
 
         this.callbacks = callbacks;
 
         this.setTcpNoDelay(true);
         this.setReuseAddr(true);
         this.setConnectionLostTimeout(0); // We have our own keep alive.
+    }
+
+    public int getUsingProtocol() {
+        return usingProtocol;
     }
 
     public void close(@NotNull final CloseReason closeReason) {
@@ -112,6 +148,8 @@ public class Connection extends WebSocketClient {
         this.usingProtocol = Integer.parseInt(serverHandshake.getFieldValue("Essential-Protocol-Version"));
 
         scheduleTimeout();
+
+        log(out -> out.printf("{\"type\": \"OPEN\", \"version\": %d}\n", usingProtocol));
 
         this.callbacks.onOpen();
     }
@@ -133,9 +171,27 @@ public class Connection extends WebSocketClient {
             this.timeoutTask = null;
         }
 
-        boolean outdated = reason.contains("Invalid status code received: 410") || reason.contains("Invalid status code received: 404");
+        KnownCloseReason knownReason;
+        if (reason.contains("Invalid status code received: 410") || reason.contains("Invalid status code received: 404")) {
+            knownReason = KnownCloseReason.OUTDATED;
+        } else if (code == 4008) {
+            knownReason = KnownCloseReason.SUSPENDED;
+        } else {
+            knownReason = null;
+        }
 
-        this.callbacks.onClose(new CloseInfo(code, reason, remote, outdated));
+        this.callbacks.onClose(new CloseInfo(code, reason, remote, knownReason));
+    }
+
+    @Override
+    public void close() {
+        log(out -> {
+            out.print("{\"type\": \"CLOSE\"}\n");
+            out.close();
+            logClosed = true;
+        });
+
+        super.close();
     }
 
     @Override
@@ -189,7 +245,7 @@ public class Connection extends WebSocketClient {
         codec.encode(packet, this::send);
     }
 
-    public void setupAndConnect(String userName, byte[] secret) {
+    public void setupAndConnect(UUID uuid, String userName, byte[] secret) {
         byte[] colon = ":".getBytes(StandardCharsets.UTF_8);
         byte[] name = userName.getBytes(StandardCharsets.UTF_8);
         byte[] nameSecret = Bytes.concat(name, colon, secret);
@@ -202,6 +258,14 @@ public class Connection extends WebSocketClient {
         } else {
             this.addHeader("Essential-Protocol-Version", protocolProperty);
         }
+
+        this.addHeader("Essential-User-UUID", uuid.toString());
+        this.addHeader("Essential-User-Name", userName);
+
+        VersionInfo versionInfo = new VersionInfo();
+        this.addHeader("Essential-Mod-Version", versionInfo.getEssentialVersion());
+        this.addHeader("Essential-Mod-Commit", versionInfo.getEssentialCommit());
+        this.addHeader("Essential-Mod-Branch", versionInfo.getEssentialBranch());
 
         // Attempt to connect.
         try {
@@ -229,9 +293,101 @@ public class Connection extends WebSocketClient {
             60L, TimeUnit.SECONDS);
     }
 
+    private static final int MAX_LOGS = 10;
+    private final Executor loggingExecutor = new LimitedExecutor(Multithreading.getPool(), 1, new ConcurrentLinkedQueue<>());
+    private PrintStream logOut;
+    private boolean logClosed;
+
+    private void log(IOConsumer<PrintStream> consumer) {
+        loggingExecutor.execute(() -> logSync(consumer));
+    }
+
+    private void logSync(IOConsumer<PrintStream> consumer) {
+        if (logClosed) return;
+
+        if (logOut == null) {
+            Path folder = getGlobalEssentialDirectory().resolve("infra-logs");
+
+            // Cleanup/compress existing files
+            cleanupLogs(folder);
+
+            // Create new file
+            Path file = folder.resolve(
+                    Instant.now().toString().replace(':', '_') // windows doesn't like colons in filenames
+                            + ".log");
+            try {
+                Files.createDirectories(folder);
+                logOut = new PrintStream(Files.newOutputStream(file));
+            } catch (IOException e) {
+                LOGGER.error("Failed to create connection log file {}", file, e);
+                return;
+            }
+        }
+
+        try {
+            consumer.accept(logOut);
+        } catch (IOException e) {
+            LOGGER.error("Failed to write to connection log file", e);
+        }
+    }
+
+    private static void cleanupLogs(Path folder) {
+        List<Path> files;
+        try (Stream<Path> stream = Files.exists(folder) ? Files.list(folder) : Stream.empty()) {
+            files = stream.sorted(Comparator.<Path, FileTime>comparing(file -> {
+                try {
+                    return Files.getLastModifiedTime(file);
+                } catch (IOException e) {
+                    LOGGER.warn("Failed to get last modified time of {}", file, e);
+                    return FileTime.from(Instant.EPOCH);
+                }
+            }).reversed()).collect(Collectors.toList());
+        } catch (IOException e) {
+            LOGGER.error("Failed to list files in {}", folder, e);
+            return;
+        }
+        int count = 0;
+        for (Path file : files) {
+            if (count >= MAX_LOGS) {
+                try {
+                    Files.delete(file);
+                } catch (IOException e) {
+                    LOGGER.warn("Failed to delete {}", file, e);
+                    continue;
+                }
+            } else if (file.getFileName().toString().endsWith(".log")) {
+                Path gzFile = file.resolveSibling(file.getFileName() + ".gz");
+                try (OutputStream out = Files.newOutputStream(gzFile);
+                     GZIPOutputStream gzOut = new GZIPOutputStream(out)) {
+                    Files.copy(file, gzOut);
+                } catch (IOException e) {
+                    LOGGER.warn("Failed to write compressed file {}", gzFile, e);
+                    throw new RuntimeException(e);
+                }
+                try {
+                    Files.delete(file);
+                } catch (IOException e) {
+                    LOGGER.warn("Failed to delete {}", file, e);
+                    continue;
+                }
+            }
+            count++;
+        }
+    }
+
+    interface IOConsumer<T> {
+        void accept(T value) throws IOException;
+    }
+
     interface Callbacks {
         void onOpen();
         void onPacketAsync(Packet packet);
         void onClose(CloseInfo info);
+    }
+
+    public enum KnownCloseReason {
+
+        OUTDATED,
+        SUSPENDED
     }
 }

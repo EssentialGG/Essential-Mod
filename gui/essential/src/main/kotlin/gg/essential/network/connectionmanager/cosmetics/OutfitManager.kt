@@ -11,6 +11,7 @@
  */
 package gg.essential.network.connectionmanager.cosmetics
 
+import gg.essential.config.EssentialConfig
 import gg.essential.connectionmanager.common.packet.cosmetic.outfit.ClientCosmeticOutfitCreatePacket
 import gg.essential.connectionmanager.common.packet.cosmetic.outfit.ClientCosmeticOutfitCosmeticSettingsUpdatePacket
 import gg.essential.connectionmanager.common.packet.cosmetic.outfit.ClientCosmeticOutfitDeletePacket
@@ -27,7 +28,7 @@ import gg.essential.gui.elementa.state.v2.ReferenceHolderImpl
 import gg.essential.gui.elementa.state.v2.State
 import gg.essential.gui.elementa.state.v2.clear
 import gg.essential.gui.elementa.state.v2.combinators.map
-import gg.essential.gui.elementa.state.v2.combinators.zip
+import gg.essential.gui.elementa.state.v2.memo
 import gg.essential.gui.elementa.state.v2.mutableListStateOf
 import gg.essential.gui.elementa.state.v2.mutableStateOf
 import gg.essential.gui.elementa.state.v2.onChange
@@ -37,7 +38,6 @@ import gg.essential.gui.elementa.state.v2.toListState
 import gg.essential.mod.Skin
 import gg.essential.mod.cosmetics.CosmeticOutfit
 import gg.essential.mod.cosmetics.CosmeticSlot
-import gg.essential.mod.cosmetics.OutfitSkin
 import gg.essential.mod.cosmetics.settings.CosmeticSetting
 import gg.essential.network.CMConnection
 import gg.essential.network.connectionmanager.NetworkedManager
@@ -59,7 +59,7 @@ class OutfitManager(
     val connectionManager: CMConnection,
     val cosmeticsData: CosmeticsData,
     val unlockedCosmetics: State<Set<CosmeticId>>,
-    val equippedCosmeticsManager: EquippedCosmeticsManager,
+    val equippedOutfitsManager: InfraEquippedOutfitsManager,
     val skins: State<Map<SkinId, Skin>>
 ) : NetworkedManager {
 
@@ -75,7 +75,7 @@ class OutfitManager(
                 .thenByDescending { it.createdAt.toEpochMilli() }
         ).map { item ->
             val skin = skins[item.skinId]
-            item.copy(skin = if (skin == null) null else OutfitSkin(skin, true))
+            item.copy(skin = skin)
         }
     }.toListState()
 
@@ -92,7 +92,7 @@ class OutfitManager(
     }
     val equippedSkin = stateBy {
         val selected = selectedOutfitId()
-        outfits().find { it.id == selected }?.skin?.skin
+        outfits().find { it.id == selected }?.skin
     }
 
     private var flushSelectedOutfitJob: Job? = null
@@ -113,8 +113,17 @@ class OutfitManager(
             sentOutfitId = selectedOutfitId
         }
 
-        equippedOwnedCosmetics.zip(equippedOwnedCosmeticsSettings).onChange(referenceHolder) { (cosmetics, settings) ->
-            equippedCosmeticsManager.update(USession.activeNow().uuid, cosmetics, settings)
+        val actuallyEquippedCosmetics = memo {
+            var cosmetics = equippedOwnedCosmetics()
+            val settings = equippedOwnedCosmeticsSettings()
+            if (!EssentialConfig.ownCosmeticsVisibleState()) {
+                cosmetics = cosmetics.filterKeys { it == CosmeticSlot.ICON || it == CosmeticSlot.EMOTE }
+            }
+            val skin = equippedSkin()
+            Pair(USession.active().uuid, InfraEquippedOutfitsManager.InfraOutfit(cosmetics, settings, skin))
+        }
+        actuallyEquippedCosmetics.onChange(referenceHolder) { (uuid, outfit) ->
+            equippedOutfitsManager.update(uuid, outfit)
         }
     }
 
@@ -128,6 +137,10 @@ class OutfitManager(
 
     fun getOutfit(id: String): CosmeticOutfit? {
         return outfits.get().find { it.id == id }
+    }
+
+    fun getOutfitState(id: String): State<CosmeticOutfit?> {
+        return outfits.map { outfitList -> outfitList.find { id == it.id } }
     }
 
     fun getSelectedOutfit(): CosmeticOutfit? {

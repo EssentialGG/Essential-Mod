@@ -11,10 +11,6 @@
  */
 package gg.essential.util;
 
-import java.net.DatagramPacket;
-import java.net.Inet4Address;
-import java.net.Inet6Address;
-
 public class ProtocolUtils {
 
     // https://en.wikipedia.org/wiki/Internet_Protocol_version_4#Header
@@ -27,22 +23,5 @@ public class ProtocolUtils {
 
     // https://en.wikipedia.org/wiki/User_Datagram_Protocol#UDP_datagram_structure
     public static final int UDP_HEADER_SIZE = 8;
-
-    /**
-     * Estimates the header size, in bytes, of a given {@link DatagramPacket}.
-     * This estimate includes the UDP and IP header.
-     * @param packet the packet
-     * @return the header size, in bytes
-     */
-    public static int guessHeaderSize(DatagramPacket packet) {
-        if (packet.getAddress() instanceof Inet4Address) {
-            return IPV4_HEADER_SIZE + UDP_HEADER_SIZE;
-        } else if (packet.getAddress() instanceof Inet6Address) {
-            return IPV6_HEADER_SIZE + UDP_HEADER_SIZE;
-        } else {
-            // Best we can do here
-            return UDP_HEADER_SIZE;
-        }
-    }
 
 }

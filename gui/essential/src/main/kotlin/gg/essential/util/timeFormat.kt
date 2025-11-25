@@ -12,8 +12,8 @@
 package gg.essential.util
 
 import gg.essential.config.EssentialConfig
+import gg.essential.gui.elementa.state.v2.ObservedDuration
 import java.time.Duration
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -26,7 +26,10 @@ const val DATE_FORMAT_NO_YEAR = "MMM dd"
 
 fun getTimeFormat(includeSeconds: Boolean): String {
     val seconds = if (includeSeconds) ":ss" else ""
-    return if (EssentialConfig.timeFormat == 0) "h:mm$seconds a" else "HH:mm$seconds"
+    return when (EssentialConfig.timeFormat) {
+        EssentialConfig.TimeFormat.AM_PM -> "h:mm$seconds a"
+        EssentialConfig.TimeFormat.REGULAR -> "HH:mm$seconds"
+    }
 }
 
 fun formatDate(date: LocalDate, displayYear: Boolean = true) =
@@ -43,40 +46,37 @@ fun TemporalAccessor.formatter(pattern: String): String {
     return format.format(this)
 }
 
-private val weeksTimeMap = TreeMap(
-    mutableMapOf(
+private val weeksTimeMap =
+    listOf(
         TimeUnit.DAYS.toMillis(7) to "w",
         TimeUnit.DAYS.toMillis(1) to "d",
         TimeUnit.HOURS.toMillis(1) to "h",
         TimeUnit.MINUTES.toMillis(1) to "m",
         TimeUnit.SECONDS.toMillis(1) to "s"
     )
-)
 
-private val daysTimeMap = TreeMap(
-    mutableMapOf(
+private val daysTimeMap =
+    listOf(
         TimeUnit.DAYS.toMillis(1) to "d",
         TimeUnit.HOURS.toMillis(1) to "h",
         TimeUnit.MINUTES.toMillis(1) to "m",
         TimeUnit.SECONDS.toMillis(1) to "s"
     )
-)
 
-fun Instant.toCosmeticOptionTime(): String {
-    return Duration.between(Instant.now(), this).toShortString()
-}
+fun Duration.toShortString(weeks: Boolean = true, expiredText: String = "Expired"): String =
+    ObservedDuration(this) {}.toShortString(weeks, expiredText)
 
-fun Duration.toShortString(weeks: Boolean = true, expiredText: String = "Expired"): String {
+fun ObservedDuration.toShortString(weeks: Boolean = true, expiredText: String = "Expired"): String {
     val delta = toMillis()
     val timeMap = if (weeks) weeksTimeMap else daysTimeMap
 
-    val ceilEntry = timeMap.floorEntry(delta) ?: return expiredText
-    val floorEntry = timeMap.floorEntry(ceilEntry.key - 1)
+    val ceilEntry = timeMap.find { delta.greaterOrEqual(it.first) } ?: return expiredText
+    val floorEntry = timeMap.find { ceilEntry.first - 1 >= it.first }
     if (ceilEntry === floorEntry || floorEntry == null) {
-        return (delta / ceilEntry.key).toString() + ceilEntry.value
+        return (delta / ceilEntry.first).toString() + ceilEntry.second
     }
-    val ceilUnits = delta / ceilEntry.key
-    val floorUnits = (delta - ceilUnits * ceilEntry.key) / floorEntry.key
+    val ceilUnits = delta / ceilEntry.first
+    val floorUnits = (delta - ceilUnits * ceilEntry.first) / floorEntry.first
 
-    return ceilUnits.toString() + ceilEntry.value + " " + floorUnits.toString() + floorEntry.value
+    return ceilUnits.toString() + ceilEntry.second + " " + floorUnits.toString() + floorEntry.second
 }

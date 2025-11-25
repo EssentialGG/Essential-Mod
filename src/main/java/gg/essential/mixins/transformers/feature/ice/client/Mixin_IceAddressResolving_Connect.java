@@ -12,7 +12,7 @@
 package gg.essential.mixins.transformers.feature.ice.client;
 
 import gg.essential.Essential;
-import gg.essential.network.connectionmanager.sps.SPSManager;
+import gg.essential.sps.SpsAddress;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -45,8 +45,8 @@ public abstract class Mixin_IceAddressResolving_Connect {
     private String setIceTarget(String address) throws Exception {
         Essential essential = Essential.getInstance();
         UUID user;
-        SPSManager spsManager = essential.getConnectionManager().getSpsManager();
-        user = spsManager.getHostFromSpsAddress(address);
+        SpsAddress spsAddress = SpsAddress.parse(address);
+        user = spsAddress != null ? spsAddress.getHost() : null;
         if (user != null) {
             connectTarget.set(user);
             address = "127.0.0.1"; // just needs to resolve

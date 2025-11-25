@@ -31,7 +31,10 @@ public class Mixin_EMFAnimationEntityContext {
 
     @WrapOperation(method = "Ltraben/entity_model_features/models/animation/EMFAnimationEntityContext;isEntityAnimPaused()Z", at = @At(value = "INVOKE", target = "Lit/unimi/dsi/fastutil/objects/ObjectSet;contains(Ljava/lang/Object;)Z"), remap = false)
     private static boolean pauseAnimationsWhenEmoting(ObjectSet<?> instance, Object uuid, Operation<Boolean> original) {
-        return original.call(instance, uuid) || essential$isEntityEmoting(MinecraftClient.getInstance().world.getPlayerByUuid((UUID) uuid));
+        return original.call(instance, uuid) ||
+                // this method may still be run for entities when MinecraftClient.getInstance().world == null depending on the behaviour of other mods
+                // specifically this gets run for special inventory chest entities that meet this condition in the Quark mod's "q" menu
+                (MinecraftClient.getInstance().world != null && essential$isEntityEmoting(MinecraftClient.getInstance().world.getPlayerByUuid((UUID) uuid)));
     }
 
     @Unique

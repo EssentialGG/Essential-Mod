@@ -16,6 +16,7 @@ import gg.essential.api.EssentialAPI
 import gg.essential.api.profile.WrappedGameProfile
 import gg.essential.api.profile.wrapped
 import gg.essential.elementa.UIComponent
+import gg.essential.elementa.components.inspector.Inspector
 import gg.essential.elementa.state.BasicState
 import gg.essential.elementa.state.State
 import org.jetbrains.annotations.ApiStatus
@@ -193,3 +194,11 @@ inline fun EssentialComponentFactory.buildConfirmationModal(block: ConfirmationM
 inline fun EssentialComponentFactory.buildIconButton(block: IconButtonBuilder.() -> Unit): UIComponent =
     IconButtonBuilder().apply(block).build(this)
 
+@Suppress("unused")
+private val init = run {
+    Inspector.registerComponentFactory(null)
+    Inspector.registerComponentFactory(EssentialComponentFactory::class.java)
+    Inspector.registerComponentFactory(EmulatedPlayerBuilder::class.java)
+    Inspector.registerComponentFactory(IconButtonBuilder::class.java)
+    Inspector.registerComponentFactory(ConfirmationModalBuilder::class.java)
+}

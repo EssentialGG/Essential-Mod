@@ -47,11 +47,11 @@ class FriendRequestToastNoticeListener(
                     denyTooltip = "Decline",
                     confirmAction = {
                         connectionManager.relationshipManager.acceptFriend(uuid)
-                        noticeManager.socialMenuNewFriendRequestNoticeManager.clearUnseenFriendRequests(uuid)
+                        connectionManager.socialMenuNewFriendRequestNoticeManager.clearUnseenFriendRequests(uuid)
                     },
                     denyAction = {
                         connectionManager.relationshipManager.denyFriend(uuid)
-                        noticeManager.socialMenuNewFriendRequestNoticeManager.clearUnseenFriendRequests(uuid)
+                        connectionManager.socialMenuNewFriendRequestNoticeManager.clearUnseenFriendRequests(uuid)
                     },
                     dismissNotification = dismissNotification,
                 )

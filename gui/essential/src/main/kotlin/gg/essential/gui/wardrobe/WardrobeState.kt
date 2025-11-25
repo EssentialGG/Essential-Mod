@@ -19,8 +19,10 @@ import gg.essential.cosmetics.CosmeticId
 import gg.essential.cosmetics.CosmeticTypeId
 import gg.essential.cosmetics.EquippedCosmetic
 import gg.essential.cosmetics.FeaturedPageCollectionId
+import gg.essential.cosmetics.ImplicitOwnershipId
 import gg.essential.cosmetics.diagnose
 import gg.essential.cosmetics.events.AnimationEventType
+import gg.essential.cosmetics.isAvailable
 import gg.essential.elementa.UIComponent
 import gg.essential.gui.common.onSetValueAndNow
 import gg.essential.gui.elementa.state.v2.ListState
@@ -39,7 +41,9 @@ import gg.essential.gui.elementa.state.v2.onChange
 import gg.essential.gui.elementa.state.v2.set
 import gg.essential.gui.elementa.state.v2.setAll
 import gg.essential.gui.elementa.state.v2.stateBy
+import gg.essential.gui.elementa.state.v2.stateUsingSystemTime
 import gg.essential.gui.elementa.state.v2.toListState
+import gg.essential.gui.elementa.state.v2.withSystemTime
 import gg.essential.gui.elementa.state.v2.zipWithEachElement
 import gg.essential.gui.state.Sale
 import gg.essential.gui.util.layoutSafePollingState
@@ -55,6 +59,7 @@ import gg.essential.network.connectionmanager.skins.SkinsManager
 import gg.essential.network.cosmetics.Cosmetic
 import gg.essential.gui.util.pollingStateV2
 import gg.essential.mod.cosmetics.featured.FeaturedItem
+import gg.essential.mod.cosmetics.featured.FeaturedItemRow
 import gg.essential.mod.cosmetics.settings.CosmeticSettings
 import gg.essential.mod.cosmetics.settings.setting
 import gg.essential.network.connectionmanager.cosmetics.EmoteWheelManager
@@ -62,6 +67,8 @@ import gg.essential.network.connectionmanager.cosmetics.ICosmeticsManager
 import gg.essential.network.connectionmanager.cosmetics.ModelLoader
 import gg.essential.network.connectionmanager.cosmetics.OutfitManager
 import gg.essential.network.connectionmanager.cosmetics.WardrobeSettings
+import gg.essential.network.connectionmanager.notices.CosmeticNotices
+import gg.essential.network.connectionmanager.notices.NoticeBannerManager
 import gg.essential.universal.UResolution
 import gg.essential.util.Client
 import gg.essential.util.EssentialSounds
@@ -78,7 +85,7 @@ import kotlin.time.Duration.Companion.seconds
 class WardrobeState(
     initialCategory: WardrobeCategory?,
     val screenOpen: State<Boolean>,
-    component: UIComponent,
+    val component: UIComponent,
     val cosmeticsManager: ICosmeticsManager,
     val modelLoader: ModelLoader,
     val settings: WardrobeSettings,
@@ -87,6 +94,8 @@ class WardrobeState(
     val emoteWheelManager: EmoteWheelManager,
     val coinsManager: CoinsManager,
     val saleState: ListState<Sale>,
+    val cosmeticNotices: CosmeticNotices,
+    val bannerManager: NoticeBannerManager,
     private val guiScale: State<Int>,
 ) {
     val diagnosticsEnabled = cosmeticsManager.localCosmeticsData != null
@@ -116,12 +125,14 @@ class WardrobeState(
 
     val rawFeaturedPageCollections = cosmeticsManager.cosmeticsData.featuredPageCollections
 
+    val rawImplicitOwnerships = cosmeticsManager.cosmeticsData.implicitOwnerships
+
     val rawCosmetics = cosmeticsManager.cosmeticsData.cosmetics
 
-    private val availableCosmetics = rawCosmetics.zip(unlockedCosmetics).map { (rawCosmetics, unlockedCosmetics) ->
-        rawCosmetics.filterTo(mutableListOf()) {
-            // TODO (low prio) `isAvailable` is not a pure function
-            (it.isAvailable() && "HIDDEN" !in it.tags) || it.id in unlockedCosmetics
+    private val availableCosmetics = stateUsingSystemTime { now ->
+        val unlockedCosmetics = unlockedCosmetics()
+        rawCosmetics().filter {
+            (it.isAvailable(now) && "HIDDEN" !in it.tags) || it.id in unlockedCosmetics
         }
     }.toListState()
 
@@ -176,14 +187,16 @@ class WardrobeState(
 
     val bundles = rawBundles
 
-    val featuredPageCollections = rawFeaturedPageCollections.filter { it.isAvailable() }
     // We currently support only one layout, so we pick one from the available ones
     // We use the raw list state, so that in the case we only have expired pages, we keep showing them until we get new ones
-    val featuredPageCollection = rawFeaturedPageCollections.map { pageCollections ->
-        pageCollections.sortedWith(
-            compareByDescending<FeaturedPageCollection> { it.isAvailable() } // Prioritize available ones (includes no availability)
-                .thenByDescending { it.availability != null } // Prioritize ones that do have an explicit range
-        ).firstOrNull()
+    val featuredPageCollection = memo {
+        val pagesWithAvailability = withSystemTime { now ->
+            rawFeaturedPageCollections().map { it to it.isAvailable(now) }
+        }
+        pagesWithAvailability.minWithOrNull(
+            compareByDescending<Pair<FeaturedPageCollection, Boolean>> { it.second } // Prioritize available ones (includes no availability)
+                .thenByDescending { it.first.availability != null } // Prioritize ones that do have an explicit range
+        )?.first
     }
 
     private val isOwnedOnly = filterSort.map { it == FilterSort.Owned }
@@ -200,7 +213,7 @@ class WardrobeState(
     val cosmeticItems = filteredCosmetics.mapEach { Item.CosmeticOrEmote(it) }
     val bundleItems = bundles.mapEach { it.toItem() }
     val outfitItems = outfitManager.outfits.mapEachNotNull { outfit ->
-        val skin = outfit.skin?.skin
+        val skin = outfit.skin
         val skinId = outfit.skinId
         if (skin == null || skinId == null) {
             null
@@ -242,7 +255,7 @@ class WardrobeState(
                 bundle.id in unlockedCosmetics
                     || bundle.id == bundlePurchaseInProgress() && bundleCosmeticsUnlocked
                     || outfitItems.any { outfit ->
-                        ((outfit.name == bundle.name && outfit.skin == bundle.skin.toMod()) || outfit.cosmetics == bundle.cosmetics)
+                        ((outfit.name == bundle.name && outfit.skin == bundle.skin?.toMod()) || outfit.cosmetics == bundle.cosmetics)
                     } && bundleCosmeticsUnlocked
             }
             .map { it.id }
@@ -321,19 +334,16 @@ class WardrobeState(
     /** Show purchase animation if true. **/
     val purchaseAnimationState = mutableStateOf(false)
 
-    val draggingEmoteSlot = mutableStateOf<Int?>(null).apply {
+    /** The [DraggedEmoteInfo] data for the emote currently being dragged or null if no emote is being dragged. */
+    val draggingEmote = mutableStateOf<DraggedEmote?>(null).apply {
         onChange(component) { inEmoteWheel.set(true) }
     }
 
-    /** Slot that a drag&drop is currently hovering on top of. `-1` for "Remove". */
-    val draggingOntoEmoteSlot = mutableStateOf<Int?>(null)
-
-    val emoteWheel = emoteWheelManager.selectedEmoteWheelSlots
-
-    val draggingOntoOccupiedEmoteSlot =
-        draggingOntoEmoteSlot.zip(emoteWheel).map { (slot, wheel) ->
-            slot != null && wheel.getOrNull(slot) != null
-        }
+    val draggingOntoOccupiedEmoteSlot = memo {
+        val dragged = draggingEmote()
+        dragged?.to != null && dragged.to != dragged.from &&
+                emoteWheelManager.getEmoteWheel(dragged.to.emoteWheelId)?.slots?.getOrNull(dragged.to.slotIndex) != null
+    }
 
     val equippedOutfitId = outfitManager.selectedOutfitId
 
@@ -432,7 +442,7 @@ class WardrobeState(
             return@memo listOf()
         }
 
-        layoutStateObject.second?.value?.rows?.flatten()?.mapNotNull {
+        layoutStateObject.second?.value?.rows?.filterIsInstance<FeaturedItemRow>()?.flatMap { it.items }?.mapNotNull {
             when (it) {
                 is FeaturedItem.Bundle -> it.bundle
                 is FeaturedItem.Cosmetic -> it.cosmetic
@@ -490,14 +500,27 @@ class WardrobeState(
     val currentlyEditingCosmeticTypeId = mutableStateOf<CosmeticTypeId?>(null)
     val currentlyEditingCosmeticCategoryId = mutableStateOf<CosmeticCategoryId?>(null)
     val currentlyEditingFeaturedPageCollectionId = mutableStateOf<FeaturedPageCollectionId?>(null)
+    val currentlyEditingImplicitOwnershipId = mutableStateOf<ImplicitOwnershipId?>(null)
 
     val currentlyEditingCosmetic = stateBy { currentlyEditingCosmeticId()?.let { id -> cosmetics().find { it.id == id } } }
     val currentlyEditingCosmeticBundle = stateBy { currentlyEditingCosmeticBundleId()?.let { id -> bundles().find { it.id == id } } }
     val currentlyEditingCosmeticType = stateBy { currentlyEditingCosmeticTypeId()?.let { id -> types().find { it.id == id } } }
     val currentlyEditingCosmeticCategory = stateBy { currentlyEditingCosmeticCategoryId()?.let { id -> rawCategories().find { it.id == id } } }
     val currentlyEditingFeaturedPageCollection = stateBy { currentlyEditingFeaturedPageCollectionId()?.let { id -> rawFeaturedPageCollections().find { it.id == id } } }
+    val currentlyEditingImplicitOwnership = stateBy { currentlyEditingImplicitOwnershipId()?.let { id -> rawImplicitOwnerships().find { it.id == id } } }
 
     val showingDiagnosticsFor = mutableStateOf<String?>(null) // value is LOCAL_PATH of cosmetic
+
+    val isUsingConfigurator = memo {
+        editingMenuOpen() || listOfNotNull(
+            showingDiagnosticsFor(),
+            currentlyEditingCosmetic(),
+            currentlyEditingCosmeticBundle(),
+            currentlyEditingCosmeticType(),
+            currentlyEditingCosmeticCategory(),
+            currentlyEditingFeaturedPageCollection(),
+        ).isNotEmpty()
+    }
 
     fun changeOutfit(offset: Int) {
         val outfits = outfitManager.outfits.get()
@@ -686,6 +709,22 @@ class WardrobeState(
     }
 
     data class CosmeticWithSortInfo(val cosmetic: Cosmetic, val owned: Boolean, val price: Int?, val collection: CosmeticCategory?)
+
+    /** The [emoteWheelId] and [slotIndex] for an emote in an emote wheel. */
+    data class EmoteSlotId(val emoteWheelId: String, val slotIndex: Int)
+    /**
+     *  The [EmoteSlotId] for an emote being dragged.
+     *  A null value for [from] indicates the emote originated from the Wardrobe container.
+     *  A null value for [to] indicates the emote's destination is the Wardrobe container and that it should be removed.
+     *  A same value for [from] and [to] indicate the emote currently has no destination and that it should not be removed.
+     */
+    data class DraggedEmote(
+        val emoteId: CosmeticId? = null,
+        val from: EmoteSlotId? = null,
+        val to: EmoteSlotId? = null,
+        val clickOffset: Pair<Float, Float> = Pair(0f, 0f),
+        val onInstantLeftClick: () -> Unit = {},
+    )
 
     companion object {
         private val LOGGER = LoggerFactory.getLogger(WardrobeState::class.java)

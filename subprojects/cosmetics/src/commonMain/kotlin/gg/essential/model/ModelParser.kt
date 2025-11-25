@@ -22,25 +22,12 @@ class ModelParser(
     private val textureWidth: Int,
     private val textureHeight: Int,
 ) {
-    private val boneByName = mutableMapOf<String, Bone>()
-
     val boundingBoxes = mutableListOf<Pair<Box3, Side?>>()
-    val rootBone = makeBone("_root")
     var textureFrameCount = 1
     var translucent = false
 
-    private fun makeBone(name: String): Bone {
-        val bone = Bone(name)
-        bone.textureWidth = textureWidth
-        bone.textureHeight = textureHeight
-
-        boneByName[name] = bone
-
-        return bone
-    }
-
-    fun parse(file: ModelFile) {
-        val geometry = file.geometries.firstOrNull() ?: return
+    fun parse(file: ModelFile): Pair<Bones, RenderGeometry>? {
+        val geometry = file.geometries.firstOrNull() ?: return null
 
         textureFrameCount = (textureHeight / geometry.description.textureHeight).coerceAtLeast(1)
         translucent = geometry.description.textureTranslucent
@@ -50,7 +37,12 @@ class ModelParser(
             else -> ((EXTRA_INFLATE_GROUPS.find { it.value.contains(cosmetic.type.slot) }?.index ?: 0) * 0.01f) + 0.01f
         }
 
-        for (bone in geometry.bones) {
+        val bones = mutableListOf<Bone>()
+        val renderGeometry = mutableListOf<List<Cube>>()
+        val children = mutableMapOf<String, MutableList<Bone>>()
+
+        // Iterating in reverse order so we parse all children before making the parent
+        for (bone in geometry.bones.asReversed()) {
             if (bone.name.startsWith("bbox_")) {
                 for (cube in bone.cubes) {
                     val origin = cube.origin
@@ -63,64 +55,71 @@ class ModelParser(
                 }
                 continue // only for data purposes, do not render
             }
-            val boneModel = makeBone(bone.name)
-            boneModel.pivotX = bone.pivot.x
-            boneModel.pivotY = -bone.pivot.y
-            boneModel.pivotZ = bone.pivot.z
-            boneModel.rotateAngleX = bone.rotation.x.toRadians()
-            boneModel.rotateAngleY = bone.rotation.y.toRadians()
-            boneModel.rotateAngleZ = bone.rotation.z.toRadians()
-            boneModel.mirror = bone.mirror
-            boneModel.side = bone.side
+            val offset = EnumPart.fromBoneName(bone.name)?.let { BedrockModel.OFFSETS.getValue(it) }
+            val boneModel = Bone(
+                bones.size,
+                bone.name,
+                children.remove(bone.name) ?: emptyList(),
+                pivotX = offset?.pivotX ?: bone.pivot.x,
+                pivotY = offset?.pivotY ?: -bone.pivot.y,
+                pivotZ = offset?.pivotZ ?: bone.pivot.z,
+                poseRotX = bone.rotation.x.toRadians(),
+                poseRotY = bone.rotation.y.toRadians(),
+                poseRotZ = bone.rotation.z.toRadians(),
+                side = bone.side,
+            )
+            bones.add(boneModel)
 
-            for (cube in bone.cubes) {
-                val (x, y, z) = cube.origin.copy().negateY()
-                val (dx, dy, dz) = cube.size
-                val mirror = cube.mirror ?: bone.mirror
+            renderGeometry.add(parseCubes(geometry, bone, extraInflate))
 
-                val inflate = cube.inflate + extraInflate
-                val cubeModel = when (val uv = cube.uv) {
-                    is ModelFile.Uvs.PerFace -> {
-                        val uvData = CubeUvData(
-                            uv.north.toFloatArray(),
-                            uv.east.toFloatArray(),
-                            uv.south.toFloatArray(),
-                            uv.west.toFloatArray(),
-                            uv.up.toFloatArray(),
-                            uv.down.toFloatArray()
-                        )
-                        Cube(boneModel, x, y - dy, z, dx, dy, dz, inflate, mirror, uvData)
-                    }
-                    is ModelFile.Uvs.Box -> {
-                        val (u, v) = uv.uv
-                        Cube(boneModel, u, v, x, y - dy, z, dx, dy, dz, inflate, mirror)
-                    }
+            // Add to front of list because we iterate all bones in reverse
+            children.getOrPut(bone.parent ?: ROOT_BONE_NAME, ::mutableListOf).add(0, boneModel)
+        }
+
+        bones.add(Bone(bones.size, ROOT_BONE_NAME, children.remove(ROOT_BONE_NAME) ?: emptyList()))
+        renderGeometry.add(emptyList())
+
+        return Pair(Bones(bones), renderGeometry)
+    }
+
+    private fun parseCubes(geometry: ModelFile.Geometry, bone: ModelFile.Bone, extraInflate: Float): List<Cube> {
+        val cubeList = mutableListOf<Cube>()
+
+        for (cube in bone.cubes) {
+            val (x, y, z) = cube.origin.copy().negateY()
+            val (dx, dy, dz) = cube.size
+            val mirror = cube.mirror ?: bone.mirror
+
+            val inflate = cube.inflate + extraInflate
+            val cubeModel = when (val uv = cube.uv) {
+                is ModelFile.Uvs.PerFace -> {
+                    val uvData = CubeUvData(
+                        uv.north.toFloatArray(),
+                        uv.east.toFloatArray(),
+                        uv.south.toFloatArray(),
+                        uv.west.toFloatArray(),
+                        uv.up.toFloatArray(),
+                        uv.down.toFloatArray()
+                    )
+                    Cube(x, y - dy, z, dx, dy, dz, inflate, mirror, textureWidth, textureHeight, uvData)
                 }
-                boneModel.cubeList.add(cubeModel)
+                is ModelFile.Uvs.Box -> {
+                    val (u, v) = uv.uv
+                    Cube(u, v, x, y - dy, z, dx, dy, dz, inflate, mirror, textureWidth, textureHeight)
+                }
             }
-
-            // For capes, we render the actual cape separately (so conceptually, the model only includes *extra*
-            // geometry). However, for backwards compatibility, we still include the cape cube in the cosmetic file, so
-            // we need to remove it from the model.
-            // (except for the internal CapeModel which we use in place of the vanilla cape renderer in certain cases)
-            if (EnumPart.fromBoneName(bone.name) == EnumPart.CAPE && geometry.description.identifier != CapeModel.GEOMETRY_ID) {
-                boneModel.cubeList.removeFirstOrNull()
-            }
-
-            (boneByName[bone.parent] ?: rootBone).addChild(boneModel)
+            cubeList.add(cubeModel)
         }
 
-        fun Bone.setAffectsPoseParts() {
-            childModels.forEach { it.setAffectsPoseParts() }
-
-            val affectedParts = mutableSetOf<EnumPart>()
-            EnumPart.fromBoneName(boxName)?.let { affectedParts.add(it) }
-            childModels.forEach { affectedParts.addAll(it.affectsPoseParts) }
-
-            affectsPose = affectedParts.isNotEmpty()
-            affectsPoseParts = affectedParts
+        // For capes, we render the actual cape separately (so conceptually, the model only includes *extra*
+        // geometry). However, for backwards compatibility, we still include the cape cube in the cosmetic file, so
+        // we need to remove it from the model.
+        // (except for the internal CapeModel which we use in place of the vanilla cape renderer in certain cases)
+        if (EnumPart.fromBoneName(bone.name) == EnumPart.CAPE && geometry.description.identifier != CapeModel.GEOMETRY_ID) {
+            cubeList.removeFirstOrNull()
         }
-        rootBone.setAffectsPoseParts()
+
+        return cubeList
     }
 
     private fun Float.toRadians() = (this / 180.0 * PI).toFloat()
@@ -145,6 +144,9 @@ class ModelParser(
                 CosmeticSlot.BACK,
             ),
             setOf(
+                CosmeticSlot.SKIRT,
+            ),
+            setOf(
                 CosmeticSlot.HAT,
                 CosmeticSlot.FULL_BODY,
             ),
@@ -154,5 +156,7 @@ class ModelParser(
                 CosmeticSlot.SHOES,
             )
         ).withIndex()
+
+        const val ROOT_BONE_NAME = "__internal_root__"
     }
 }

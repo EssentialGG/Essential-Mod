@@ -11,14 +11,14 @@
  */
 package gg.essential.gui.overlay
 
-import gg.essential.elementa.ElementaVersion
 import gg.essential.elementa.components.Window
 
-open class Layer(val priority: LayerPriority) {
+interface Layer {
+    val priority: LayerPriority
     /**
      * The [Window] powering this layer.
      */
-    val window = Window(ElementaVersion.V6)
+    val window: Window
 
     /**
      * Controls whether this layer is visible on the screen.
@@ -26,7 +26,7 @@ open class Layer(val priority: LayerPriority) {
      * May be set to `false` for single frames to hide specific layers from screenshots.
      * This does not affect input processing and should not be used to hide layers for extended periods of time.
      */
-    var rendered = true
+    var rendered: Boolean
 
     /**
      * Whether this layer respects the vanilla Hide Gui (F1 key) setting.
@@ -39,8 +39,10 @@ open class Layer(val priority: LayerPriority) {
      * Note that currently the screen will continue to be animated and will receive draw calls even while hidden (but
      * will be draw far off-screen).
      * This is due to a limitation in Elementa (no way to pause an entire Window) and may be changed in the future.
+     *
+     * Defaults to `true`.
      */
-    var respectsHideGuiSetting = true
+    var respectsHideGuiSetting: Boolean
 
     /**
      * Whether this layer requires (or at least recommends) the user to use the mouse.
@@ -52,12 +54,8 @@ open class Layer(val priority: LayerPriority) {
      *
      * The empty screen cannot be closed by the user directly. It is up to the content in the layer to correctly handle
      * Esc key events.
+     *
+     * Defaults to `true` for layers with [priority] == [LayerPriority.Modal], and `false` for all others.
      */
-    var unlocksMouse = priority == LayerPriority.Modal
-
-    /** Internal. For OverlayManagerImpl only. */
-    var passThroughEvent = false
-    init {
-        window.onKeyType { _, _ -> passThroughEvent = true }
-    }
+    var unlocksMouse: Boolean
 }

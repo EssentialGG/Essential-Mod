@@ -144,7 +144,11 @@ public abstract class MixinServerData implements ServerDataExt {
     private static void readEssentialExt(NBTTagCompound tag, CallbackInfoReturnable<MixinServerData> ci) {
         MixinServerData serverData = ci.getReturnValue();
         if (tag.hasKey(KEY_SHARE_WITH_FRIENDS)) {
+            //#if MC>=12105
+            //$$ serverData.shareWithFriends = tag.getBoolean(KEY_SHARE_WITH_FRIENDS).orElse(false);
+            //#else
             serverData.shareWithFriends = tag.getBoolean(KEY_SHARE_WITH_FRIENDS);
+            //#endif
         }
     }
 }

@@ -52,12 +52,17 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.*;
 
+import static gg.essential.cosmetics.EquippedOutfitsManagerMcKt.getEquippedOutfitsManager;
 import static gg.essential.gui.elementa.state.v2.FlattenKt.flatten;
 import static gg.essential.gui.elementa.state.v2.StateKt.memo;
 import static gg.essential.gui.elementa.state.v2.StateKt.mutableStateOf;
 import static gg.essential.network.cosmetics.ConversionsKt.toInfra;
 import static gg.essential.util.Let.let;
 import static gg.essential.util.UIdentifierKt.toMC;
+
+//#if MC>=12109
+//$$ import net.minecraft.util.AssetInfo;
+//#endif
 
 //#if MC>=12002
 //$$ import com.llamalad7.mixinextras.injector.ModifyReturnValue;
@@ -79,7 +84,7 @@ public abstract class MixinAbstractClientPlayer implements AbstractClientPlayerE
     });
     @Unique
     private final MutableState<State<Map<CosmeticSlot, EquippedCosmetic>>> cosmeticsSourceState = mutableStateOf(
-        let(Essential.getInstance().getConnectionManager().getCosmeticsManager().getEquippedCosmeticsManager().getVisibleCosmeticsState(cosmeticsSourceUuid), cosmeticsSource -> {
+        let(getEquippedOutfitsManager(this).getVisibleCosmeticsState(cosmeticsSourceUuid), cosmeticsSource -> {
             if (!skinOverriddenByServer) {
                 return cosmeticsSource;
             } else {
@@ -123,7 +128,11 @@ public abstract class MixinAbstractClientPlayer implements AbstractClientPlayerE
     //#if MC>=12002
     //$$ @Unique
     //$$ private String getModel() {
-    //$$     return this.getSkinTextures().model().getName();
+        //#if MC>=12109
+        //$$ return this.getSkin().model().asString();
+        //#else
+        //$$ return this.getSkinTextures().model().getName();
+        //#endif
     //$$ }
     //$$ @Shadow public abstract SkinTextures getSkinTextures();
     //#else
@@ -215,11 +224,22 @@ public abstract class MixinAbstractClientPlayer implements AbstractClientPlayerE
     //#if MC>=12002
     //$$ @ModifyReturnValue(method = "getSkinTextures", at = @At("RETURN"))
     //$$ private SkinTextures overrideCapeIfSelectedInEssential(SkinTextures skinTextures) {
+    //#if MC>=12109
+    //$$     var asset = skinTextures.cape();
+    //$$     var texture = asset != null ? asset.texturePath() : null;
+    //$$     CallbackInfoReturnable<Identifier> ci = new CallbackInfoReturnable<>("", true, texture);
+    //$$     overrideCapeIfSelectedInEssential(ci);
+    //$$     if (ci.getReturnValue() != texture) {
+    //$$         var newAsset = new AssetInfo.SkinAssetInfo(ci.getReturnValue(), null);
+    //$$         skinTextures = new SkinTextures(skinTextures.body(), newAsset, skinTextures.elytra(), skinTextures.model(), skinTextures.secure());
+    //$$     }
+    //#else
     //$$     CallbackInfoReturnable<Identifier> ci = new CallbackInfoReturnable<>("", true, skinTextures.capeTexture());
     //$$     overrideCapeIfSelectedInEssential(ci);
     //$$     if (ci.getReturnValue() != skinTextures.capeTexture()) {
     //$$         skinTextures = new SkinTextures(skinTextures.texture(), skinTextures.textureUrl(), ci.getReturnValue(), skinTextures.elytraTexture(), skinTextures.model(), skinTextures.secure());
     //$$     }
+    //#endif
     //$$     return skinTextures;
     //$$ }
     //$$ @Unique
@@ -310,5 +330,18 @@ public abstract class MixinAbstractClientPlayer implements AbstractClientPlayerE
     @Override
     public void setRenderedPose(PlayerPose renderedPose) {
         this.renderedPose = renderedPose;
+    }
+
+    @Unique
+    private float cosmeticFrozenYaw = Float.NaN;
+
+    @Override
+    public float essential$getCosmeticFrozenYaw(){
+        return cosmeticFrozenYaw;
+    }
+
+    @Override
+    public void essential$setCosmeticFrozenYaw(float frozenYaw){
+        cosmeticFrozenYaw = frozenYaw;
     }
 }

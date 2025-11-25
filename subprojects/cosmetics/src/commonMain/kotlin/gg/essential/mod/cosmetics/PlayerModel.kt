@@ -37,6 +37,7 @@ object PlayerModel {
             now(),
             null,
             null,
+            null,
             emptyMap(),
             emptyMap(),
             0,

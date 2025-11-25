@@ -39,6 +39,7 @@ import gg.essential.network.registerPacketHandler
 import gg.essential.util.*
 import gg.essential.util.GuiEssentialPlatform.Companion.platform
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
@@ -52,7 +53,6 @@ class CoinsManager(val connectionManager: CMConnection) : NetworkedManager {
 
     private val referenceHolder = ReferenceHolderImpl()
     private var currentCodeValidationJob: Job? = null
-    private var isClaimingCoins = false
 
     // Actual data
     private val mutableCoins: MutableState<Int> = mutableStateOf(0)
@@ -69,6 +69,7 @@ class CoinsManager(val connectionManager: CMConnection) : NetworkedManager {
 
     // This is in the coins manager because we could receive the purchase modal when we are not in the wardrobe, and it needs to be able to access this
     val areCoinsVisuallyFrozen = mutableStateOf(false)
+    val isClaimingCoins = mutableStateOf(false)
 
     // Derived data
     val creatorCode = stateBy { (creatorCodeConfigured() ?: creatorCodeNonPersistent()).uppercase() }
@@ -117,7 +118,7 @@ class CoinsManager(val connectionManager: CMConnection) : NetworkedManager {
         mutableCoinsSpent.set(0)
     }
 
-    fun purchaseBundle(bundle: CoinBundle, loadedPartnerIds: Set<String>, callback: (URI) -> Unit) {
+    fun purchaseBundle(bundle: CoinBundle, callback: (URI) -> Unit) {
         // If we are already waiting for a response, prevent spamming
         if (purchaseRequestInProgress) return
         purchaseRequestInProgress = true
@@ -125,9 +126,9 @@ class CoinsManager(val connectionManager: CMConnection) : NetworkedManager {
         val creatorCode = if (creatorCodeValid.get() == true) creatorCode.get() else null
 
         val packet = if (bundle.isSpecificAmount) {
-            ClientCheckoutDynamicCoinBundlePacket(bundle.numberOfCoins, bundle.currency, creatorCode, loadedPartnerIds)
+            ClientCheckoutDynamicCoinBundlePacket(bundle.numberOfCoins, bundle.currency, creatorCode)
         } else {
-            ClientCheckoutCoinBundlePacket(bundle.id, bundle.currency, creatorCode, loadedPartnerIds)
+            ClientCheckoutCoinBundlePacket(bundle.id, bundle.currency, creatorCode)
         }
         connectionManager.send(packet) { maybeResponse ->
             purchaseRequestInProgress = false
@@ -197,8 +198,6 @@ class CoinsManager(val connectionManager: CMConnection) : NetworkedManager {
             val responsePacket = maybeResponse.orElse(null)
             if (responsePacket is ServerCoinBundleOptionsPacket) {
                 mutablePricing.setAll(responsePacket.coinBundles.map { it.toMod(currency) })
-            } else {
-                Notifications.push("Error obtaining coin bundles", "An unexpected error has occurred. Try again.")
             }
         }
     }
@@ -208,7 +207,7 @@ class CoinsManager(val connectionManager: CMConnection) : NetworkedManager {
         // If we are currently claiming coins, we might receive a top-up packet before we get the claim confirmation, so we handle all balance updates during claiming as claim top-ups.
         if (topUpAmount != null) {
             // If we aren't in the middle of a claim
-            if (!isClaimingCoins) {
+            if (!isClaimingCoins.getUntracked()) {
                 val manager = platform.createModalManager()
                 manager.queueModal(
                     // Make the modal first as it disables coins animations
@@ -217,7 +216,7 @@ class CoinsManager(val connectionManager: CMConnection) : NetworkedManager {
                 )
             } else {
                 // Otherwise, this is a claim top-up packet, so we finish the claiming process
-                isClaimingCoins = false
+                isClaimingCoins.set(false)
                 mutableCoins.set(coins)
             }
         } else {
@@ -241,7 +240,7 @@ class CoinsManager(val connectionManager: CMConnection) : NetworkedManager {
         // We only try to claim if they don't have coins and if they haven't spent any coins yet. (Basically new user)
         if (coins.get() != 0 || coinsSpent.get() != 0) return
 
-        isClaimingCoins = true
+        isClaimingCoins.set(true)
         // Freeze coins until we get a response to prevent the balance packet we receive as a response from animating them
         areCoinsVisuallyFrozen.set(true)
 
@@ -260,7 +259,7 @@ class CoinsManager(val connectionManager: CMConnection) : NetworkedManager {
                 LOGGER.error("ClientCheckoutClaimCoinsPacket gave invalid response!")
             }
             areCoinsVisuallyFrozen.set(false) // Unfreeze if unsuccessful
-            isClaimingCoins = false
+            isClaimingCoins.set(false)
         }
     }
 

@@ -11,6 +11,8 @@
  */
 package gg.essential.gui.overlay
 
+import gg.essential.Essential
+import gg.essential.elementa.ElementaVersion
 import gg.essential.elementa.UIComponent
 import gg.essential.elementa.components.UIBlock
 import gg.essential.elementa.components.UIContainer
@@ -28,46 +30,62 @@ import gg.essential.universal.UMatrixStack
 import gg.essential.universal.UMouse
 import gg.essential.universal.UResolution
 import gg.essential.universal.UScreen
+import gg.essential.util.UDrawContext
 import me.kbrewster.eventbus.Subscribe
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiScreen
+import org.slf4j.LoggerFactory
+
+//#if MC>=12109
+//$$ import net.minecraft.client.gui.Click
+//$$ import net.minecraft.client.input.MouseInput
+//#endif
+
+//#if MC>=12106
+//$$ import gg.essential.util.AdvancedDrawContext
+//#endif
 
 //#if MC>=11600
 //$$ import gg.essential.mixins.transformers.client.MouseHelperAccessor
 //$$ import net.minecraft.client.gui.widget.Widget
 //#else
+import gg.essential.mixins.transformers.client.gui.GuiScreenAccessor
 import org.lwjgl.input.Mouse
 import java.lang.invoke.MethodHandles
 //#endif
 
 object OverlayManagerImpl : OverlayManager {
+    private val LOGGER = LoggerFactory.getLogger(OverlayManagerImpl::class.java)
     private val mc = Minecraft.getMinecraft()
-    private val layers = mutableListOf<Layer>()
+    private val layers = mutableListOf<LayerImpl>()
+    private val layersAndSpecials = mutableListOf<LayerOrSpecial>(
+        BelowScreenContentLayer,
+        VanillaScreenLayer,
+        AboveScreenLayer,
+    )
 
     private const val FAKE_MOUSE_POS = -1e6 // far off-screen but not too far so math doesn't break when cast to Int
-    private var layersWithTrueMousePos = emptySet<Layer>()
+    private var layersWithTrueMousePos = emptySet<LayerOrSpecial>()
 
     private var focus: Pair<Layer, UIComponent>? = null
 
-    private val belowScreenContentLayer = createPersistentLayer(LayerPriority.BelowScreenContent)
-    private val screenLayer = createLayer(VanillaScreenLayer())
-    private val aboveScreenLayer = createPersistentLayer(LayerPriority.AboveScreen)
-
-    override fun createPersistentLayer(priority: LayerPriority): PersistentLayer {
-        return createLayer(PersistentLayer(priority))
+    override fun addLayer(priority: LayerPriority): Layer {
+        return LayerImpl(priority).also { addLayer(it) }
     }
 
-    override fun createEphemeralLayer(priority: LayerPriority): EphemeralLayer {
-        return createLayer(EphemeralLayer(priority))
-    }
+    private fun addLayer(layer: LayerImpl) {
 
-    private fun <T : Layer> createLayer(layer: T): T {
         layers.add(layers.indexOfLast { it.priority <= layer.priority } + 1, layer)
-        return layer
+        layersAndSpecials.add(layersAndSpecials.indexOfLast { it.priority <= layer.priority } + 1, LayerOrSpecial.Layer(layer))
+
+        if (!Events.registered) Events.register()
     }
 
     override fun removeLayer(layer: Layer) {
+
         layers.remove(layer)
+        layersAndSpecials.remove(LayerOrSpecial.Layer(layer))
+        clickedLayers.removeIf { (it.first as? LayerOrSpecial.Layer)?.layer == layer }
     }
 
     /**
@@ -95,30 +113,10 @@ object OverlayManagerImpl : OverlayManager {
     }
 
     /**
-     * Disposes of any ephemeral layers which no longer have any children in accordance with [EphemeralLayer.onClose]
-     * and any layers with a Window where [Window.hasErrored] is set to true.
+     * Disposes of any layers with a Window where [Window.hasErrored] is set to true.
      */
     private fun cleanupLayers() {
-        // Ephemeral layers may be temporarily empty e.g. when a modal is closed in response to a click and a new
-        // component is scheduled to be opened via `Window.enqueueRenderOperation`. Ordinarily we'd clean up these
-        // layers anyway, because there's no way for us to know that it's only temporarily empty.
-        // But to catch at least some of these, we'll process all queued render operations before we clean up.
-        // Using the screen layer because it's a dummy layer and it should always be empty.
-        screenLayer.window.draw(UMatrixStack())
-
-        layers.removeIf { layer ->
-            if (layer is EphemeralLayer && layer.window.children.isEmpty()) {
-                layer.onClose()
-                if (layer.window.children.isEmpty()) {
-                    val screen = UScreen.currentScreen
-                    if (screen is OverlayInteractionScreen && screen.layer == layer) {
-                        UScreen.displayScreen(null)
-                    }
-                    return@removeIf true
-                }
-            }
-            return@removeIf layer.window.hasErrored
-        }
+        layers.removeIf { it.window.hasErrored }
     }
 
     /**
@@ -139,9 +137,9 @@ object OverlayManagerImpl : OverlayManager {
     private fun computeLayersWithTrueMousePos() {
         val hovered = getHoveredLayer()
         layersWithTrueMousePos = if (hovered != null) {
-            layers.dropWhile { it != hovered }.toSet()
+            layersAndSpecials.dropWhile { it != LayerOrSpecial.Layer(hovered) }.toSet()
         } else {
-            layers.toSet()
+            layersAndSpecials.toSet()
         }
     }
 
@@ -161,18 +159,19 @@ object OverlayManagerImpl : OverlayManager {
 
         for (layer in layers) {
             if (layer != newLayer) {
-                layer.unfocus()
+                layer.window.unfocus()
             }
         }
+        VanillaScreenLayer.unfocus()
     }
 
-    private fun handleDraw(matrixStack: UMatrixStack, priority: LayerPriority) =
-        handleDraw(matrixStack, priority..priority)
+    private fun handleDraw(drawContext: UDrawContext, priority: LayerPriority) =
+        handleDraw(drawContext, priority..priority)
 
-    private fun handleDraw(matrixStack: UMatrixStack, priority: ClosedRange<LayerPriority>) {
+    private fun handleDraw(drawContext: UDrawContext, priority: ClosedRange<LayerPriority>) {
         val hideGui = mc.gameSettings.hideGUI && mc.currentScreen == null
 
-        for (layer in layers.filter { it.priority in priority }) {
+        fun drawLayer(matrixStack: UMatrixStack, layer: Layer) {
             val layerMatrixStack =
                 if (hideGui && layer.respectsHideGuiSetting || !layer.rendered) {
                     matrixStack.fork().also {
@@ -182,7 +181,7 @@ object OverlayManagerImpl : OverlayManager {
                     matrixStack
                 }
 
-            if (layer in layersWithTrueMousePos) {
+            if (LayerOrSpecial.Layer(layer) in layersWithTrueMousePos) {
                 layer.window.draw(layerMatrixStack)
             } else {
                 withFakeMousePos {
@@ -191,8 +190,20 @@ object OverlayManagerImpl : OverlayManager {
             }
         }
 
+        for (layer in layers.filter { it.priority in priority }) {
+            //#if MC>=12106
+            //$$ AdvancedDrawContext.drawImmediate(drawContext.mc) { matrixStack ->
+            //$$     drawLayer(matrixStack, layer)
+            //$$ }
+            //#else
+            drawLayer(drawContext.matrixStack, layer)
+            //#endif
+        }
+
         propagateFocus()
     }
+
+    private val clickedLayers = mutableSetOf<Pair<LayerOrSpecial, /*button*/ Int>>()
 
     private fun handleClick(event: GuiClickEvent, priority: ClosedRange<LayerPriority>) {
         for (layer in layers.filter { it.priority in priority }.asReversed()) {
@@ -202,6 +213,8 @@ object OverlayManagerImpl : OverlayManager {
                     consumed = false
                 }
             }
+
+            clickedLayers.add(Pair(LayerOrSpecial.Layer(layer), event.button))
 
             layer.window.mouseClickListeners.add(finalHandler)
             layer.window.mouseClick(event.mouseX, event.mouseY, event.button)
@@ -215,9 +228,39 @@ object OverlayManagerImpl : OverlayManager {
         propagateFocus()
     }
 
-    private fun handleMouseRelease(priority: ClosedRange<LayerPriority>) {
+    private fun handleMouseRelease(priority: ClosedRange<LayerPriority>, button: Int) {
         for (layer in layers.filter { it.priority in priority }.asReversed()) {
-            layer.window.mouseRelease()
+            if (clickedLayers.remove(Pair(LayerOrSpecial.Layer(layer), button))) {
+                layer.window.mouseRelease()
+            }
+        }
+    }
+
+    private fun fireSyntheticMouseRelease() {
+        val affected = clickedLayers.filter { it.first !in layersWithTrueMousePos }
+        for (entry in affected) {
+            val (layer, button) = entry
+            // Something in this layer has been clicked, but then a new layer opened up and stole the focus.
+            // Since we're about to supply a vastly different mouse position to this layer during draw, we need to first
+            // send it a synthetic `mouseRelease`, otherwise it'll act as if the user click-dragged from wherever the
+            // mouse was last frame all the way to our fake position.
+            if (layer is LayerOrSpecial.Layer) {
+                layer.layer.window.mouseRelease()
+            } else if (layer == VanillaScreenLayer) {
+                Events.ignoreMouseReleaseEvent = true
+                try {
+                    //#if MC>=12109
+                    //$$ mc.currentScreen?.mouseReleased(Click(UMouse.Scaled.x, UMouse.Scaled.y, MouseInput(button, 0)))
+                    //#elseif MC>=11600
+                    //$$ mc.currentScreen?.mouseReleased(UMouse.Scaled.x, UMouse.Scaled.y, button)
+                    //#else
+                    (mc.currentScreen as GuiScreenAccessor?)?.invokeMouseReleased(UMouse.Scaled.x.toInt(), UMouse.Scaled.y.toInt(), button)
+                    //#endif
+                } finally {
+                    Events.ignoreMouseReleaseEvent = false
+                }
+            }
+            clickedLayers.remove(entry)
         }
     }
 
@@ -270,14 +313,6 @@ object OverlayManagerImpl : OverlayManager {
         }
     }
 
-    private fun Layer.unfocus() {
-        if (this is VanillaScreenLayer) {
-            unfocus()
-        } else {
-            window.unfocus()
-        }
-    }
-
     private inline fun withFakeMousePos(block: () -> Unit) {
         val orgX = UMouse.Raw.x
         val orgY = UMouse.Raw.y
@@ -286,18 +321,33 @@ object OverlayManagerImpl : OverlayManager {
         GlobalMouseOverride.set(orgX, orgY)
     }
 
-    object Events {
+    private object Events {
+        var registered = false
+
+        fun register() {
+            registered = true
+            Essential.EVENT_BUS.register(this)
+        }
+
+        // Note: only safe to unregister at end of frame, not in the middle of one (because mouse pos needs to be restored)
+        fun unregister() {
+            registered = false
+            Essential.EVENT_BUS.unregister(this)
+            focus = null
+        }
+
         private var originalMousePos: Pair<Double, Double>? = null
         private var originalMousePosEvent: Pair<Int, Int>? = null
 
         private fun firstDraw(event: GuiDrawScreenEvent) {
             cleanupLayers()
             computeLayersWithTrueMousePos()
+            fireSyntheticMouseRelease()
 
-            handleDraw(event.matrixStack, LayerPriority.BelowScreen)
+            handleDraw(event.drawContext, LayerPriority.BelowScreen)
 
             // We're about to draw parts of the screen, so now's the time to suppress the mouse position if we need to
-            if (belowScreenContentLayer !in layersWithTrueMousePos) {
+            if (BelowScreenContentLayer !in layersWithTrueMousePos) {
                 originalMousePos = Pair(UMouse.Raw.x, UMouse.Raw.y)
                 GlobalMouseOverride.set(FAKE_MOUSE_POS, FAKE_MOUSE_POS)
                 originalMousePosEvent = Pair(event.mouseX, event.mouseY)
@@ -313,10 +363,10 @@ object OverlayManagerImpl : OverlayManager {
             originalMousePosEvent?.let { (x, y) -> event.mouseX = x; event.mouseY = y }
             originalMousePosEvent = null
 
-            handleDraw(event.matrixStack, LayerPriority.BelowScreenContent)
+            handleDraw(event.drawContext, LayerPriority.BelowScreenContent)
 
             // We're about to draw the screen content, so now's the time to suppress the mouse position if we need to
-            if (screenLayer !in layersWithTrueMousePos) {
+            if (VanillaScreenLayer !in layersWithTrueMousePos) {
                 originalMousePos = Pair(UMouse.Raw.x, UMouse.Raw.y)
                 GlobalMouseOverride.set(FAKE_MOUSE_POS, FAKE_MOUSE_POS)
                 event.mouseX = FAKE_MOUSE_POS.toInt()
@@ -329,10 +379,10 @@ object OverlayManagerImpl : OverlayManager {
             originalMousePos?.let { (x, y) -> GlobalMouseOverride.set(x, y) }
             originalMousePos = null
 
-            handleDraw(event.matrixStack, LayerPriority.AboveScreenContent)
+            handleDraw(event.drawContext, LayerPriority.AboveScreenContent)
 
             // We're about to draw modded content, so now's the time to suppress the mouse position if we need to
-            if (aboveScreenLayer !in layersWithTrueMousePos) {
+            if (AboveScreenLayer !in layersWithTrueMousePos) {
                 originalMousePos = Pair(UMouse.Raw.x, UMouse.Raw.y)
                 GlobalMouseOverride.set(FAKE_MOUSE_POS, FAKE_MOUSE_POS)
             }
@@ -343,27 +393,42 @@ object OverlayManagerImpl : OverlayManager {
             originalMousePos?.let { (x, y) -> GlobalMouseOverride.set(x, y) }
             originalMousePos = null
 
-            handleDraw(event.matrixStack, LayerPriority.AboveScreen..LayerPriority.Highest)
+            handleDraw(event.drawContext, LayerPriority.AboveScreen..LayerPriority.Highest)
+
+            if (layers.isEmpty()) {
+                unregister()
+            }
         }
 
-        private fun nonScreenDraw(event: RenderTickEvent) {
+        private fun nonScreenDraw(drawContext: UDrawContext) {
             cleanupLayers()
             layersWithTrueMousePos = emptySet() // mouse is captured, no one gets to see it
 
             // TODO could add more specific events in the HUD rendering code, but we only use Modal and above atm anyway
-            handleDraw(event.matrixStack, LayerPriority.BelowScreen..LayerPriority.Highest)
+            handleDraw(drawContext, LayerPriority.BelowScreen..LayerPriority.Highest)
 
             unlockMouseIfRequired()
+
+            if (layers.isEmpty()) {
+                unregister()
+            }
         }
 
-        private fun flushVanillaBuffers() {
+        private fun flushVanillaBuffers(drawContext: UDrawContext) {
             // We need to flush the vanilla vertex consumers so that our rendering doesn't mess up their state.
             // Minecraft already flushes these at the *end* of GUI rendering, but we inject somewhere in the "middle",
             // so that buffer can be full, but not flushed yet.
             // `bufferSource` / `entityVertexConsumers` is the only one that we need to flush at the time of writing
             // this comment, since it's the only one that Minecraft uses during GUI rendering.
+            // As of 1.20, the DrawContext which MC passes around has an explicit `draw` method, so we can simply call
+            // that one. This is also required with ImmediatelyFast as of 1.21.2 because it uses a custom vertex
+            // consumer provider separate from the vanilla global one.
 
-            //#if MC>=11600
+            //#if MC>=12106
+            //$$ // Minecraft's new gui renderer no longer uses immediate rendering
+            //#elseif MC>=12000
+            //$$ drawContext.mc.draw()
+            //#elseif MC>=11600
             //$$ Minecraft.getInstance().getRenderTypeBuffers().getBufferSource().finish()
             //#endif
         }
@@ -375,7 +440,7 @@ object OverlayManagerImpl : OverlayManager {
         fun handleDraw(event: GuiDrawScreenEvent.Priority) {
             if (!event.screen.isReal()) return
 
-            flushVanillaBuffers()
+            flushVanillaBuffers(event.drawContext)
             if (event.isPre) {
                 firstDraw(event)
                 sawPriorityPreDrawEvent = true
@@ -389,7 +454,7 @@ object OverlayManagerImpl : OverlayManager {
         fun handleDraw(event: GuiDrawScreenEvent) {
             if (!event.screen.isReal()) return
 
-            flushVanillaBuffers()
+            flushVanillaBuffers(event.drawContext)
 
             if (event.isPre) {
                 if (!sawPriorityPreDrawEvent) {
@@ -413,13 +478,14 @@ object OverlayManagerImpl : OverlayManager {
             if (event.isPre) {
                 return
             }
+            val drawContext = event.drawContext!!
 
             if (event.isLoadingScreen) {
-                flushVanillaBuffers()
+                flushVanillaBuffers(drawContext)
                 layersWithTrueMousePos = emptySet() // the loading screen isn't a real screen and can't handle input
                 // The loading screen is drawn on top of whatever screen is active, so the actual active screen isn't
                 // visible, so we don't want to render screen-related layers either.
-                handleDraw(event.matrixStack, LayerPriority.Modal..LayerPriority.Highest)
+                handleDraw(drawContext, LayerPriority.Modal..LayerPriority.Highest)
                 return
             }
 
@@ -427,8 +493,8 @@ object OverlayManagerImpl : OverlayManager {
                 return // more specific GuiDrawScreenEvents will be emitted
             }
 
-            flushVanillaBuffers()
-            nonScreenDraw(event)
+            flushVanillaBuffers(drawContext)
+            nonScreenDraw(drawContext)
         }
 
         @Subscribe
@@ -436,6 +502,10 @@ object OverlayManagerImpl : OverlayManager {
             if (!event.screen.isReal()) return
 
             handleClick(event, LayerPriority.AboveScreen..LayerPriority.Highest)
+
+            if (!event.isCancelled) {
+                clickedLayers.add(Pair(VanillaScreenLayer, event.button))
+            }
         }
 
         @Subscribe
@@ -446,11 +516,13 @@ object OverlayManagerImpl : OverlayManager {
             handleClick(event, LayerPriority.BelowScreen..LayerPriority.AboveScreenContent)
         }
 
+        var ignoreMouseReleaseEvent = false
         @Subscribe
         fun mouseRelease(event: GuiMouseReleaseEvent) {
+            if (ignoreMouseReleaseEvent) return
             if (!event.screen.isReal()) return
 
-            handleMouseRelease(LayerPriority.BelowScreen..LayerPriority.Highest)
+            handleMouseRelease(LayerPriority.BelowScreen..LayerPriority.Highest, event.button)
         }
 
         @Subscribe
@@ -475,10 +547,35 @@ object OverlayManagerImpl : OverlayManager {
         }
     }
 
-    /**
-     * Internal layer representing the vanilla screen.
-     */
-    private class VanillaScreenLayer : Layer(LayerPriority.AboveScreenContent) {
+    private class LayerImpl(override val priority: LayerPriority) : Layer {
+        override val window: Window = Window(ElementaVersion.V10)
+        override var rendered: Boolean = true
+        override var respectsHideGuiSetting: Boolean = true
+        override var unlocksMouse: Boolean = priority == LayerPriority.Modal
+
+        /** Internal. For OverlayManagerImpl only. */
+        var passThroughEvent = false
+        init {
+            window.onKeyType { _, _ -> passThroughEvent = true }
+        }
+    }
+
+    sealed interface LayerOrSpecial {
+        val priority: LayerPriority
+
+        data class Layer(val layer: gg.essential.gui.overlay.Layer) : LayerOrSpecial {
+            override val priority: LayerPriority
+                get() = layer.priority
+        }
+
+        sealed class Special(override val priority: LayerPriority) : LayerOrSpecial
+    }
+
+    object BelowScreenContentLayer : LayerOrSpecial.Special(LayerPriority.BelowScreenContent)
+
+    object AboveScreenLayer : LayerOrSpecial.Special(LayerPriority.AboveScreen)
+
+    object VanillaScreenLayer : LayerOrSpecial.Special(LayerPriority.AboveScreenContent) {
         fun unfocus() {
             //#if MC>=11600
             //$$ val screen = UScreen.currentScreen ?: return // no active screen, nothing to do

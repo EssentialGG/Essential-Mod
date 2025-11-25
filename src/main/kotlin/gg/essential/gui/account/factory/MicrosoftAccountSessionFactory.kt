@@ -23,6 +23,7 @@ import gg.essential.gui.notification.markdownBody
 import gg.essential.lib.gson.*
 import gg.essential.util.USession
 import gg.essential.util.colored
+import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.lang.reflect.Type
 import java.net.URI
@@ -36,9 +37,11 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.write
+import kotlin.io.path.deleteIfExists
+import kotlin.io.path.exists
 
 /** Provides sessions from Microsoft accounts (persisted in the given file, independent of official launcher). */
-class MicrosoftAccountSessionFactory(private val savePath: Path) : ManagedSessionFactory {
+class MicrosoftAccountSessionFactory(private val savePath: Path, oldSavePath: Path) : ManagedSessionFactory {
 
     var latestAuthService: MicrosoftUserAuthentication? = null
 
@@ -48,33 +51,58 @@ class MicrosoftAccountSessionFactory(private val savePath: Path) : ManagedSessio
     }.create()
 
     private val lock = ReentrantReadWriteLock()
-    private val state = if (Files.exists(savePath)) {
-        try {
-            Files.newBufferedReader(savePath).use {
-                gson.fromJson(it, State::class.java)
+    private val state = getState(savePath)
+
+    init {
+        // Check for old accounts path
+        if (oldSavePath.exists()) {
+            val oldState = getState(oldSavePath)
+            // Migrate old path accounts to the new path
+            LOGGER.info("Migrating microsoft accounts from old path: '$oldSavePath' to '$savePath'")
+            state.accounts.addAll(
+                oldState.accounts.filter { oldAccount ->
+                    state.accounts.none { it.uuid == oldAccount.uuid }
+                }
+            )
+            if (save()) {
+                oldSavePath.deleteIfExists()
+                oldSavePath.resolveSibling("${oldSavePath.fileName}.bak").deleteIfExists()
+                LOGGER.info("Successfully migrated accounts")
+            } else {
+                LOGGER.error("Unable to migrate accounts")
             }
-        } catch (e: JsonSyntaxException) { // Caused by corrupted json
+        }
+    }
+
+    private fun getState(path: Path): State {
+        return if (Files.exists(path)) {
             try {
-                Files.move(
-                    savePath,
-                    savePath.resolveSibling("${savePath.fileName}.bak"),
-                    StandardCopyOption.REPLACE_EXISTING
-                )
-            } catch (ignored: IOException) {
-                // If the backup fails we can't do anything about it
+                Files.newBufferedReader(path).use {
+                    gson.fromJson(it, State::class.java)
+                }
+            } catch (e: JsonSyntaxException) { // Caused by corrupted json
+                try {
+                    Files.move(
+                        path,
+                        path.resolveSibling("${path.fileName}.bak"),
+                        StandardCopyOption.REPLACE_EXISTING
+                    )
+                } catch (ignored: IOException) {
+                    // If the backup fails we can't do anything about it
+                }
+                e.printStackTrace()
+                Notifications.error("Account Error", "Failed to load accounts. Please add them again.")
+                State(mutableListOf())
             }
-            e.printStackTrace()
-            Notifications.error("Account Error", "Failed to load accounts. Please add them again.")
+        } else {
             State(mutableListOf())
         }
-    } else {
-        State(mutableListOf())
     }
 
     private fun save() = lock.write {
 
         val tempFile = Files.createTempFile(savePath.parent, "essential-microsoft-accounts", ".json")
-        try {
+        return@write try {
             Files.write(tempFile, gson.toJson(state).toByteArray())
             try {
                 Files.move(tempFile, savePath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
@@ -82,9 +110,11 @@ class MicrosoftAccountSessionFactory(private val savePath: Path) : ManagedSessio
                 e.printStackTrace()
                 Files.move(tempFile, savePath, StandardCopyOption.REPLACE_EXISTING)
             }
+            true
         } catch (e: IOException) {
             e.printStackTrace()
             Notifications.error("Account Error", "Unable to save your accounts.")
+            false
         } finally {
             Files.deleteIfExists(tempFile)
         }
@@ -229,5 +259,9 @@ class MicrosoftAccountSessionFactory(private val savePath: Path) : ManagedSessio
                 }
             }
         }
+    }
+
+    companion object {
+        private val LOGGER = LoggerFactory.getLogger(MicrosoftAccountSessionFactory::class.java)
     }
 }

@@ -15,6 +15,7 @@ import com.llamalad7.mixinextras.sugar.Share;
 import com.llamalad7.mixinextras.sugar.ref.LocalRef;
 import gg.essential.handlers.OnlineIndicator;
 import gg.essential.universal.UMatrixStack;
+import gg.essential.util.UDrawContext;
 import net.minecraft.client.network.NetworkPlayerInfo;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
@@ -49,7 +50,8 @@ public class MixinTabListRenderer {
     private static float shiftTextAndRenderEssentialIndicator(String text, float x, float y, int color, @Share("info") LocalRef<NetworkPlayerInfo> infoRef) {
         NetworkPlayerInfo networkPlayerInfo = infoRef.get();
         if (networkPlayerInfo != null) {
-            OnlineIndicator.drawTabIndicatorOuter(new UMatrixStack(), networkPlayerInfo, (int) x, (int) y);
+            UDrawContext drawContext = new UDrawContext(new UMatrixStack());
+            OnlineIndicator.drawTabIndicatorOuter(drawContext, networkPlayerInfo, (int) x, (int) y);
 
         }
 

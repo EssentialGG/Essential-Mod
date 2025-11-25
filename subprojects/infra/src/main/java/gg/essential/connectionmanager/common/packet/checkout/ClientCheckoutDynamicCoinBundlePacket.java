@@ -17,7 +17,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Currency;
-import java.util.Set;
 
 public class ClientCheckoutDynamicCoinBundlePacket extends Packet {
 
@@ -28,14 +27,10 @@ public class ClientCheckoutDynamicCoinBundlePacket extends Packet {
     @SerializedName("partner_code")
     private final @Nullable String partnerCode;
 
-    @SerializedName("partnered_mod_ids")
-    private final @NotNull Set<String> partneredModIds;
-
-    public ClientCheckoutDynamicCoinBundlePacket(int coins, @NotNull Currency currency, @Nullable String partnerCode, @NotNull Set<String> partneredModIds) {
+    public ClientCheckoutDynamicCoinBundlePacket(int coins, @NotNull Currency currency, @Nullable String partnerCode) {
         this.coins = coins;
         this.currency = currency;
         this.partnerCode = partnerCode;
-        this.partneredModIds = partneredModIds;
     }
 
     public int getCoins() {

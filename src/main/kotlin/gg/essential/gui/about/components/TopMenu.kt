@@ -29,6 +29,7 @@ import gg.essential.gui.common.constraints.CenterPixelConstraint
 import gg.essential.gui.common.modal.OpenLinkModal
 import gg.essential.gui.common.shadow.EssentialUIText
 import gg.essential.gui.common.shadow.ShadowEffect
+import gg.essential.gui.elementa.state.v2.toV2
 import gg.essential.universal.USound
 import gg.essential.util.bindHoverEssentialTooltip
 import gg.essential.util.centered
@@ -56,7 +57,7 @@ class TopMenu(aboutMenu: AboutMenu, platformSpecific: BasicState<Boolean>, selec
         } childOf this
     }
 
-    private val platformSwitch by FullEssentialToggle(platformSpecific, EssentialPalette.COMPONENT_BACKGROUND).constrain {
+    private val platformSwitch by FullEssentialToggle(platformSpecific.toV2()).constrain {
         x = SiblingConstraint(10f)
         y = CenterPixelConstraint()
     }.bindParent(this, selectedPage.map { it is ChangelogPage }, index = 1)

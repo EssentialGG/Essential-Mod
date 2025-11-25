@@ -72,6 +72,8 @@ public abstract class Mixin_AddPerServerPrivacyButton extends GuiScreen {
 
         //#if MC>=11700
         //$$ CyclingButtonWidget<?> resourcePacks = CollectionsKt.filterIsInstance(this.children(), CyclingButtonWidget.class).get(0);
+        //#elseif MC>=11600
+        //$$ Button resourcePacks = buttonList.get(0);
         //#else
         GuiButton resourcePacks = buttonList.get(2);
         //#endif
@@ -93,8 +95,16 @@ public abstract class Mixin_AddPerServerPrivacyButton extends GuiScreen {
         //$$ resourcePacks.setY(resourcePacksY = resourcePacks.getY() + offset);
         //#else
         int offset = Math.max(minY - resourcePacks.y, 0);
+
+        //#if MC==11602
+        // Only 1.16.2 is different, it reverts to the original indices in 1.17+ as the resource-pack button is changed
+        //$$ buttonList.get(1).y += offset;
+        //$$ buttonList.get(2).y += offset;
+        //#else
         buttonList.get(0).y += offset;
         buttonList.get(1).y += offset;
+        //#endif
+
         resourcePacksY = resourcePacks.y += offset;
         //#endif
 

@@ -39,6 +39,7 @@ public class SocialManager implements NetworkedManager {
 
     @NotNull
     private final Map<String, Set<UUID>> invitedFriends = Maps.newConcurrentMap();
+
     private final @NotNull ConnectionManager connectionManager;
 
     public SocialManager(@NotNull final ConnectionManager connectionManager) {

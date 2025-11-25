@@ -12,9 +12,8 @@
 package gg.essential.mixins.transformers.client.gui;
 
 //#if MC<=11202
-import gg.essential.Essential;
 import gg.essential.mixins.ext.client.multiplayer.ServerDataExtKt;
-import gg.essential.network.connectionmanager.sps.SPSManager;
+import gg.essential.sps.SpsAddress;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiDisconnected;
@@ -67,8 +66,7 @@ public abstract class Mixin_BypassModCompat_Gui extends GuiScreen {
         }
 
         // We only want to act on SPS servers
-        SPSManager spsManager = Essential.getInstance().getConnectionManager().getSpsManager();
-        if (!spsManager.isSpsAddress(serverData.serverIP)) {
+        if (SpsAddress.parse(serverData.serverIP) == null) {
             return;
         }
 

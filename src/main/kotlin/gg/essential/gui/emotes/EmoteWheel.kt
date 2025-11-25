@@ -14,7 +14,8 @@ package gg.essential.gui.emotes
 import gg.essential.Essential
 import gg.essential.config.EssentialConfig
 import gg.essential.connectionmanager.common.packet.cosmetic.ClientCosmeticAnimationTriggerPacket
-import gg.essential.cosmetics.events.AnimationEventType
+import gg.essential.cosmetics.CosmeticId
+import gg.essential.cosmetics.state.EssentialAnimationSystem
 import gg.essential.elementa.ElementaVersion
 import gg.essential.elementa.UIComponent
 import gg.essential.elementa.WindowScreen
@@ -23,6 +24,7 @@ import gg.essential.elementa.components.UIContainer
 import gg.essential.elementa.components.Window
 import gg.essential.elementa.state.BasicState
 import gg.essential.elementa.utils.withAlpha
+import gg.essential.event.render.RenderTickEvent
 import gg.essential.gui.EssentialPalette
 import gg.essential.gui.common.MenuButton
 import gg.essential.gui.common.sendEmotesDisabledNotification
@@ -61,14 +63,17 @@ import gg.essential.gui.layoutdsl.whenHovered
 import gg.essential.gui.layoutdsl.width
 import gg.essential.gui.notification.Notifications
 import gg.essential.gui.notification.error
-import gg.essential.gui.util.onAnimationFrame
 import gg.essential.gui.wardrobe.Wardrobe
 import gg.essential.gui.wardrobe.WardrobeCategory
 import gg.essential.mod.cosmetics.CosmeticSlot
 import gg.essential.mod.cosmetics.settings.CosmeticProperty
+import gg.essential.mod.cosmetics.settings.CosmeticSetting
+import gg.essential.mod.cosmetics.settings.CosmeticSettingType
 import gg.essential.model.BedrockModel
+import gg.essential.model.PlayerMolangQuery
 import gg.essential.model.util.PlayerPoseManager
 import gg.essential.network.connectionmanager.cosmetics.AssetLoader
+import gg.essential.network.connectionmanager.cosmetics.removeSingletonSettingType
 import gg.essential.network.connectionmanager.telemetry.TelemetryManager
 import gg.essential.network.cosmetics.Cosmetic
 import gg.essential.network.cosmetics.toInfra
@@ -84,7 +89,9 @@ import gg.essential.util.setPerspective
 import gg.essential.util.textLiteral
 import gg.essential.util.toState
 import gg.essential.vigilance.utils.onLeftClick
+import me.kbrewster.eventbus.Subscribe
 import net.minecraft.client.entity.AbstractClientPlayer
+import net.minecraft.entity.player.EntityPlayer
 import net.minecraft.item.EnumAction
 import net.minecraft.item.ItemStack
 import java.util.concurrent.TimeUnit
@@ -95,7 +102,7 @@ import java.util.concurrent.TimeUnit
 //#endif
 
 class EmoteWheel : WindowScreen(
-    version = ElementaVersion.V6,
+    version = ElementaVersion.V10,
     drawDefaultBackground = false,
     restoreCurrentGuiOnClose = false,
 ) {
@@ -122,6 +129,8 @@ class EmoteWheel : WindowScreen(
             ).toState()
         }
     }.toListState()
+
+    private var equipping = false
 
     init {
         // Allow the player to move while the emote wheel is open
@@ -170,20 +179,6 @@ class EmoteWheel : WindowScreen(
             }.apply { shouldIgnore = { it.isPassThrough() } }
         }
 
-        var equipping = false
-        // Check for keybind release to equip the emote and close the wheel
-        window.onAnimationFrame {
-            if (!equipping && !keybind.keyBinding.isKeyDown) {
-                window.focusedComponent?.let { focused ->
-                    if (focused is EmoteWheelEntry && canEmote(UPlayer.getPlayer()!!)) {
-                        focused.emoteModel?.getUntracked()?.let { equipEmote(it) }
-                    }
-                }
-                displayScreen(null)
-                equipping = true
-            }
-        }
-
         window.onKeyType { _, keyCode ->
             if (MinecraftUtils.isDevelopment() || System.getProperty("elementa.debug", "false") == "true") {
                 if (keyCode == UKeyboard.KEY_F3) {
@@ -200,6 +195,20 @@ class EmoteWheel : WindowScreen(
                 else -> return@onMouseScroll
             }
             emoteWheelManager.shiftSelectedEmoteWheel(shiftValue)
+        }
+    }
+
+    override fun onTick() {
+        super.onTick()
+        // Check for keybind release to equip the emote and close the wheel
+        if (!equipping && !keybind.keyBinding.isKeyDown) {
+            window.focusedComponent?.let { focused ->
+                if (focused is EmoteWheelEntry && canEmote(UPlayer.getPlayer()!!)) {
+                    focused.emoteModel?.getUntracked()?.let { equipEmote(it) }
+                }
+            }
+            displayScreen(null)
+            equipping = true
         }
     }
 
@@ -245,6 +254,52 @@ class EmoteWheel : WindowScreen(
 
     override fun doesGuiPauseGame(): Boolean {
         return false
+    }
+
+
+    /**
+     * Handles the delay between an emote starting and ending, unequipping the current emote after the delay.
+     * The handler listens to the render tick event, checking if enough time has passed in game ticks, this lets it account
+     * for game pausing and slowed tick times.
+     */
+    private class EmoteUnequipDelayHandler(
+        private val endDelayInSeconds: Float,
+        private val invocationId: Int,
+        player: EntityPlayer
+    ) {
+
+        // Use PlayerMolangQuery to get the time of the player in seconds, which respects game pause time
+        private val timeQuery: () -> Float = PlayerMolangQuery(player)::time
+
+        private val startTime: Float = timeQuery()
+
+        init {
+            if (startTime.isNaN()) {
+                unequipCurrentEmote() // unequip immediately and don't register
+            } else {
+                Essential.EVENT_BUS.register(this)
+            }
+        }
+
+        private fun unequip() {
+            unequipCurrentEmote()
+            Essential.EVENT_BUS.unregister(this)
+        }
+
+        @Subscribe
+        fun renderTickListener(event: RenderTickEvent) {
+            if (!event.isPre) return
+
+            if (latestInvocation != invocationId) {
+                // stop this handler if the emote was changed
+                Essential.EVENT_BUS.unregister(this)
+                return
+            }
+
+            if (timeQuery() - startTime >= endDelayInSeconds) {
+                unequip()
+            }
+        }
     }
 
     companion object {
@@ -334,6 +389,9 @@ class EmoteWheel : WindowScreen(
                 ?: emoteTransitionTimeMs
         }
 
+        // store the last animation variant played by this client, read later to prevent repeats
+        private val lastAnimationVariantPlayed: MutableMap<CosmeticId, String> = mutableMapOf()
+
         fun equipEmote(emote: BedrockModel) {
             val essential = Essential.getInstance()
             val connectionManager = essential.connectionManager
@@ -344,10 +402,10 @@ class EmoteWheel : WindowScreen(
 
             emoteComing = true
 
-            val animLength = emote.animationEvents
-                .filter { it.type == AnimationEventType.EMOTE }
-                .maxOfOrNull { it.getTotalTime(emote) }
-                ?: 0f
+            // Get a random emote animation event, considering the probability and priority of each event, also avoid repeating events if multiple
+            val randomEvent = EssentialAnimationSystem.Companion.getRandomEmoteAnimationEventOrNull(emote, lastAnimationVariantPlayed)
+
+            val animLength = randomEvent?.getTotalTime(emote) ?: 0f
 
             val slot = CosmeticSlot.EMOTE
             // If there's already an emote equipped, then we don't need to change the perspective or register a new listener
@@ -370,30 +428,48 @@ class EmoteWheel : WindowScreen(
                 0f
             }
 
+            fun setEmoteSettings(outfitId: String){
+                // if the emote had multiple animations, one of which being set to skip next time,
+                // then we need to explicitly set the variant to be played via CosmeticSettings
+                if (randomEvent != null && lastAnimationVariantPlayed[emote.cosmetic.id] != null) {
+                    outfitManager.updateOutfitCosmeticSettings(outfitId, emote.cosmetic.id,
+                        // old settings minus this setting type
+                        (outfitManager.getOutfit(outfitId)?.cosmeticSettings?.get(emote.cosmetic.id)
+                            ?.removeSingletonSettingType(CosmeticSettingType.ANIMATION_VARIANT) ?: emptyList()) +
+                                // new setting to add
+                                CosmeticSetting.AnimationVariant(emote.cosmetic.id, true,
+                                    CosmeticSetting.AnimationVariant.Data(randomEvent.name)))
+                }
+            }
+
             Multithreading.scheduleOnMainThread({
                 emoteComing = false
 
-                if (cosmeticManager.equippedCosmetics[slot] == emote.cosmetic.id) {
+                if (cosmeticManager.equippedCosmetics[slot]?.id == emote.cosmetic.id) {
+                    outfitManager.selectedOutfitId.getUntracked()?.let { setEmoteSettings(it) }
                     essential.cosmeticEventEmitter.triggerEvent(UUIDUtil.getClientUUID(), slot, "reset")
                     connectionManager.send(ClientCosmeticAnimationTriggerPacket(slot.toInfra(), "reset"))
                 } else {
                     val outfitId = outfitManager.selectedOutfitId.getUntracked() ?: return@scheduleOnMainThread
+                    setEmoteSettings(outfitId)
                     outfitManager.updateEquippedCosmetic(outfitId, slot, emote.cosmetic.id)
                 }
 
                 val invocationId = ++latestInvocation
+                val player = UPlayer.getPlayer()
                 if (animLength != Float.POSITIVE_INFINITY) { // Non-looping emote
-                    // Once emote has finished its animation, unequip it
-                    Multithreading.scheduleOnMainThread({
-                        if (invocationId == latestInvocation) {
-                            unequipCurrentEmote()
-                        }
-                    }, ((animLength - PlayerPoseManager.transitionTime) * 1000).toLong(), TimeUnit.MILLISECONDS)
+                    if (player != null) {
+                        // Once emote has finished its animation, unequip it
+                        EmoteUnequipDelayHandler(animLength - PlayerPoseManager.transitionTime, invocationId, player)
+                    } else {
+                        // If we can't get the player, just unequip immediately, this shouldn't normally occur
+                        unequipCurrentEmote()
+                    }
                 } else if (!emote.cosmetic.emoteInterruptionTriggers.movement) { // Movement doesn't cancel this emote and it loops
 
                     UKeyboard.getKeyName(UMinecraft.getSettings().keyBindSneak)?.let { keybind ->
                         //#if MC>=11202
-                        UPlayer.getPlayer()?.sendStatusMessage(textLiteral("Press $keybind to Stop Emote"), true)
+                        player?.sendStatusMessage(textLiteral("Press $keybind to Stop Emote"), true)
                         //#else
                         //$$ UMinecraft.getMinecraft().ingameGUI.setRecordPlaying(textLiteral("Press $keybind to Stop Emote"), false)
                         //#endif

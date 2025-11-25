@@ -23,6 +23,8 @@ interface CMConnection {
 
     val isOpen: Boolean
 
+    val usingProtocol: Int
+
     fun registerOnConnected(onConnected: () -> Unit)
 
     fun <T : Packet> registerPacketHandler(cls: Class<T>, handler: (T) -> Unit)
@@ -33,6 +35,7 @@ interface CMConnection {
     fun send(packet: Packet, callback: Consumer<Optional<Packet>>?, timeoutUnit: TimeUnit?, timeoutValue: Long?)
     @Deprecated("Use `call` instead.", ReplaceWith("call(packet).await()"))
     fun send(packet: Packet, callback: Consumer<Optional<Packet>>?) = send(packet, callback, TimeUnit.SECONDS, 10)
+
 }
 
 inline fun <reified T : Packet> CMConnection.registerPacketHandler(noinline handler: (T) -> Unit) =

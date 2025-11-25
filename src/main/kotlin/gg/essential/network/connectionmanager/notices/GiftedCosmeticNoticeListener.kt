@@ -12,13 +12,17 @@
 package gg.essential.network.connectionmanager.notices
 
 import gg.essential.gui.wardrobe.components.showGiftReceivedToast
+import gg.essential.network.connectionmanager.cosmetics.CosmeticsData
 import gg.essential.notices.NoticeType
 import gg.essential.notices.model.Notice
 import gg.essential.util.UUIDUtil
 import gg.essential.util.thenAcceptOnMainThread
 import java.util.UUID
 
-class GiftedCosmeticNoticeListener(private val noticeManager: NoticesManager) : NoticeListener {
+class GiftedCosmeticNoticeListener(
+    private val noticeManager: NoticesManager,
+    private val cosmeticsData: CosmeticsData,
+) : NoticeListener {
 
     override fun noticeAdded(notice: Notice) {
         if (notice.type != NoticeType.GIFTED_COSMETIC_TOAST) {
@@ -26,8 +30,9 @@ class GiftedCosmeticNoticeListener(private val noticeManager: NoticesManager) : 
         }
         val uuid = UUID.fromString(notice.metadata["gifted_by_id"] as? String ?: return)
         val cosmeticId = notice.metadata["cosmetic_id"] as? String ?: return
+        val cosmetic = cosmeticsData.getCosmetic(cosmeticId) ?: return
         UUIDUtil.getName(uuid).thenAcceptOnMainThread { name ->
-            showGiftReceivedToast(cosmeticId, uuid, name)
+            showGiftReceivedToast(cosmetic, uuid, name)
             noticeManager.dismissNotice(notice.id)
         }
     }

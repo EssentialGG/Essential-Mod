@@ -179,9 +179,11 @@ class EssentialMarkdown(
         }
     }
 
-    override fun animationFrame() {
-        super.animationFrame()
+    init {
+        addUpdateFunc { _, _ -> update() }
+    }
 
+    fun update() {
         if (needsInitialLayout) {
             needsInitialLayout = false
             reparse()
@@ -210,7 +212,7 @@ class EssentialMarkdown(
 
     override fun draw(matrixStack: UMatrixStack) {
         if (needsInitialLayout) {
-            animationFrame()
+            update()
         }
         beforeDraw(matrixStack)
 

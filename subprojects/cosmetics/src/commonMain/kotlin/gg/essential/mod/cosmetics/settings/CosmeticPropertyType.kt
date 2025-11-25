@@ -18,6 +18,7 @@ enum class CosmeticPropertyType(
     val singleton: Boolean,
 ) {
     ARMOR_HANDLING("Armor Handling", true),
+    ARMOR_HANDLING_V2("Armor Handling V2", true),
     POSITION_RANGE("Player Position Adjustment", true),
     INTERRUPTS_EMOTE("Interrupts Emote", true),
     REQUIRES_UNLOCK_ACTION("Requires Unlock Action", true),
@@ -29,4 +30,6 @@ enum class CosmeticPropertyType(
     VARIANTS("Variants", true),
     DEFAULT_SIDE("Default Side", true),
     MUTUALLY_EXCLUSIVE("Mutually Exclusive", true),
+    ALL_OTHER_COSMETIC_OR_ITEM_HIDING("Hides Cosmetics or Items", true),
+    LOCKS_PLAYER_ROTATION("Locks Player Rotation", true),
 }

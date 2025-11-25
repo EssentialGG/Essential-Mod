@@ -18,6 +18,7 @@ import gg.essential.cosmetics.CosmeticsRenderState;
 import gg.essential.mixins.impl.client.model.ElytraPoseSupplier;
 import gg.essential.model.backend.PlayerPose;
 import gg.essential.model.backend.minecraft.PlayerPoseKt;
+import kotlin.Pair;
 import net.minecraft.client.entity.AbstractClientPlayer;
 import net.minecraft.client.model.ModelElytra;
 import net.minecraft.client.renderer.entity.layers.LayerElytra;
@@ -72,15 +73,11 @@ public abstract class Mixin_ElytraPoseSupplier implements ElytraPoseSupplier {
     @Shadow @Final private ModelElytra modelElytra;
 
     @Unique
-    private PlayerPose.Part leftWingPose;
-
-    @Unique
-    private PlayerPose.Part rightWingPose;
+    private Pair<PlayerPose.Part, PlayerPose.Part> wingsPose;
 
     @Inject(method = RENDER_LAYER, at = @At("HEAD"))
     private void unsetRenderedPose(CallbackInfo ci) {
-        leftWingPose = null;
-        rightWingPose = null;
+        wingsPose = null;
     }
 
     @Inject(method = RENDER_LAYER, at = @At(value = "INVOKE", target = MODEL_RENDER))
@@ -112,24 +109,18 @@ public abstract class Mixin_ElytraPoseSupplier implements ElytraPoseSupplier {
         CosmeticsRenderState cState = new CosmeticsRenderState.Live((AbstractClientPlayer) entity);
     //#endif
 
-        this.leftWingPose = ((ElytraPoseSupplier) this.modelElytra).getLeftWingPose();
-        this.rightWingPose = ((ElytraPoseSupplier) this.modelElytra).getRightWingPose();
+        wingsPose = ((ElytraPoseSupplier) this.modelElytra).getWingsPose();
 
         Vec3 offset = PlayerPoseKt.getElytraPoseOffset(cState);
-        if (leftWingPose != null) leftWingPose = leftWingPose.offset(offset);
-        if (rightWingPose != null) rightWingPose = rightWingPose.offset(offset);
+        if (wingsPose != null) wingsPose = new Pair<>(
+            wingsPose.component1().offset(offset),
+            wingsPose.component2().offset(offset)
+        );
     }
 
-    @Nullable
     @Override
-    public PlayerPose.Part getLeftWingPose() {
-        return leftWingPose;
-    }
-
-    @Nullable
-    @Override
-    public PlayerPose.Part getRightWingPose() {
-        return rightWingPose;
+    public @Nullable Pair<PlayerPose.Part, PlayerPose.Part> getWingsPose() {
+        return wingsPose;
     }
 }
 //#else

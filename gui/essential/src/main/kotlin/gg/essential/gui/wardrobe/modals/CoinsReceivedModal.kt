@@ -13,16 +13,19 @@ package gg.essential.gui.wardrobe.modals
 
 import gg.essential.elementa.constraints.ChildBasedSizeConstraint
 import gg.essential.elementa.dsl.*
-import gg.essential.elementa.state.BasicState
 import gg.essential.gui.EssentialPalette
 import gg.essential.gui.common.HighlightedBlock
-import gg.essential.gui.common.MenuButton
+import gg.essential.gui.common.OutlineButtonStyle
 import gg.essential.gui.common.modal.Modal
+import gg.essential.gui.common.outlineButton
+import gg.essential.gui.elementa.state.v2.stateOf
 import gg.essential.gui.layoutdsl.*
 import gg.essential.gui.overlay.ModalManager
 import gg.essential.gui.wardrobe.components.coinPackImage
 import gg.essential.network.connectionmanager.coins.CoinsManager
+import gg.essential.universal.USound
 import gg.essential.util.EssentialSounds.playCoinsSound
+import gg.essential.util.onLeftClick
 
 class CoinsReceivedModal private constructor(
     modalManager: ModalManager,
@@ -47,12 +50,6 @@ class CoinsReceivedModal private constructor(
 
         coinsManager.areCoinsVisuallyFrozen.set(true)
 
-        val okButton by MenuButton(buttonText, BasicState(MenuButton.BLUE), BasicState(MenuButton.LIGHT_BLUE)) {
-            playCoinsSound()
-            coinsManager.areCoinsVisuallyFrozen.set(false)
-            super.close()
-        }
-
         container.contentContainer.layoutAsBox(Modifier.width(222f).childBasedHeight()) {
             column {
                 spacer(height = 19f)
@@ -70,7 +67,12 @@ class CoinsReceivedModal private constructor(
                     coinPackImage(coinsManager, receivedAmount)
                 }
                 spacer(height = 17f)
-                okButton(Modifier.width(91f).height(20f))
+                outlineButton(stateOf(buttonText), style = OutlineButtonStyle.BLUE, modifier = Modifier.width(91f).shadow()).onLeftClick {
+                    USound.playButtonPress()
+                    playCoinsSound()
+                    coinsManager.areCoinsVisuallyFrozen.set(false)
+                    super.close()
+                }
                 spacer(height = 16f)
             }
         }
