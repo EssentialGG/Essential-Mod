@@ -116,6 +116,7 @@ class Wardrobe(
     private val cosmeticBundleConfiguration by lazy { CosmeticBundleConfiguration(state) }
     private val featuredPageCollectionConfiguration by lazy { FeaturedPageCollectionConfiguration(state) }
     private val implicitOwnershipConfiguration by lazy { ImplicitOwnershipConfiguration(state) }
+    private val cosmeticSortWeightConfiguration by lazy { CosmeticSortWeightConfiguration(state) }
 
     private val currentConfigurationComponent = stateBy {
         val diagnosticsFor = state.showingDiagnosticsFor()
@@ -133,6 +134,7 @@ class Wardrobe(
             state.currentlyEditingCosmeticCategory() != null -> cosmeticCategoryConfiguration
             state.currentlyEditingFeaturedPageCollection() != null -> featuredPageCollectionConfiguration
             state.currentlyEditingImplicitOwnership() != null -> implicitOwnershipConfiguration
+            state.currentlyEditingSortWeightCategory() != null -> cosmeticSortWeightConfiguration
             state.editingMenuOpen() -> configurationMenu
             else -> null
         }
@@ -241,6 +243,8 @@ class Wardrobe(
                             if_(state.currentCategory.map { it is WardrobeCategory.Skins }) {
                                 addSkinButton()
                             } `else` {
+                                val collapsed = State { mainContainerWidthState() < collapseTopBarButtonsWidth }
+                                redeemCodeButton(collapsed, state)
                                 coinsButton(state)
                             }
                         }
@@ -357,12 +361,8 @@ class Wardrobe(
     }
 
     override fun onScreenClose() {
-        Multithreading.runAsync {
-            cosmeticsManager.capeManager.flushCapeUpdates()
-        }
-        Multithreading.runAsync {
-            Essential.getInstance().skinManager.flushChanges(false)
-        }
+        Essential.getInstance().skinManager.flushChangesAsync()
+        cosmeticsManager.capeManager.flushCapeUpdatesAsync()
         outfitManager.flushSelectedOutfit(false)
         emoteWheelManager.flushSelectedEmoteWheel(false)
 

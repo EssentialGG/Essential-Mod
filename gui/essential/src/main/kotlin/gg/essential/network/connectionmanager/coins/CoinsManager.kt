@@ -12,11 +12,9 @@
 package gg.essential.network.connectionmanager.coins
 
 import gg.essential.config.EssentialConfig
-import gg.essential.connectionmanager.common.packet.checkout.ClientCheckoutClaimCoinsPacket
 import gg.essential.connectionmanager.common.packet.checkout.ClientCheckoutCoinBundlePacket
 import gg.essential.connectionmanager.common.packet.checkout.ClientCheckoutDynamicCoinBundlePacket
 import gg.essential.connectionmanager.common.packet.checkout.ClientCheckoutPartnerCodeRequestDataPacket
-import gg.essential.connectionmanager.common.packet.checkout.ServerCheckoutClaimCoinsResponsePacket
 import gg.essential.connectionmanager.common.packet.checkout.ServerCheckoutPartnerCodeDataPacket
 import gg.essential.connectionmanager.common.packet.checkout.ServerCheckoutUrlPacket
 import gg.essential.connectionmanager.common.packet.coins.ClientCoinBundleOptionsPacket
@@ -26,11 +24,14 @@ import gg.essential.connectionmanager.common.packet.coins.ServerCoinsBalancePack
 import gg.essential.connectionmanager.common.packet.currency.ClientCurrencyOptionsPacket
 import gg.essential.connectionmanager.common.packet.currency.ServerCurrencyOptionsPacket
 import gg.essential.connectionmanager.common.packet.response.ResponseActionPacket
+import gg.essential.connectionmanager.common.packet.store.ClientRedeemStoreClaimPacket
+import gg.essential.connectionmanager.common.packet.store.ServerRedeemStoreClaimResponsePacket
 import gg.essential.gui.elementa.state.v2.*
 import gg.essential.gui.elementa.state.v2.combinators.*
 import gg.essential.gui.elementa.state.v2.stateBy
 import gg.essential.gui.notification.Notifications
 import gg.essential.gui.notification.sendCheckoutFailedNotification
+import gg.essential.gui.overlay.modalFlow
 import gg.essential.gui.wardrobe.modals.CoinsReceivedModal
 import gg.essential.network.CMConnection
 import gg.essential.network.connectionmanager.NetworkedManager
@@ -244,22 +245,26 @@ class CoinsManager(val connectionManager: CMConnection) : NetworkedManager {
         // Freeze coins until we get a response to prevent the balance packet we receive as a response from animating them
         areCoinsVisuallyFrozen.set(true)
 
-        connectionManager.send(ClientCheckoutClaimCoinsPacket("WARDROBE_REFRESH")) { optionalPacket ->
-            val packet = optionalPacket.orElse(null)
-            if (packet is ServerCheckoutClaimCoinsResponsePacket) {
-
-                // The modal will also unfreeze coins when it's dismissed
-                // Alongside this response, infra sends down a top-up balance packet too, it's handler will set isClaimingCoins back to false
-                val manager = platform.createModalManager()
-                manager.queueModal(CoinsReceivedModal.fromCoinClaim(manager, this, packet.coinsClaimed))
-
-                return@send // Return if successful
-            } else if (packet !is ResponseActionPacket || packet.errorMessage == null) {
-                // Invalid packet or missing errorMessage means infra error
-                LOGGER.error("ClientCheckoutClaimCoinsPacket gave invalid response!")
+        connectionManager.connectionScope.launch {
+            try {
+                val packet = connectionManager.call(ClientRedeemStoreClaimPacket("WARDROBE_REFRESH"))
+                    .awaitOneOf(ServerRedeemStoreClaimResponsePacket::class.java, ResponseActionPacket::class.java)
+                    ?: throw IllegalStateException("Infra didn't respond!")
+                when (packet) {
+                    is ResponseActionPacket -> {
+                        LOGGER.error("Failed to claim redemption code because {}", packet.errorMessage ?: "Unknown Error")
+                    }
+                    is ServerRedeemStoreClaimResponsePacket -> {
+                        // Await the modal such that the coins are updated visually only after the user closes it
+                        modalFlow(platform.createModalManager()) {
+                            awaitModal<Nothing> { CoinsReceivedModal.fromCoinClaim(modalManager, this@CoinsManager, packet.products.first().amount) }
+                        }
+                    }
+                }
+            } finally {
+                areCoinsVisuallyFrozen.set(false)
+                isClaimingCoins.set(false)
             }
-            areCoinsVisuallyFrozen.set(false) // Unfreeze if unsuccessful
-            isClaimingCoins.set(false)
         }
     }
 

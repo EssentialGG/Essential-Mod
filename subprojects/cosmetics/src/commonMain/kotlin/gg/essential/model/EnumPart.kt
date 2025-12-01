@@ -17,7 +17,7 @@ import gg.essential.model.ModelParser.Companion.ROOT_BONE_NAME
 /** Different bones cosmetics can be bound to */
 enum class EnumPart(
 
-     /** represents the armor slot IDs that the part covers */
+     /** represents the armor slot IDs that the part covers @see [ArmorSlots] */
     val armorSlotIds: Set<Int>,
 ) {
     // Represents the model root, also used to differentiate geometry or emitters that are otherwise disconnected from any other EnumParts
@@ -25,8 +25,8 @@ enum class EnumPart(
     // Body parts
     HEAD(setOf(3)),
     BODY(setOf(2)),
-    RIGHT_ARM(setOf(2)),
-    LEFT_ARM(setOf(2)),
+    RIGHT_ARM(setOf(2, 4)),
+    LEFT_ARM(setOf(2, 4)),
     LEFT_LEG(setOf(0, 1)),
     RIGHT_LEG(setOf(0, 1)),
     // Parrots

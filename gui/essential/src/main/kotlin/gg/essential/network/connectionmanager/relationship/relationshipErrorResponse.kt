@@ -27,7 +27,7 @@ val RelationshipErrorResponse.message: String
 fun RelationshipErrorResponse.showToast(uuid: UUID, name: String) = when (this) {
     EXISTING_REQUEST_IS_PENDING ->
         Notifications.error("Friend request failed", "") {
-            markdownBody("Friend request already sent to ${name.colored(EssentialPalette.TEXT_HIGHLIGHT)}.")
+            markdownBody("Friend request already sent to ${name.replace("_", "\\_").colored(EssentialPalette.TEXT_HIGHLIGHT)}.")
         }
     SENDER_TYPE_VERIFIED_SLOT_LIMIT ->
         Notifications.error(
@@ -36,26 +36,26 @@ fun RelationshipErrorResponse.showToast(uuid: UUID, name: String) = when (this) 
         )
     TARGET_TYPE_VERIFIED_SLOT_LIMIT ->
         Notifications.error("Friend request failed", "") {
-            markdownBody("${name.colored(EssentialPalette.TEXT_HIGHLIGHT)}'s friends list is full.")
+            markdownBody("${name.replace("_", "\\_").colored(EssentialPalette.TEXT_HIGHLIGHT)}'s friends list is full.")
         }
     NO_PENDING_REQUEST_TO_VERIFY ->
         Notifications.error("Error", "No pending friend request to accept.")
     VERIFIED_RELATIONSHIP_ALREADY_EXISTS ->
         Notifications.error("Friend request failed", "") {
-            markdownBody("You are already friends with ${name.colored(EssentialPalette.TEXT_HIGHLIGHT)}.")
+            markdownBody("You are already friends with ${name.replace("_", "\\_").colored(EssentialPalette.TEXT_HIGHLIGHT)}.")
         }
     NO_BLOCKED_RELATIONSHIP_TO_CONVERT ->
         Notifications.error("Error", "") {
-            markdownBody("Failed to block ${name.colored(EssentialPalette.TEXT_HIGHLIGHT)}.")
+            markdownBody("Failed to block ${name.replace("_", "\\_").colored(EssentialPalette.TEXT_HIGHLIGHT)}.")
         }
     SENDER_BLOCKED_TARGET ->
         Notifications.error("Friend request failed", "") {
-            markdownBody("You have blocked ${name.colored(EssentialPalette.TEXT_HIGHLIGHT)}. " +
+            markdownBody("You have blocked ${name.replace("_", "\\_").colored(EssentialPalette.TEXT_HIGHLIGHT)}. " +
                     "Unblock them before sending them a friend request.")
         }
     TARGET_BLOCKED_SENDER ->
         Notifications.warning("Friend request declined", "") {
-            markdownBody("${name.colored(EssentialPalette.TEXT_HIGHLIGHT)} has blocked you.")
+            markdownBody("${name.replace("_", "\\_").colored(EssentialPalette.TEXT_HIGHLIGHT)} has blocked you.")
         }
     SENDER_TYPE_OUTGOING_SLOT_LIMIT ->
         Notifications.error(
@@ -64,27 +64,27 @@ fun RelationshipErrorResponse.showToast(uuid: UUID, name: String) = when (this) 
         )
     TARGET_TYPE_INCOMING_SLOT_LIMIT ->
         Notifications.error("Friend request failed", "") {
-            markdownBody("${name.colored(EssentialPalette.TEXT_HIGHLIGHT)} has too many pending friend requests.")
+            markdownBody("${name.replace("_", "\\_").colored(EssentialPalette.TEXT_HIGHLIGHT)} has too many pending friend requests.")
         }
     TARGET_PRIVACY_SETTING_FRIEND_OF_FRIENDS ->
         Notifications.warning("Friend request declined", "") {
-            markdownBody("${name.colored(EssentialPalette.TEXT_HIGHLIGHT)} is only accepting friend requests from friends of friends.")
+            markdownBody("${name.replace("_", "\\_").colored(EssentialPalette.TEXT_HIGHLIGHT)} is only accepting friend requests from friends of friends.")
         }
     TARGET_PRIVACY_SETTING_NO_ONE ->
         Notifications.warning("Friend request declined", "") {
-            markdownBody("${name.colored(EssentialPalette.TEXT_HIGHLIGHT)} is not accepting any friend requests.")
+            markdownBody("${name.replace("_", "\\_").colored(EssentialPalette.TEXT_HIGHLIGHT)} is not accepting any friend requests.")
         }
     TARGET_NOT_EXIST ->
         Notifications.error("Error", "") {
-            markdownBody("${name.colored(EssentialPalette.TEXT_HIGHLIGHT)} does not exist.")
+            markdownBody("${name.replace("_", "\\_").colored(EssentialPalette.TEXT_HIGHLIGHT)} does not exist.")
         }
     USER_IS_PERMANENTLY_SUSPENDED ->
         Notifications.error("Friend request failed", "") {
-            markdownBody("${name.colored(EssentialPalette.TEXT_HIGHLIGHT)} is suspended.")
+            markdownBody("${name.replace("_", "\\_").colored(EssentialPalette.TEXT_HIGHLIGHT)} is suspended.")
         }
     USER_IS_TEMPORARILY_SUSPENDED ->
         Notifications.error("Friend request failed", "") {
-            markdownBody("${name.colored(EssentialPalette.TEXT_HIGHLIGHT)} is temporarily suspended.")
+            markdownBody("${name.replace("_", "\\_").colored(EssentialPalette.TEXT_HIGHLIGHT)} is temporarily suspended.")
         }
     else -> throw AssertionError() // FIXME: Workaround for compiler bug fixed in Kotlin 2.0
 }

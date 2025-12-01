@@ -9,16 +9,22 @@
  * commercialize, or otherwise exploit, or create derivative works based
  * upon, this file or any other in this repository, all of which is reserved by Essential.
  */
-package gg.essential.util;
+package gg.essential.connectionmanager.common.packet.store;
 
-import java.io.IOException;
+import gg.essential.connectionmanager.common.packet.Packet;
+import org.jetbrains.annotations.NotNull;
 
-public class APIException extends IOException {
-    public APIException(String errorMessage, Throwable cause) {
-        super(errorMessage, cause);
+public class ClientRedeemStoreClaimPacket extends Packet {
+
+    @NotNull
+    private final String code;
+
+    public ClientRedeemStoreClaimPacket(@NotNull String code) {
+        this.code = code;
     }
 
-    public APIException(String errorMessage) {
-        super(errorMessage);
+    public @NotNull String getCode() {
+        return code;
     }
+
 }

@@ -71,10 +71,10 @@ sealed class AbstractConfiguration<I, T>(
                     }
                     divider()
                     row(Modifier.fillWidth().childBasedMaxHeight(3f), Arrangement.spacedBy(5f, FloatPosition.CENTER)) {
-                        navButton("Reset", Modifier.fillWidth(0.3f)) {
+                        navButton("Reset", enabled = configurationType.canReset, modifier = Modifier.fillWidth(0.3f)) {
                             platform.pushModal { manager -> getResetModal(manager, id) }
                         }
-                        navButton("Delete", Modifier.fillWidth(0.3f)) {
+                        navButton("Delete", enabled = configurationType.canUpdate, modifier = Modifier.fillWidth(0.3f)) {
                             platform.pushModal { manager -> getDeleteModal(manager, id) }
                         }
                         if_({ submenuState() != null }) {
@@ -136,11 +136,11 @@ sealed class AbstractConfiguration<I, T>(
 
     protected fun T.update(newItem: T?) = id().update(newItem)
     @JvmName("updateById")
-    protected fun I.update(newItem: T?) = configurationType.updateHandler(cosmeticsDataWithChanges, this, newItem)
+    protected fun I.update(newItem: T?) = configurationType.updateHandler?.invoke(cosmeticsDataWithChanges, this, newItem)
 
     protected fun T.reset() = id().reset()
     @JvmName("resetById")
-    protected fun I.reset() = configurationType.resetHandler(cosmeticsDataWithChanges, this)
+    protected fun I.reset() = configurationType.resetHandler?.invoke(cosmeticsDataWithChanges, this)
 
     protected fun T.idAndName() = configurationType.idAndNameMapper(this)
 

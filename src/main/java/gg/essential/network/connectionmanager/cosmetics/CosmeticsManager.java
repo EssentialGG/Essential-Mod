@@ -35,6 +35,7 @@ import gg.essential.gui.elementa.state.v2.State;
 import gg.essential.gui.elementa.state.v2.StateKt;
 import gg.essential.gui.elementa.state.v2.collections.TrackedList;
 import gg.essential.gui.notification.Notifications;
+import gg.essential.gui.wardrobe.Wardrobe;
 import gg.essential.mod.EssentialAsset;
 import gg.essential.mod.cosmetics.*;
 import gg.essential.network.connectionmanager.ConnectionManager;
@@ -145,6 +146,10 @@ public class CosmeticsManager implements NetworkedManager, ICosmeticsManager {
             this.connectionManager.getSubscriptionManager(),
             (hash) -> {
                 this.capeManager.queueCape(hash);
+                // If we're still in the Wardrobe, we'll delay flushing until it's closed, so we don't spam Mojang too much
+                if (Wardrobe.getInstance() == null) {
+                    this.capeManager.flushCapeUpdatesAsync();
+                }
                 return Unit.INSTANCE;
             },
             this.cosmeticsData,

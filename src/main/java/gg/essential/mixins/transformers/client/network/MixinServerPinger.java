@@ -22,14 +22,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-//#if MC>=12002
-//$$ import net.minecraft.client.network.ServerAddress;
-//#endif
-
-//#if MC>=11700
-//$$ import java.net.InetSocketAddress;
-//#endif
-
 import static gg.essential.mixins.ext.client.multiplayer.ServerDataExtKt.getExt;
 
 @Mixin(ServerPinger.class)
@@ -64,16 +56,7 @@ public abstract class MixinServerPinger {
     }
 
     @Inject(method = "tryCompatibilityPing", at = @At("HEAD"), cancellable = true)
-    private void abortIfUntrusted(
-        //#if MC>=11700
-        //$$ InetSocketAddress address,
-        //#endif
-        //#if MC>=12002
-        //$$ ServerAddress serverAddress,
-        //#endif
-        ServerData serverData,
-        CallbackInfo ci
-    ) {
+    private void abortIfUntrusted(CallbackInfo ci, @Local(argsOnly = true) ServerData serverData) {
         if (requiresProxy(serverData)) {
             ci.cancel();
         }

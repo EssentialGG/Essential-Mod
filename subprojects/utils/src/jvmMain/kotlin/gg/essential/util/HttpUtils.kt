@@ -46,7 +46,10 @@ val httpClient: CompletableFuture<OkHttpClient> = CompletableFuture.supplyAsync 
                     .header("User-Agent", "Essential/${VersionInfo().essentialVersion} (https://essential.gg)")
                     .build()
             )
-        }.build()
+        }
+        // FIXME temporary workaround, not to be included in release builds
+        .apply {  }
+        .build()
 }
 
 private val httpClientDeferred = httpClient.asDeferred()

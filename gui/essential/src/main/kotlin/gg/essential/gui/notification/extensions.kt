@@ -84,6 +84,7 @@ private val defaultMarkdownConfig = MarkdownConfig(
 )
 
 @JvmOverloads
+@Deprecated("Using this method could cause unintended formatting to be parsed. f.ex. underscores could be parsed as italics")
 fun NotificationBuilder.markdownBody(
     message: String,
     markdownConfig: MarkdownConfig = defaultMarkdownConfig

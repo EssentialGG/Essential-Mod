@@ -21,12 +21,13 @@ import gg.essential.gui.elementa.state.v2.mutableStateOf
 import gg.essential.mod.Model
 import gg.essential.mod.Skin
 import gg.essential.network.CMConnection
+import gg.essential.network.mojang.MojangProfileLookupApi
 import gg.essential.network.registerPacketHandler
 import gg.essential.util.Client
 import gg.essential.util.ExponentialBackoff
 import gg.essential.util.GuiEssentialPlatform.Companion.platform
+import gg.essential.util.RateLimitException
 import gg.essential.util.Sha256
-import gg.essential.util.httpGet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -34,15 +35,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.future.asDeferred
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.nio.file.NoSuchFileException
 import java.nio.file.Path
-import java.util.Base64
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import kotlin.collections.component1
@@ -162,45 +160,14 @@ object PlayerSkinLookup {
     }
 
     private suspend fun fetchFromMojang(uuid: UUID): Skin? {
-        // TODO fetching and response code handling is mostly copied from UuidNameLookup
-        //  both classes can probably use the same backing class, but first UuidNameLookup would need to be cleaned up
-        val url = "https://sessionserver.mojang.com/session/minecraft/profile/${uuid.toString().replace("-", "")}";
         val backoff = ExponentialBackoff(2.seconds, 60.seconds, 2.0)
-        val json = Json { ignoreUnknownKeys = true }
 
         while (true) {
-            val response = httpGet(url) { builder ->
-                builder.header("Content-Type", "application/json")
+            try {
+                return MojangProfileLookupApi.fetch(uuid)?.textures?.skin
+            } catch (_: RateLimitException) {
+                delay(backoff.increment())
             }
-
-            when (response.code()) {
-                // player not found
-                204, 404 -> return null
-                // ratelimit exceeded
-                429 -> {
-                    delay(backoff.increment())
-                    continue
-                }
-                else -> {}
-            }
-
-            @Serializable
-            class TextureMetadata(val model: Model)
-            @Serializable
-            class Texture(val url: String, val metadata: TextureMetadata = TextureMetadata(Model.STEVE))
-            @Serializable
-            class Textures(val textures: Map<String, Texture> = emptyMap())
-            @Serializable
-            class Property(val name: String, val value: String)
-            @Serializable
-            class Profile(val properties: List<Property>)
-
-            val profile: Profile = json.decodeFromString(response.body()!!.string())
-            val property = profile.properties.find { it.name == "textures" } ?: return null
-            val propertyValue = String(Base64.getDecoder().decode(property.value))
-            val textures: Textures = json.decodeFromString(propertyValue)
-            val skin = textures.textures["SKIN"] ?: return null
-            return Skin.fromUrl(skin.url, skin.metadata.model)
         }
     }
 

@@ -14,6 +14,7 @@ package gg.essential.cosmetics;
 import com.mojang.authlib.minecraft.MinecraftProfileTexture;
 import gg.essential.api.cosmetics.RenderCosmetic;
 import gg.essential.config.EssentialConfig;
+import gg.essential.compat.aether.AetherGlovesCompat;
 import gg.essential.event.entity.PlayerTickEvent;
 import gg.essential.gui.common.EmulatedUI3DPlayer;
 import gg.essential.gui.elementa.state.v2.State;
@@ -202,7 +203,8 @@ public class PlayerWearableManager {
                 !canRenderCosmetic(player, 0),
                 !canRenderCosmetic(player, 1),
                 !canRenderCosmetic(player, 2),
-                !canRenderCosmetic(player, 3)
+                !canRenderCosmetic(player, 3),
+                AetherGlovesCompat.isWearingGloves(player)
         );
     }
 

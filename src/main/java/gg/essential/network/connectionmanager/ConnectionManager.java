@@ -21,8 +21,8 @@ import gg.essential.elementa.state.v2.ReferenceHolder;
 import gg.essential.event.client.PostInitializationEvent;
 import gg.essential.gui.elementa.state.v2.ReferenceHolderImpl;
 import gg.essential.gui.elementa.state.v2.State;
-import gg.essential.handlers.GameProfileManager;
-import gg.essential.mod.Model;
+import gg.essential.gui.wardrobe.Wardrobe;
+import gg.essential.handlers.MojangSkinManager;
 import gg.essential.mod.Skin;
 import gg.essential.network.client.MinecraftHook;
 import gg.essential.network.connectionmanager.chat.ChatManager;
@@ -272,12 +272,14 @@ public class ConnectionManager extends ConnectionManagerKt {
         effect(refHolder, observer -> {
             Skin skin = this.outfitManager.getEquippedSkin().get(observer);
             if (skin == null) return Unit.INSTANCE;
-            Model model = skin.getModel();
-            String hash = skin.getHash();
-            String url = String.format(Locale.ROOT, GameProfileManager.SKIN_URL, hash);
             USession session = USession.Companion.activeNow();
-            Essential.getInstance().getSkinManager().changeSkin(session.getToken(), model, url);
             PlayerSkinLookup.INSTANCE.put(session.getUuid(), skin);
+            MojangSkinManager skinManager = Essential.getInstance().getSkinManager();
+            skinManager.queueSkin(session.getUuid(), skin);
+            // If we're still in the Wardrobe, we'll delay flushing until it's closed, so we don't spam Mojang too much
+            if (Wardrobe.getInstance() == null) {
+                skinManager.flushChangesAsync();
+            }
             return Unit.INSTANCE;
         });
 

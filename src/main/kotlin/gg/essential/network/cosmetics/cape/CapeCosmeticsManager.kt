@@ -21,80 +21,66 @@ import gg.essential.mod.cosmetics.CAPE_DISABLED_COSMETIC_ID
 import gg.essential.mod.cosmetics.CosmeticSlot
 import gg.essential.network.connectionmanager.ConnectionManager
 import gg.essential.network.connectionmanager.cosmetics.CosmeticsManager
-import gg.essential.util.Multithreading
+import gg.essential.network.mojang.ManagedMojangProfileApi
+import gg.essential.network.mojang.MojangProfileApi
+import gg.essential.util.Client
+import gg.essential.util.USession
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import net.minecraft.client.Minecraft
 import net.minecraft.entity.player.EnumPlayerModelParts
-import java.util.concurrent.Semaphore
 
 
 class CapeCosmeticsManager(
     private val connectionManager: ConnectionManager,
     private val cosmeticsManager: CosmeticsManager,
 ) {
+    private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Client)
 
-    /**
-     * Mutex which must be acquired while talking to Mojang to avoid two threads getting into a data race.
-     * If synchronization on `this` is also required, this mutex must be acquired first.
-     */
-    private val mojangLock = Semaphore(1)
+    private fun mojangProfileApi(): ManagedMojangProfileApi =
+        ManagedMojangProfileApi.forUser(USession.activeNow().uuid)
 
-    private var cachedCapes: List<MojangCapeApi.Cape>? = null
-
-    private var activeCape: String? = null
     private var queued: Upload? = null
 
-    private data class Upload(val hash: String?)
+    private data class Upload(val api: ManagedMojangProfileApi, val hash: String?)
 
-    private fun fetchCapes(allowCache: Boolean) = (if (allowCache) cachedCapes else null)
-        ?: MojangCapeApi.fetchCapes().also { capes ->
-            synchronized(this) {
-                cachedCapes = capes
-                activeCape = capes.find { it.active }?.hash
-            }
-        }
-
-    fun queueCape(hash: String?) = synchronized(this) {
-        queued = Upload(hash)
+    fun queueCape(hash: String?) {
+        queued = Upload(mojangProfileApi(), hash)
     }
 
-    fun flushCapeUpdates() {
-        var cape: MojangCapeApi.Cape? = null
+    fun flushCapeUpdatesAsync() = coroutineScope.launch {
+        flushCapeUpdates()
+    }
+    suspend fun flushCapeUpdates() = withContext(NonCancellable) { doFlushCapeUpdates() }
+    private suspend fun doFlushCapeUpdates() {
+        var cape: MojangProfileApi.Cape? = null
 
-        mojangLock.acquire()
         try {
-            val capes = fetchCapes(true)
+            val upload = queued.also { queued = null } ?: return
 
-            synchronized(this) {
-                val upload = queued.also { queued = null } ?: return
+            val api = upload.api
+            val cached = api.fetch()
+            cape = cached.capes.find { it.hash == upload.hash }
 
-                if (upload.hash == activeCape) {
-                    return
-                }
+            api.putCape(cape?.id) ?: return
 
-                cape = capes.find { it.hash == upload.hash }
-
-                activeCape = cape?.hash
-            }
-
-            MojangCapeApi.putCape(cape?.id)
             Essential.logger.info("Updated Mojang cape to \"${cape?.name ?: "<none>"}\"")
-            MinecraftGameProfileTexturesRefresher.updateTextures(activeCape, "CAPE")
+            MinecraftGameProfileTexturesRefresher.updateTextures()
         } catch (e: Throwable) {
             Essential.logger.error("Error enabling cape $cape at Mojang:", e)
-        } finally {
-            mojangLock.release()
         }
     }
 
     fun unlockMissingCapesAsync() {
-        Multithreading.scheduledPool.execute {
-            mojangLock.acquire()
+        connectionManager.connectionScope.launch {
             try {
-                this.unlockMissingCapes()
+                unlockMissingCapes()
             } catch (e: Throwable) {
                 Essential.logger.error("Error loading capes from Mojang:", e)
-            } finally {
-                mojangLock.release()
             }
         }
         if (CAPE_DISABLED_COSMETIC_ID !in cosmeticsManager.unlockedCosmetics.get()) {
@@ -134,45 +120,27 @@ class CapeCosmeticsManager(
         }
     }
 
-    private fun unlockMissingCapes() {
-        val capes = fetchCapes(false)
+    private suspend fun unlockMissingCapes() {
+        val api = mojangProfileApi()
+        val profile = api.fetch()
+        val capes = profile.capes
         val missing = capes.filter { it.hash !in cosmeticsManager.unlockedCosmetics.get() }
         if (missing.isEmpty()) {
             return // no capes yet to unlock, nothing to do
         }
 
-        // Fetching signatures requires changing the active cape, we need to revert that later
-        val originallyActive = capes.find { it.active }
-        var active = originallyActive
+        val signatures = api.obtainSignaturesForCapes(missing)
 
-        val signatures = mutableListOf<Pair<String, String>>()
-        for (cape in missing) {
-            // If the cape is not currently active, we need to activate it cause that's the only way to get a signature
-            if (cape != active) {
-                MojangCapeApi.putCape(cape.id)
-                // Wait a second just in case it needs to propagate on Mojang's end (and in case there's a rate limit)
-                Thread.sleep(1000)
-                active = cape
-            }
-            // Fetch a signature for this cape
-            signatures.add(MojangCapeApi.fetchCurrentTextures())
-        }
-
-        // If we had to change the active cape on Mojang's end, revert it to what the user expects
-        if (originallyActive != active) {
-            MojangCapeApi.putCape(originallyActive?.id)
-        }
-
-        // Finally, send an unlock request to the backend
-        connectionManager.send(ClientCosmeticCapesUnlockedPacket(signatures.toMap())) { reply ->
+        val payload = signatures.associate { it.second.value to it.second.signature!! }
+        connectionManager.send(ClientCosmeticCapesUnlockedPacket(payload)) { reply ->
             if ((reply.orElse(null) as ResponseActionPacket?)?.isSuccessful != true) {
                 Essential.logger.warn("Backend failed to unlock capes ($reply):")
-                for ((cape, proof) in missing.zip(signatures)) {
+                for ((cape, proof) in signatures) {
                     Essential.logger.warn("  - ${cape.name}:")
                     Essential.logger.warn("      Id: ${cape.id}")
                     Essential.logger.warn("      Url: ${cape.url}")
-                    Essential.logger.warn("      Proof of ownership: ${proof.first}")
-                    Essential.logger.warn("      Signature: ${proof.second}")
+                    Essential.logger.warn("      Proof of ownership: ${proof.value}")
+                    Essential.logger.warn("      Signature: ${proof.signature}")
                 }
             }
         }

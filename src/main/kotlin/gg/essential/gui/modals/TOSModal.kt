@@ -16,7 +16,6 @@ import gg.essential.data.OnboardingData
 import gg.essential.gui.EssentialPalette
 import gg.essential.gui.common.OutlineButtonStyle
 import gg.essential.gui.common.modal.EssentialModal2
-import gg.essential.gui.common.modal.Modal
 import gg.essential.gui.common.textStyle
 import gg.essential.gui.elementa.state.v2.MutableState
 import gg.essential.gui.elementa.state.v2.State
@@ -48,18 +47,15 @@ import gg.essential.gui.overlay.ModalManager
 import gg.essential.gui.util.focusable
 import gg.essential.network.connectionmanager.ConnectionManager
 import gg.essential.universal.USound
-import gg.essential.util.AutoUpdate
+import gg.essential.util.AutoUpdate.showUpdateModal
 import gg.essential.util.openInBrowser
 import gg.essential.vigilance.utils.onLeftClick
-import kotlinx.coroutines.launch
 import java.net.URI
 
 class TOSModal(
     modalManager: ModalManager,
-    private val unprompted: Boolean = false,
     private val requiresAuth: Boolean = false,
-    private val confirmAction: Modal.() -> Unit,
-    private val cancelAction: () -> Unit = {},
+    private val continuation: ModalFlow.ModalContinuation<Boolean>
 ) : EssentialModal2(modalManager, true) {
 
     private val ageCheckbox = mutableStateOf(false)
@@ -142,37 +138,8 @@ class TOSModal(
 
                 if (requiresAuth && !Essential.getInstance().connectionManager.isAuthenticated) {
                     isConnecting.set(true)
-                    val connectionManager = Essential.getInstance().connectionManager
-
-                    coroutineScope.launch {
-                        val status = connectionManager.connectionStatus
-                                    .letState { status ->
-                                        if (status == ConnectionManager.Status.NO_TOS) return@letState null
-                                        if (status != ConnectionManager.Status.SUCCESS) return@letState status
-                                        if (!connectionManager.suspensionManager.isLoaded()) return@letState null
-                                        if (!connectionManager.rulesManager.isLoaded()) return@letState null
-                                        ConnectionManager.Status.SUCCESS
-                                    }
-                                    .await { it != null }
-
-                        val modal = when {
-                            connectionManager.outdated -> AutoUpdate.createUpdateModal(modalManager)
-                            status == ConnectionManager.Status.MOJANG_UNAUTHORIZED -> AccountNotValidModal(modalManager, successCallback = confirmAction)
-                            status != ConnectionManager.Status.SUCCESS -> NotAuthenticatedModal(modalManager, successCallback = confirmAction)
-                            else -> null
-                        }
-
-                        if (modal != null) {
-                            replaceWith(modal)
-                        } else {
-                            confirmAction.invoke(this@TOSModal)
-                            close()
-                        }
-                    }
-                } else {
-                    confirmAction.invoke(this@TOSModal)
-                    close()
                 }
+                replaceWith(continuation.resume(true))
             },
         ) { currentStyle ->
             text({ if (isConnecting()) "Connecting..." else "Agree" }, Modifier.textStyle(currentStyle))
@@ -187,11 +154,7 @@ class TOSModal(
                 .focusable(),
             disabled = isConnecting,
             action = {
-                if (unprompted) {
-                    OnboardingData.setDeniedTos()
-                }
-                cancelAction()
-                close()
+                replaceWith(continuation.resume(false))
             }
         ) { style ->
             text("Cancel", Modifier.textStyle(style))
@@ -200,13 +163,34 @@ class TOSModal(
 
 }
 
-suspend fun ModalFlow.tosModal(): Boolean =
-    awaitModal { continuation ->
+suspend fun ModalFlow.tosModal(): Boolean {
+    val acceptedTos = awaitModal { continuation ->
         TOSModal(
             modalManager,
-            unprompted = false,
             requiresAuth = true,
-            confirmAction = { modalManager.queueModal(continuation.resumeImmediately(true)) },
-            cancelAction = { modalManager.queueModal(continuation.resumeImmediately(false)) }
+            continuation = continuation,
         )
     }
+    if (acceptedTos) {
+        OnboardingData.setAcceptedTos()
+
+        if(!Essential.getInstance().connectionManager.isAuthenticated) {
+            val connectionManager = Essential.getInstance().connectionManager
+            val status = connectionManager.connectionStatus
+                .letState { status ->
+                    if (status == ConnectionManager.Status.NO_TOS) return@letState null
+                    if (status != ConnectionManager.Status.SUCCESS) return@letState status
+                    if (!connectionManager.suspensionManager.isLoaded()) return@letState null
+                    if (!connectionManager.rulesManager.isLoaded()) return@letState null
+                    ConnectionManager.Status.SUCCESS
+                }.await { it != null }
+
+            when {
+                connectionManager.outdated -> showUpdateModal()
+                status == ConnectionManager.Status.MOJANG_UNAUTHORIZED -> return accountNotValidModal()
+                status != ConnectionManager.Status.SUCCESS -> return notAuthenticatedModal()
+            }
+        }
+    }
+    return acceptedTos
+}

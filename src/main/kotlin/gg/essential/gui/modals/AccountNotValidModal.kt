@@ -12,49 +12,67 @@
 package gg.essential.gui.modals
 
 import gg.essential.Essential
-import gg.essential.gui.common.modal.ConfirmDenyModal
-import gg.essential.gui.common.modal.Modal
-import gg.essential.gui.common.modal.configure
-import gg.essential.gui.common.onSetValueAndNow
+import gg.essential.gui.common.modal.EssentialModal2
+import gg.essential.gui.elementa.state.v2.effect
+import gg.essential.gui.layoutdsl.LayoutScope
+import gg.essential.gui.layoutdsl.wrappedText
+import gg.essential.gui.overlay.ModalFlow
 import gg.essential.gui.overlay.ModalManager
+import gg.essential.gui.util.pollingStateV2
 import gg.essential.handlers.account.WebAccountManager
-import gg.essential.gui.util.pollingState
 
 class AccountNotValidModal(
     modalManager: ModalManager,
     private val skipAuthCheck: Boolean = false,
-    private val successCallback: Modal.() -> Unit = {},
-    private val failureCallback: Modal.() -> Unit = {},
-) : ConfirmDenyModal(modalManager, false) {
+    private val continuation: ModalFlow.ModalContinuation<Boolean?>
+) : EssentialModal2(modalManager, false) {
 
-    private val authStatus = pollingState { Essential.getInstance().connectionManager.isAuthenticated }
+    private val authStatus = pollingStateV2 { Essential.getInstance().connectionManager.isAuthenticated }
+    private var unregisterEffect: (() -> Unit)? = null
+    private var hasResumed = false
 
-    init {
-        configure {
-            contentText = "Something went wrong or your account is not authenticated with Essential. Log into your account on our website to securely add it in-game."
-            primaryButtonText = "Open Browser"
-        }
+    override fun LayoutScope.layoutBody() {
+        wrappedText("Something went wrong or your account is not authenticated with Essential. Log into your account on our website to securely add it in-game.", centered = true)
+    }
 
-        onPrimaryAction {
-            WebAccountManager.openInBrowser()
-        }
+    override fun LayoutScope.layoutButtons() {
+        primaryAndCancelButtons(
+            "Open Browser",
+            "Cancel",
+            primaryAction = { hasResumed = true; replaceWith(continuation.resume(true)) },
+            cancelAction = { hasResumed = true; replaceWith(continuation.resumeImmediately(false)) }
+        )
     }
 
     override fun onOpen() {
         super.onOpen()
         if (skipAuthCheck) return
         // Immediately move on if a connection is established and authenticated
-        authStatus.onSetValueAndNow {
-            if (it) {
-                successCallback.invoke(this)
-                replaceWith(null)
+        unregisterEffect = effect(this) {
+            if (authStatus()) {
+                hasResumed = true;
+                replaceWith(continuation.resumeImmediately(null))
             }
         }
     }
 
     override fun onClose() {
-        if (!authStatus.get()) {
-            failureCallback.invoke(this)
+        unregisterEffect?.invoke()
+        if (!hasResumed) {
+            modalManager.queueModal(continuation.resumeImmediately(false))
         }
     }
 }
+
+suspend fun ModalFlow.accountNotValidModal(): Boolean {
+    while (!Essential.getInstance().connectionManager.isAuthenticated) {
+        val accepted = awaitModal { continuation -> AccountNotValidModal(modalManager, false, continuation) }
+        when (accepted) {
+            true -> WebAccountManager.openInBrowser()
+            false -> return false
+            null -> return true
+        }
+    }
+    return true
+}
+

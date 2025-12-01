@@ -35,10 +35,11 @@ import gg.essential.gui.wardrobe.Item
 import gg.essential.gui.wardrobe.ItemId
 import gg.essential.gui.wardrobe.WardrobeState
 import gg.essential.gui.wardrobe.components.openWardrobeWithHighlight
-import gg.essential.handlers.MojangSkinManager
 import gg.essential.image.PNGFile
 import gg.essential.mod.Model
 import gg.essential.mod.Skin
+import gg.essential.network.mojang.ManagedMojangProfileApi
+import gg.essential.network.mojang.MojangProfileLookupApi
 import gg.essential.universal.USound
 import gg.essential.util.*
 import gg.essential.util.GuiEssentialPlatform.Companion.platform
@@ -48,6 +49,7 @@ import gg.essential.util.image.bitmap.toTexture
 import gg.essential.util.lwjgl3.api.*
 import gg.essential.vigilance.utils.onLeftClick
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import java.net.MalformedURLException
 import java.nio.file.Files
@@ -56,6 +58,7 @@ import java.util.*
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.io.path.Path
 import kotlin.io.path.inputStream
+import kotlin.io.path.readBytes
 
 class SkinModal private constructor(
     modalManager: ModalManager,
@@ -209,7 +212,16 @@ class SkinModal private constructor(
         fun steal(modalManager: ModalManager, state: WardrobeState) = UsernameInputModal(modalManager, "") { uuid, name, modal ->
             modal.primaryButtonEnableStateOverride.set(false)
             modal.clearError()
-            val skin = MojangSkinManager.getTextureProperty(uuid)?.first?.propertyToSkin()
+            val skin = try {
+                // FIXME ideally shouldn't be using runBlocking here
+                runBlocking {
+                    MojangProfileLookupApi.fetch(uuid)?.textures?.skin
+                }
+            } catch (e: Exception) {
+                // FIXME ideally error in UI should reflect actual issue
+                LOGGER.error("Failed to fetch profile for $uuid", e)
+                null
+            }
             if (skin != null) {
                 modal.replaceWith(add(modalManager, skin, initialName = state.skinsManager.getNextIncrementalSkinName()))
             } else {
@@ -227,19 +239,16 @@ class SkinModal private constructor(
          * Mojang skin uploads are reverted immediately to keep the skin unselected.
          */
         fun addFile(modalManager: ModalManager, path: Path, skinOverride: UIdentifier, initialName: String, defaultModel: Model) = SkinModal(modalManager, skinOverride, "Add Skin", initialName, defaultModel) { name, model ->
-            val mojangSkinManager = platform.mojangSkinManager
-            val accessToken = USession.activeNow().token
-            val oldSkin = mojangSkinManager.activeSkin
-            val skin = mojangSkinManager.uploadSkin(accessToken, model, path.toFile(), false)
-
-            if (skin == null) {
+            val mojangApi = ManagedMojangProfileApi.forUser(USession.activeNow().uuid)
+            val bytes = path.readBytes()
+            // FIXME shouldn't need to use runBlocking here
+            val skin = try {
+                runBlocking { mojangApi.uploadSkin(bytes, model) }
+            } catch (e: Exception) {
+                LOGGER.error("Failed to upload skin", e)
                 Notifications.push("Skin Upload", "Skin upload failed!")
                 return@SkinModal
             }
-
-            val oldActiveSkin = oldSkin.join()
-            mojangSkinManager.changeSkin(accessToken, oldActiveSkin.model, oldActiveSkin.url)
-            mojangSkinManager.flushChanges(false)
 
             platform.skinsManager.addSkin(name, skin).whenComplete { skinItem, throwable ->
                 if (skinItem != null) {

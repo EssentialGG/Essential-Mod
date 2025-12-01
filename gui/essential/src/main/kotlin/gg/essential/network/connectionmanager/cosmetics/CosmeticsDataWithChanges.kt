@@ -148,12 +148,17 @@ class CosmeticsDataWithChanges(
             implicitOwnerships = implicitOwnershipsMap + updatedImplicitOwnerships.getUntracked().filterValues { it == null },
             cosmetics = cosmeticsMap + updatedCosmetics.get().filterValues { it == null },
         ).thenApply {
-            updatedCosmetics.set(emptyMap())
-            updatedCategories.set(emptyMap())
-            updatedTypes.set(emptyMap())
-            updatedBundles.set(emptyMap())
-            updatedFeaturedPageCollections.set(emptyMap())
+            resetLocalChanges()
         }.logExceptions()
+    }
+
+    fun resetLocalChanges() {
+        updatedCosmetics.set(emptyMap())
+        updatedCategories.set(emptyMap())
+        updatedTypes.set(emptyMap())
+        updatedBundles.set(emptyMap())
+        updatedFeaturedPageCollections.set(emptyMap())
+        updatedImplicitOwnerships.set(emptyMap())
     }
 
     fun getUpdatesSummary() = memo {

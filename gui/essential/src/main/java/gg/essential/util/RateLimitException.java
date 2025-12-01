@@ -12,7 +12,7 @@
 package gg.essential.util;
 
 public class RateLimitException extends Exception {
-    public RateLimitException(String errorMessage) {
-        super(errorMessage);
+    public RateLimitException() {
+        super("Rate limit exceeded");
     }
 }

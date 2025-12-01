@@ -42,7 +42,6 @@ import gg.essential.gui.util.pollingStateV2
 import gg.essential.universal.UKeyboard
 import gg.essential.universal.UMinecraft
 import gg.essential.util.*
-import net.minecraft.client.Minecraft
 import java.nio.file.Path
 
 class ScreenshotBrowser(editPath: Path? = null): InternalEssentialGUI(
@@ -173,11 +172,5 @@ class ScreenshotBrowser(editPath: Path? = null): InternalEssentialGUI(
     override fun updateGuiScale() {
         newGuiScale = GuiUtil.getGuiScale()
         super.updateGuiScale()
-    }
-
-    override fun onResize(mcIn: Minecraft, w: Int, h: Int) {
-        newGuiScale = GuiUtil.getGuiScale()
-
-        super.onResize(mcIn, w, h)
     }
 }

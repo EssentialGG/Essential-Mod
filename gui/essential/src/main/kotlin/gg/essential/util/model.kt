@@ -14,4 +14,4 @@ package gg.essential.util
 import gg.essential.api.utils.mojang.Model as APIModel
 import gg.essential.mod.Model
 
-fun Model.toAPIModel(): APIModel = APIModel.values()[this.ordinal]
+fun APIModel.toModModel(): Model = Model.values()[this.ordinal]

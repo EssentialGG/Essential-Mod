@@ -18,11 +18,12 @@ package gg.essential.cosmetics
 data class ArmorSlots(val slots: Byte) {
 
     constructor(
-        boots: Boolean,      // Slot 0
-        leggings: Boolean,   // Slot 1
-        chestplate: Boolean, // Slot 2
-        helmet: Boolean,     // Slot 3
-    ) : this((boots.toFlag(0) + leggings.toFlag(1) + chestplate.toFlag(2) + helmet.toFlag(3)).toByte())
+        boots: Boolean,             // Slot 0
+        leggings: Boolean,          // Slot 1
+        chestplate: Boolean,        // Slot 2
+        helmet: Boolean,            // Slot 3
+        gloves: Boolean = false,    // Slot 4, third party mod supported armor slot (The Aether mod)
+    ) : this((boots.toFlag(0) + leggings.toFlag(1) + chestplate.toFlag(2) + helmet.toFlag(3) + gloves.toFlag(4)).toByte())
 
     operator fun get(i: Int): Boolean = (slots.toInt() and (1 shl i)) != 0
 

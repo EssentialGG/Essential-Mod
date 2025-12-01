@@ -27,7 +27,7 @@ import gg.essential.gui.common.shadow.EssentialUIText
 import gg.essential.gui.common.shadow.ShadowIcon
 import gg.essential.gui.elementa.GuiScaleOffsetConstraint
 import gg.essential.gui.layoutdsl.*
-import gg.essential.gui.modals.UpdateAvailableModal
+import gg.essential.gui.modals.updateAvailableModal
 import gg.essential.universal.USound
 import gg.essential.util.AutoUpdate
 import gg.essential.util.GuiUtil
@@ -44,7 +44,7 @@ class LeftPane(pages: Map<Category, Page>, selectedPage: BasicState<Page>, botto
     init {
         val updateButtonModifier = Modifier.childBasedWidth(10f).childBasedHeight(4f)
             .color(EssentialPalette.GREEN_BUTTON).hoverColor(EssentialPalette.GREEN_BUTTON_HOVER)
-            .onLeftClick { GuiUtil.pushModal { manager -> UpdateAvailableModal(manager) } }
+            .onLeftClick { GuiUtil.launchModalFlow { updateAvailableModal() } }
 
         layout {
             column(Modifier.fillParent()) {

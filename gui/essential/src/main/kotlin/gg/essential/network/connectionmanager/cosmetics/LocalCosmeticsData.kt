@@ -53,7 +53,7 @@ import kotlin.io.path.writeBytes
 import kotlin.streams.toList
 
 class LocalCosmeticsData private constructor(
-    private val rootPath: Path,
+    val rootPath: Path,
     private val assetLoader: AssetLoader,
     private val state: MutableCosmeticsData = MutableCosmeticsData(),
 ) : CosmeticsData by state {

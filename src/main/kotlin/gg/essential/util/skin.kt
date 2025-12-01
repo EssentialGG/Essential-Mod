@@ -11,11 +11,40 @@
  */
 package gg.essential.util
 
+import com.google.common.base.Suppliers
 import com.mojang.authlib.GameProfile
 import com.mojang.authlib.properties.Property
 import gg.essential.mod.Skin
+import gg.essential.network.mojang.MojangProfileLookupApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asExecutor
+import net.minecraft.client.Minecraft
+import java.util.concurrent.CompletableFuture
+import kotlin.collections.firstOrNull
 
-fun Property.propertyToSkin(): Skin = value.propertyToSkin()
+fun getSkinFromMinecraft(): CompletableFuture<Skin> {
+    return CompletableFuture.supplyAsync(
+        //#if MC>=12002
+        //$$ { MinecraftClient.getInstance().gameProfile.properties },
+        //#else
+        // Note: getProfileProperties is not thread-safe, so we must evaluate it immediately
+        Suppliers.ofInstance(Minecraft.getMinecraft().profileProperties),
+        //#endif
+        Dispatchers.Client.asExecutor()
+    ).thenApply { properties ->
+        properties
+            .get("textures")
+            .firstOrNull()
+            ?.propertyToSkin()
+            //#if MC>=11903
+            //$$ ?: Skin.default(USession.activeNow().uuid)
+            //#else
+            ?: Skin.defaultPre1_19_3(USession.activeNow().uuid)
+            //#endif
+    }
+}
+
+fun Property.propertyToSkin(): Skin? = MojangProfileLookupApi.Property(name, value).decodedAsTextures.skin
 
 fun GameProfile.gameProfileToSkin(): Skin? {
     return properties["textures"].firstOrNull()?.let {

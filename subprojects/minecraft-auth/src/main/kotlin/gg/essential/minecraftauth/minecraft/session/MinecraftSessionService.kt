@@ -24,7 +24,10 @@ import okhttp3.RequestBody
 import java.util.*
 
 object MinecraftSessionService {
-    private const val JOIN_URI = "https://sessionserver.mojang.com/session/minecraft/join"
+    private val JOIN_URI = System.getProperty(
+        "minecraft.api.session.host",
+        "https://sessionserver.mojang.com"
+    ) + "/session/minecraft/join"
 
     /**
      * Attempts to send a "fake" join request to Mojang's session server.

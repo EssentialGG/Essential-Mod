@@ -25,6 +25,9 @@ import net.minecraft.world.GameRules
 
 class EssentialGameRules {
 
+    //#if MC>=12109
+    //$$ // Minecraft now has a builtin `pvp` gamerule
+    //#else
     val pvpGameRule =
         //#if MC>=11600
         //$$ if (!ruleExists("pvp")) {
@@ -65,6 +68,7 @@ class EssentialGameRules {
     //$$     })
     //$$     return exists
     //$$ }
+    //#endif
     //#endif
 
 }

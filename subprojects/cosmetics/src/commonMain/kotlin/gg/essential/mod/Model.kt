@@ -11,6 +11,7 @@
  */
 package gg.essential.mod
 
+import gg.essential.serialization.SnakeAsUpperCaseSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -28,6 +29,8 @@ enum class Model(
     STEVE("default", "classic"),
     @SerialName("slim")
     ALEX("slim", "slim");
+
+    object UpperCase : SnakeAsUpperCaseSerializer<Model>(Model.serializer())
 
     companion object {
         @JvmStatic

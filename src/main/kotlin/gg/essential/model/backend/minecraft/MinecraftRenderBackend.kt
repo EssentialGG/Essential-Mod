@@ -43,18 +43,6 @@ import gg.essential.model.util.UVertexConsumer as CVertexConsumer
 //#endif
 
 //#if MC>=12105
-//$$ import com.mojang.blaze3d.pipeline.BlendFunction
-//$$ import com.mojang.blaze3d.pipeline.RenderPipeline
-//$$ import com.mojang.blaze3d.vertex.VertexFormat
-//$$ import gg.essential.util.ModLoaderUtil
-//#if FORGE==0
-//$$ import net.irisshaders.iris.api.v0.IrisApi
-//$$ import net.irisshaders.iris.api.v0.IrisProgram
-//#endif
-//$$ import net.minecraft.client.MinecraftClient
-//$$ import net.minecraft.client.gl.Framebuffer
-//$$ import net.minecraft.client.gl.RenderPipelines
-//$$ import net.minecraft.client.render.BuiltBuffer
 //$$ import net.minecraft.client.texture.GlTexture
 //#endif
 
@@ -105,71 +93,6 @@ object MinecraftRenderBackend : RenderBackend {
 
         dst.gpuTexture().copyFrom(ops.map { GpuTexture.CopyOp(it.src.gpuTexture(), it.srcX, it.srcY, it.destX, it.destY, it.width, it.height) })
     }
-
-    //#if MC>=12105
-    //$$ private fun RenderLayer.drawImpl(pipeline: RenderPipeline, buffer: BuiltBuffer) {
-    //$$     startDrawing()
-    //$$     buffer.use {
-            //#if MC>=12106
-            //$$ val dynamicTransforms = RenderSystem.getDynamicUniforms().write(
-            //$$     RenderSystem.getModelViewMatrix(),
-            //$$     org.joml.Vector4f(1.0F, 1.0F, 1.0F, 1.0F),
-            //#if MC>=12109
-            //$$     org.joml.Vector3f(),
-            //#else
-            //$$     RenderSystem.getModelOffset(),
-            //#endif
-            //$$     RenderSystem.getTextureMatrix(),
-            //$$     RenderSystem.getShaderLineWidth(),
-            //$$ )
-            //#endif
-    //$$         val vertexBuffer = pipeline.vertexFormat.uploadImmediateVertexBuffer(buffer.buffer)
-    //$$         val sortedBuffer = buffer.sortedBuffer
-    //$$         val (indexBuffer, indexType) = if (sortedBuffer != null) {
-    //$$             pipeline.vertexFormat.uploadImmediateIndexBuffer(sortedBuffer) to buffer.drawParameters.indexType()
-    //$$         } else {
-    //$$             val shapeIndexBuffer = RenderSystem.getSequentialBuffer(buffer.drawParameters.mode())
-    //$$             shapeIndexBuffer.getIndexBuffer(buffer.drawParameters.indexCount()) to shapeIndexBuffer.indexType
-    //$$         }
-    //$$         val target = MinecraftClient.getInstance().framebuffer
-    //$$         RenderSystem.getDevice().createCommandEncoder().createRenderPass(
-                //#if MC>=12106
-                //$$ { "Immediate draw for $name" },
-                //$$ RenderSystem.outputColorTextureOverride ?: target.colorAttachmentView!!,
-                //$$ java.util.OptionalInt.empty(),
-                //$$ if (target.useDepthAttachment) RenderSystem.outputDepthTextureOverride ?: target.depthAttachmentView else null,
-                //$$ java.util.OptionalDouble.empty()
-                //#else
-                //$$ target.colorAttachment!!,
-                //$$ java.util.OptionalInt.empty(),
-                //$$ if (target.useDepthAttachment) target.depthAttachment else null,
-                //$$ java.util.OptionalDouble.empty()
-                //#endif
-    //$$         ).use { renderPass ->
-    //$$             renderPass.setPipeline(pipeline)
-                //#if MC>=12106
-                //$$ RenderSystem.bindDefaultUniforms(renderPass)
-                //$$ renderPass.setUniform("DynamicTransforms", dynamicTransforms)
-                //#else
-                //$$ if (RenderSystem.SCISSOR_STATE.isEnabled) {
-                //$$     renderPass.enableScissor(RenderSystem.SCISSOR_STATE)
-                //$$ }
-                //#endif
-    //$$             for (i in 0 until 12) {
-    //$$                 RenderSystem.getShaderTexture(i)?.let { renderPass.bindSampler("Sampler$i", it) }
-    //$$             }
-    //$$             renderPass.setVertexBuffer(0, vertexBuffer)
-    //$$             renderPass.setIndexBuffer(indexBuffer, indexType)
-                //#if MC>=12106
-                //$$ renderPass.drawIndexed(0, 0, buffer.drawParameters.indexCount(), 1)
-                //#else
-                //$$ renderPass.drawIndexed(0, buffer.drawParameters.indexCount())
-                //#endif
-    //$$         }
-    //$$     }
-    //$$     endDrawing()
-    //$$ }
-    //#endif
 
     //#if MC>=12104
     //$$ // As of 1.21.4, MC itself now finally uses the RenderLayer system for its particles, so we'll do the same.

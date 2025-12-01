@@ -89,21 +89,18 @@ object GuiUtil : GuiUtil, OverlayManager by OverlayManagerImpl, ModalManager by 
     }
 
     @JvmStatic
-    fun <T : GuiScreen> openScreen(type: Class<T>, screen: () -> T) {
-        val essential = Essential.getInstance()
-        val connectionManager = essential.connectionManager
+    fun <T : GuiScreen> openScreen(type: Class<T>, screen: () -> T) = openScreen(type, screen, intrusive = false)
+
+    fun <T : GuiScreen> openScreen(type: Class<T>, screen: () -> T, intrusive: Boolean) {
         val screenRequiresTOS = GuiRequiresTOS::class.java.isAssignableFrom(type)
         val screenRequiresCosmetics = type == Wardrobe::class.java
-        val screenRequiresAuth = screenRequiresCosmetics || type == SocialMenu::class.java
         val screenChecksSocialSuspension = type == SocialMenu::class.java
 
         if (screenRequiresTOS && !OnboardingData.hasAcceptedTos()) {
-            if (openedScreen() == null) {
+            if (openedScreen() == null && !intrusive) {
                 // Show a notification when we're not in any menu, so it's less intrusive
                 sendTosNotification {
-                    pushModal {
-                        TOSModal(it, unprompted = false, requiresAuth = screenRequiresAuth, { openScreen(type, screen) })
-                    }
+                    openScreen(type, screen, intrusive = true)
                 }
                 return
             }

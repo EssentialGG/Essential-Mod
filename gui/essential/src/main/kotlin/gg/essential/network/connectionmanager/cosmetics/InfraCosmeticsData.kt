@@ -70,9 +70,7 @@ class InfraCosmeticsData private constructor(
     }
 
     fun resetState() {
-        state.categories.clear()
-        state.types.clear()
-        state.cosmetics.clear()
+        state.clear()
 
         categoriesKnownOrRequested.clear()
         activeCategoryRequests.clear()

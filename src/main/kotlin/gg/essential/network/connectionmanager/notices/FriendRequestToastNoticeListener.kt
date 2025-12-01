@@ -41,7 +41,7 @@ class FriendRequestToastNoticeListener(
                 action = {},
                 close = {},
             ) {
-                markdownBody("${name.colored(EssentialPalette.TEXT_HIGHLIGHT)} wants to be your friend.")
+                markdownBody("${name.replace("_", "\\_").colored(EssentialPalette.TEXT_HIGHLIGHT)} wants to be your friend.")
                 val component = ConfirmDenyNotificationActionComponent(
                     confirmTooltip = "Accept",
                     denyTooltip = "Decline",

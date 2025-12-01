@@ -14,14 +14,25 @@ package gg.essential.connectionmanager.common.packet.telemetry;
 import gg.essential.connectionmanager.common.packet.Packet;
 import gg.essential.lib.gson.annotations.SerializedName;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.Set;
 
 public class ServerRecognizedTelemetryPacket extends Packet {
+
+    @SerializedName("accepted_telemetry_categories")
+    @Nullable
+    private Set<String> acceptedTelemetryCategories = null;
 
     @SerializedName("recognized_telemetry")
     @NotNull
     private final List<String> recognizedTelemetry;
+
+    public ServerRecognizedTelemetryPacket(@Nullable final Set<String> acceptedTelemetryCategories, @NotNull final List<String> recognizedTelemetry) {
+        this.acceptedTelemetryCategories = acceptedTelemetryCategories;
+        this.recognizedTelemetry = recognizedTelemetry;
+    }
 
     public ServerRecognizedTelemetryPacket(@NotNull final List<String> recognizedTelemetry) {
         this.recognizedTelemetry = recognizedTelemetry;
@@ -32,4 +43,8 @@ public class ServerRecognizedTelemetryPacket extends Packet {
         return this.recognizedTelemetry;
     }
 
+    @Nullable
+    public Set<String> getAcceptedTelemetryCategories() {
+        return this.acceptedTelemetryCategories;
+    }
 }

@@ -22,6 +22,7 @@ import gg.essential.network.connectionmanager.legacyjre.LegacyJre;
 import gg.essential.network.connectionmanager.legacyjre.LegacyJreDnsResolver;
 import gg.essential.network.connectionmanager.legacyjre.LegacyJreSocketFactory;
 import gg.essential.util.LimitedExecutor;
+import gg.essential.util.MagicPathsKt;
 import gg.essential.util.Multithreading;
 import kotlin.Lazy;
 import kotlin.LazyKt;
@@ -57,8 +58,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.GZIPOutputStream;
-
-import static gg.essential.util.ExtensionsKt.getGlobalEssentialDirectory;
 
 public class Connection extends WebSocketClient {
     private static final Logger LOGGER = LoggerFactory.getLogger(Connection.class);
@@ -306,7 +305,7 @@ public class Connection extends WebSocketClient {
         if (logClosed) return;
 
         if (logOut == null) {
-            Path folder = getGlobalEssentialDirectory().resolve("infra-logs");
+            Path folder = MagicPathsKt.getGlobalEssentialDirectory().resolve("infra-logs");
 
             // Cleanup/compress existing files
             cleanupLogs(folder);

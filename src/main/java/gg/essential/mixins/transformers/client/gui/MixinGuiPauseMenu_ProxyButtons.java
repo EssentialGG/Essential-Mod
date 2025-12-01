@@ -22,15 +22,28 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+//#if MC >= 11600
+//$$ import org.spongepowered.asm.mixin.Final;
+//$$ import org.spongepowered.asm.mixin.Shadow;
+//#endif
+
 @Mixin(GuiIngameMenu.class)
 public class MixinGuiPauseMenu_ProxyButtons implements ScreenWithVanillaProxyElementsExt {
+
+    //#if MC >= 11600
+    //$$ @Shadow @Final private boolean isFullMenu;
+    //#endif
 
     @Unique
     private final ScreenWithProxiesHandler proxyHandler = ScreenWithProxiesHandler.forPauseMenu((GuiScreen) (Object) this);
 
     @Inject(method = "initGui", at = @At("TAIL"))
     private void addProxyButtons(CallbackInfo ci) {
+        //#if MC >= 11600
+        //$$ if (this.isFullMenu) proxyHandler.initGui();
+        //#else
         proxyHandler.initGui();
+        //#endif
     }
 
     @Override

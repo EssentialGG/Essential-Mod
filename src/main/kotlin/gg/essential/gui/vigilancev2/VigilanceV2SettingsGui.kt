@@ -26,8 +26,8 @@ import gg.essential.gui.InternalEssentialGUI
 import gg.essential.gui.elementa.state.v2.*
 import gg.essential.gui.elementa.state.v2.combinators.map
 import gg.essential.gui.layoutdsl.*
-import gg.essential.gui.modals.UpdateAvailableModal
 import gg.essential.gui.modals.communityRulesModal
+import gg.essential.gui.modals.updateAvailableModal
 import gg.essential.gui.vigilancev2.components.vigilanceCategoryTextColor
 import gg.essential.gui.vigilancev2.palette.VigilancePalette
 import gg.essential.network.connectionmanager.telemetry.FeatureSessionTelemetry
@@ -172,7 +172,7 @@ class VigilanceV2SettingsGui @JvmOverloads constructor(
             .hoverColor(EssentialPalette.GREEN_BUTTON_HOVER)
             .shadow(Color.BLACK)
             .onLeftClick {
-                GuiUtil.pushModal { UpdateAvailableModal(it) }
+                GuiUtil.launchModalFlow { updateAvailableModal() }
             }
 
         if_(AutoUpdate.updateAvailable) {

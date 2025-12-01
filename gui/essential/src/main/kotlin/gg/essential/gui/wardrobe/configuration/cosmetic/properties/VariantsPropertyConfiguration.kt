@@ -75,7 +75,7 @@ class VariantsPropertyConfiguration(
                     essentialStateTextInput(
                         mutableStateOf(variant.color),
                         { String.format("%08X", it.rgba.toInt()).substring(0, 6) },
-                        { Color.rgba(Integer.parseInt(it + "FF", 16).toUInt()) },
+                        { Color.rgba(it.padEnd(8, 'F').toUInt(16)) },
                         Modifier.width(50f)
                     ).state.onSetValue(stateScope) {
                         variants[index] = variant.copy(color = it)

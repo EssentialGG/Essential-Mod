@@ -281,6 +281,8 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
 
     val acknowledgedPermanentSuspension = property("Hidden.acknowledged_permanent_suspension", false)
 
+    val collectOptionalTelemetryWithSource = mutableStateOf(/*state*/true to /*updateInfra*/false)
+
     override val migrations = listOf(
         Migration { config ->
             val overrideGuiScale = config.remove("general.general.gui_scale") as Boolean? ?: return@Migration
@@ -657,7 +659,7 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
                 }
             }
         }
-        category("Privacy") {
+        category("Privacy & Data") {
             subcategory("Privacy") {
                 switch(sendServerUpdatesState) {
                     name = "Show game activity status to friends"
@@ -678,6 +680,12 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
                     name = "Terms of Service and Privacy Policy"
                     description = "Deny the Essential terms of service and privacy policy. Warning! This will prevent the use of Essential features."
                     label = "Deny TOS & PP"
+                }
+            }
+            subcategory("Data") {
+                switch(collectOptionalTelemetryWithSource.bimap({ it.first }, { it to true })) {
+                    name = "Collect optional telemetry data"
+                    description = "Give Essential permission to collect additional telemetry data to help improve your experience."
                 }
             }
         }

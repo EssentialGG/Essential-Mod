@@ -9,22 +9,9 @@
  * commercialize, or otherwise exploit, or create derivative works based
  * upon, this file or any other in this repository, all of which is reserved by Essential.
  */
-package gg.essential.connectionmanager.common.packet.checkout;
+package gg.essential.connectionmanager.common.packet.store;
 
-import gg.essential.connectionmanager.common.packet.Packet;
-import gg.essential.lib.gson.annotations.SerializedName;
-
-public class ServerCheckoutClaimCoinsResponsePacket extends Packet {
-
-    @SerializedName("coins_claimed")
-    private final int coinsClaimed;
-
-    public ServerCheckoutClaimCoinsResponsePacket(int coinsClaimed) {
-        this.coinsClaimed = coinsClaimed;
-    }
-
-    public int getCoinsClaimed() {
-        return coinsClaimed;
-    }
-
+public enum ProductRedemptionState {
+    REDEEMED,
+    ALREADY_OWNED
 }

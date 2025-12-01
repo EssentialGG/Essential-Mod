@@ -86,6 +86,7 @@ import gg.essential.network.connectionmanager.coins.CoinsManager
 import gg.essential.network.connectionmanager.cosmetics.AssetLoader
 import gg.essential.network.connectionmanager.features.Feature
 import gg.essential.network.cosmetics.Cosmetic
+import gg.essential.universal.UDesktop
 import gg.essential.universal.UKeyboard
 import gg.essential.universal.UMouse
 import gg.essential.universal.USound
@@ -232,6 +233,19 @@ fun LayoutScope.previewWindowTitleBar(state: WardrobeState, modifier: Modifier) 
             if_({ state.cosmeticsManager.cosmeticsDataWithChanges != null && state.showingDiagnosticsFor() == null }) {
                 val saveTooltip = state.cosmeticsManager.cosmeticsDataWithChanges!!.getUpdatesSummary()
                 if_(state.isUsingConfigurator) {
+                    ifNotNull(state.currentlyEditingCosmetic) { currentlyEditingCosmetic ->
+                        titleBarButton(Modifier.color(EssentialPalette.GRAY_BUTTON).hoverColor(EssentialPalette.GRAY_BUTTON_HOVER).hoverTooltip("Open cosmetic folder").hoverScope()) {
+                            icon(EssentialPalette.FOLDER_10X7)
+                        }.onLeftClick { click ->
+                            handleClick(click) {
+                                val data = state.cosmeticsManager.localCosmeticsData
+                                if (data != null) {
+                                    UDesktop.open(data.rootPath.resolve(currentlyEditingCosmetic.localPath).toFile())
+                                }
+                            }
+                        }
+                    }
+
                     val saveColor = saveTooltip.map { if (it == null) EssentialPalette.GRAY_BUTTON else EssentialPalette.YELLOW_BUTTON_HOVER }
                     box(modifier.width(17f).heightAspect(1f).color(saveColor).shadow(EssentialPalette.BLACK).hoverTooltip(saveTooltip.map { it ?: "No changes" }).hoverScope()) {
                         icon(EssentialPalette.SAVE_9X)

@@ -111,7 +111,7 @@ class PartyManager(private val scope: CoroutineScope) {
                 timerEnabled = component.timerEnabledState
                 withCustomComponent(Slot.ACTION, component)
                 withCustomComponent(Slot.ICON, EssentialPalette.ENVELOPE_9X7.create())
-                markdownBody("${username.colored(EssentialPalette.TEXT_HIGHLIGHT)} wants to join your world.")
+                markdownBody("${username.replace("_", "\\_").colored(EssentialPalette.TEXT_HIGHLIGHT)} wants to join your world.")
             }
         }
 

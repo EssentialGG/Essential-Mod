@@ -32,7 +32,6 @@ val mcPlatform: String by project.extra
 
 repositories {
     mavenLocal()
-    modMenu()
 }
 base.archivesName.set("Essential " + project.name)
 
@@ -97,7 +96,8 @@ dependencies {
     testImplementation(kotlin("test"))
 
     if (platform.isFabric && mcVersion >= 11600) {
-        val modMenuDependency = "com.terraformersmc:modmenu:${when {
+        repositories.modrinth()
+        val modMenuDependency = "maven.modrinth:modmenu:${when {
             platform.mcVersion >= 11800 -> "3.0.0"
             platform.mcVersion <= 11700 -> "1.16.22"
             else -> "2.0.14"
@@ -136,6 +136,21 @@ dependencies {
         }
         include(modImplementation(fabricApi.module("fabric-api-base", fapiVersion))!!)
         include(modImplementation(fabricApi.module("fabric-networking-api-v1", fapiVersion))!!)
+    }
+
+    // Dependencies for The Aether Mod gloves cosmetic hiding, @see [AetherGlovesCompat]
+    val mc = platform.mcVersion
+    when {
+        mc >= 12100 && !platform.isForge -> "accessories:1.1.0-beta.52+1.21.1"
+        mc == 12004 && platform.isNeoForge -> "curios:7.4.3+1.20.4"
+        mc == 12001 && platform.isFabric -> "accessories:1.0.0-beta.48+1.20.1"
+        mc == 12001 && platform.isForge -> "curios:1.19.2-5.1.6.4"
+        mc >= 11902 && mc < 12001 && platform.isForge -> "curios:1.19.2-5.1.6.4"
+        mc == 11202 -> "aether:1.12.2-v1.5.4.1"
+        else -> null
+    }?.let {
+        repositories.modrinth()
+        modCompileOnly("maven.modrinth:$it")
     }
 
 

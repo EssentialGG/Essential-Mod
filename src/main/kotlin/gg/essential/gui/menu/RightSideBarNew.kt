@@ -48,7 +48,7 @@ import gg.essential.gui.layoutdsl.row
 import gg.essential.gui.layoutdsl.shadow
 import gg.essential.gui.layoutdsl.spacer
 import gg.essential.gui.layoutdsl.then
-import gg.essential.gui.modals.UpdateAvailableModal
+import gg.essential.gui.modals.updateAvailableModal
 import gg.essential.gui.proxies.ScreenWithProxiesHandler.Companion.mountWithProxy
 import gg.essential.gui.screenshot.components.ScreenshotBrowser
 import gg.essential.gui.sps.WorldShareSettingsGui
@@ -168,7 +168,7 @@ class RightSideBarNew(
         mountWithProxy("update") {
             if_(AutoUpdate.updateAvailable) {
                 IconFlag(stateOf(MenuButton.NOTICE_GREEN), EssentialPalette.DOWNLOAD_7X8).onLeftClick {
-                    GuiUtil.pushModal { UpdateAvailableModal(it) }
+                    GuiUtil.launchModalFlow { updateAvailableModal() }
                 }(Modifier.hoverScope().then(State {
                     val position = if (isMinimal()) EssentialTooltip.Position.LEFT else EssentialTooltip.Position.ABOVE
                     Modifier.hoverTooltip("Update Available!", position = position)

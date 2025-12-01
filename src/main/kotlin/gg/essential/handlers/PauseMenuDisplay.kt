@@ -79,11 +79,9 @@ import gg.essential.gui.menu.LeftSideBar
 import gg.essential.gui.modal.sps.FirewallBlockingModal
 import gg.essential.gui.modals.EssentialAutoInstalledModal
 import gg.essential.gui.modals.FeaturesEnabledModal
-import gg.essential.gui.modals.NotAuthenticatedModal
-import gg.essential.gui.modals.TOSModal
-import gg.essential.gui.modals.UpdateAvailableModal
 import gg.essential.gui.modals.UpdateNotificationModal
 import gg.essential.gui.modals.ensurePrerequisites
+import gg.essential.gui.modals.updateAvailableModal
 import gg.essential.gui.notification.Notifications
 import gg.essential.gui.notification.error
 import gg.essential.gui.notification.toastButton
@@ -279,7 +277,7 @@ class PauseMenuDisplay {
                 )
 
                 Notifications.pushPersistentToast(AutoUpdate.getNotificationTitle(false), message ?: " ", {
-                    GuiUtil.pushModal { manager -> UpdateAvailableModal(manager) }
+                    GuiUtil.launchModalFlow { updateAvailableModal() }
                 }, {
                     if (!updateClicked) {
                         AutoUpdate.ignoreUpdate()
@@ -457,26 +455,6 @@ class PauseMenuDisplay {
                         showIPWarningOverride,
                         callback,
                     )
-                }
-
-                if (!OnboardingData.hasAcceptedTos()) {
-                    pushModal { manager ->
-                        TOSModal(
-                            manager,
-                            requiresAuth = true,
-                            confirmAction = { retryModal() }
-                        )
-                    }
-
-                    return
-                }
-
-                if (!connectionManager.isAuthenticated) {
-                    pushModal { manager ->
-                        NotAuthenticatedModal(manager, successCallback = { retryModal() })
-                    }
-
-                    return
                 }
 
                 if (showNetworkRelatedWarnings) {

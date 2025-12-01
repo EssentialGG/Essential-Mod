@@ -17,6 +17,7 @@ import gg.essential.gui.common.Checkbox
 import gg.essential.gui.elementa.state.v2.MutableState
 import gg.essential.gui.elementa.state.v2.State
 import gg.essential.gui.elementa.state.v2.combinators.not
+import gg.essential.gui.elementa.state.v2.onChange
 import gg.essential.gui.elementa.state.v2.stateOf
 import gg.essential.universal.USound
 import gg.essential.util.onLeftClick
@@ -26,7 +27,7 @@ fun LayoutScope.checkbox(
     onValueChange: (Boolean) -> Unit
 ): Checkbox {
     return Checkbox(initialValue)().apply {
-        isChecked.onSetValue {
+        isChecked.onChange(this) {
             onValueChange(it)
         }
     }

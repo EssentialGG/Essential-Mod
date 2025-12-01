@@ -17,18 +17,12 @@ import gg.essential.connectionmanager.common.packet.relationships.ServerLookupUu
 import gg.essential.elementa.state.BasicState;
 import gg.essential.gui.common.ReadOnlyState;
 import gg.essential.gui.elementa.state.v2.State;
-import gg.essential.lib.gson.Gson;
-import gg.essential.lib.gson.JsonElement;
-import gg.essential.lib.gson.JsonObject;
-import gg.essential.lib.gson.JsonParser;
 import gg.essential.network.CMConnection;
+import gg.essential.network.mojang.MojangNameToUuidApi;
+import gg.essential.network.mojang.MojangProfileLookupApi;
 import kotlin.coroutines.EmptyCoroutineContext;
 import kotlinx.coroutines.Dispatchers;
-import okhttp3.Request;
-import okhttp3.Response;
 
-import java.io.IOException;
-import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -40,59 +34,19 @@ import static kotlinx.coroutines.ExecutorsKt.asExecutor;
 
 public class UuidNameLookup {
 
-    private static final String UUID_TO_NAME_API = "https://sessionserver.mojang.com/session/minecraft/profile/";
-    private static final String NAME_TO_UUID_API = "https://api.mojang.com/users/profiles/minecraft/";
-
     // Stores any successful or in progress loading futures
     private static final ConcurrentHashMap<UUID, CompletableFuture<String>> uuidLoadingFutures = new ConcurrentHashMap<>();
 
     // Stores any successful or in progress loading futures
     private static final ConcurrentHashMap<String, CompletableFuture<UUID>> nameLoadingFutures = new ConcurrentHashMap<>();
 
-    private static Profile fetchProfile(String apiAddress) throws PlayerNotFoundException, RateLimitException, IOException {
-        Request request = new Request.Builder().url(apiAddress).header("Content-Type", "application/json").build();
-
-        try(Response response = HttpUtils.getHttpClient().join().newCall(request).execute()) {
-            String json = response.body() != null ? response.body().string() : null;
-
-            switch (response.code()) {
-                case 204:
-                case 404:
-                    throw new PlayerNotFoundException("Player not found");
-                case 429:
-                    throw new RateLimitException("Rate limit exceeded");
-                default:
-                    if (json == null) {
-                        throw new APIException("Failed to load profile: No response body");
-                    }
-            }
-
-            JsonElement jsonElement = JsonParser.parseString(json);
-            if (!jsonElement.isJsonObject()) {
-                throw new APIException("Failed to load profile: Invalid response");
-            }
-
-            JsonObject jsonObject = jsonElement.getAsJsonObject();
-            if (jsonObject.has("errorMessage")) {
-                throw new APIException("Failed to load profile: " + jsonObject.get("errorMessage").getAsString());
-            }
-
-            return (new Gson()).fromJson(jsonObject, Profile.class);
-        }
-    }
-
-    public static Profile fetchProfileFromUsername(String username) throws PlayerNotFoundException, RateLimitException, IOException {
-        return fetchProfile(NAME_TO_UUID_API + username);
-    }
-
-    public static Profile fetchProfileFromUUID(UUID uuid) throws PlayerNotFoundException, RateLimitException, IOException {
-        return fetchProfile(UUID_TO_NAME_API + uuid.toString().replaceAll("-", ""));
-    }
-
     public static CompletableFuture<String> getName(UUID uuid) {
         return uuidLoadingFutures.computeIfAbsent(uuid, ignored1 -> CompletableFuture.supplyAsync(() -> {
             try {
-                Profile profile = fetchProfileFromUUID(uuid);
+                MojangProfileLookupApi.Profile profile = MojangProfileLookupApi.INSTANCE.fetchBlocking(uuid);
+                if (profile == null) {
+                    throw new PlayerNotFoundException("Player not found");
+                }
                 nameLoadingFutures.put(profile.getName().toLowerCase(Locale.ROOT), CompletableFuture.completedFuture(uuid));
                 return profile.getName();
             } catch (Exception e) {
@@ -118,15 +72,11 @@ public class UuidNameLookup {
                 } else {
                     Dispatchers.getIO().dispatch(EmptyCoroutineContext.INSTANCE, () -> {
                         try {
-                            Profile profile = fetchProfileFromUsername(nameLower);
-                            UUID loadedUuid = UUID.fromString(
-                                new StringBuilder(profile.getId())
-                                    .insert(20, '-')
-                                    .insert(16, '-')
-                                    .insert(12, '-')
-                                    .insert(8, '-')
-                                    .toString()
-                            );
+                            MojangNameToUuidApi.Profile profile = MojangNameToUuidApi.INSTANCE.fetchBlocking(nameLower);
+                            if (profile == null) {
+                                throw new PlayerNotFoundException("Player not found");
+                            }
+                            UUID loadedUuid = profile.getId();
                             uuidLoadingFutures.put(loadedUuid, CompletableFuture.completedFuture(profile.getName()));
                             future.complete(loadedUuid);
                         } catch (Exception e) {
@@ -173,36 +123,5 @@ public class UuidNameLookup {
             }
             return value;
         };
-    }
-
-    public class Property {
-        private String name;
-        private String value;
-
-        public String getName() {
-            return this.name;
-        }
-
-        public String getValue() {
-            return this.value;
-        }
-    }
-
-    public static class Profile {
-        private String id;
-        private String name;
-        private List<Property> properties;
-
-        public String getId() {
-            return this.id;
-        }
-
-        public String getName() {
-            return this.name;
-        }
-
-        public List<Property> getProperties() {
-            return this.properties;
-        }
     }
 }

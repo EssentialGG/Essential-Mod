@@ -15,6 +15,7 @@ import gg.essential.cosmetics.CosmeticId
 import gg.essential.gui.EssentialPalette
 import gg.essential.gui.common.EssentialDropDown
 import gg.essential.gui.common.FullEssentialToggle
+import gg.essential.gui.common.compactFullEssentialToggle
 import gg.essential.gui.common.input.StateTextInput
 import gg.essential.gui.common.input.essentialStateTextInput
 import gg.essential.gui.elementa.state.v2.*
@@ -140,6 +141,16 @@ class CosmeticConfiguration(
         }
 
         labeledStringInputRow("Add tag:", mutableStateOf("")).state.onSetValue(stateScope) { cosmeticsDataWithChanges.setCosmeticTags(cosmetic.id, cosmetic.tags + it) }
+        val isLegacyState = mutableStateOf(cosmetic.isLegacy)
+        isLegacyState.onChange(stateScope) {
+            cosmeticsDataWithChanges.setCosmeticTags(cosmetic.id, if (it) cosmetic.tags + "LEGACY" else cosmetic.tags - "LEGACY")
+        }
+        labeledRow("Is legacy: ") {
+            box(Modifier.childBasedWidth(3f).childBasedHeight(3f).hoverScope()) {
+                compactFullEssentialToggle(isLegacyState)
+                spacer(1f, 1f)
+            }
+        }
         labeledManagedNullableISODateInputRow("Available After:", mutableStateOf(cosmetic.availableAfter)).state.onSetValue(stateScope) { cosmeticsDataWithChanges.setCosmeticAvailable(cosmetic.id, it, cosmetic.availableUntil, cosmetic.showTimerAfter) }
         labeledManagedNullableISODateInputRow("Available Until:", mutableStateOf(cosmetic.availableUntil)).state.onSetValue(stateScope) { cosmeticsDataWithChanges.setCosmeticAvailable(cosmetic.id, cosmetic.availableAfter, it, cosmetic.showTimerAfter) }
         labeledManagedNullableISODateInputRow("Show Timer After:", mutableStateOf(cosmetic.showTimerAfter)).state.onSetValue(stateScope) { cosmeticsDataWithChanges.setCosmeticAvailable(cosmetic.id, cosmetic.availableAfter, cosmetic.availableUntil, it) }

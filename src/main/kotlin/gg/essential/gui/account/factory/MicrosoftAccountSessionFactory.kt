@@ -250,7 +250,7 @@ class MicrosoftAccountSessionFactory(private val savePath: Path, oldSavePath: Pa
                             Notifications.error("Account Error", "") {
                                 markdownBody(
                                     "An error occurred while trying to keep " +
-                                        "${username.colored(EssentialPalette.TEXT_HIGHLIGHT)} signed in. " +
+                                        "${username.replace("_", "\\_").colored(EssentialPalette.TEXT_HIGHLIGHT)} signed in. " +
                                         "Please add this account again."
                                 )
                             }

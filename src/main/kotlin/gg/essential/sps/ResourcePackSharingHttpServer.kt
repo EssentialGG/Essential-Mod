@@ -17,13 +17,13 @@ import gg.essential.Essential
 import gg.essential.mixins.ext.client.resource.ResourcePackWithPath
 import gg.essential.sps.quic.jvm.LOCALHOST
 import gg.essential.universal.UMinecraft
+import gg.essential.util.HttpStatus
 import gg.essential.util.Multithreading
 import gg.essential.util.ResourceManagerUtil
 import gg.essential.util.executor
 import net.minecraft.client.Minecraft
 import net.minecraft.client.resources.IResourcePack
 import org.apache.commons.codec.digest.DigestUtils
-import org.apache.http.HttpStatus
 import java.net.InetSocketAddress
 import java.nio.file.Files
 import java.nio.file.Path
@@ -63,14 +63,14 @@ object ResourcePackSharingHttpServer {
         val server = HttpServer.create(InetSocketAddress(LOCALHOST, 0), 0)
         server.createContext("/") {
             if (spsManager.localSession == null || !spsManager.isShareResourcePack) {
-                it.sendResponseHeaders(HttpStatus.SC_FORBIDDEN, 0)
+                it.sendResponseHeaders(HttpStatus.FORBIDDEN, 0)
                 it.responseBody.close()
                 return@createContext
             }
 
             when (val packInfo = packInfo) {
                 null -> {
-                    it.sendResponseHeaders(HttpStatus.SC_NOT_FOUND, 0)
+                    it.sendResponseHeaders(HttpStatus.NOT_FOUND, 0)
                     it.responseBody.close()
                 }
 
@@ -96,7 +96,7 @@ object ResourcePackSharingHttpServer {
     }
 
     private fun sendFile(file: Path, exchange: HttpExchange) {
-        exchange.sendResponseHeaders(HttpStatus.SC_OK, file.fileSize())
+        exchange.sendResponseHeaders(HttpStatus.OK, file.fileSize())
         file.inputStream().use {
             it.copyTo(exchange.responseBody)
         }

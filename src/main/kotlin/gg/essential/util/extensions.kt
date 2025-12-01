@@ -42,10 +42,8 @@ import net.minecraft.server.MinecraftServer
 import net.minecraft.server.integrated.IntegratedServer
 import net.minecraft.world.storage.WorldSummary
 import java.awt.Color
-import java.io.File
 import java.io.InputStream
 import java.nio.file.Path
-import java.nio.file.Paths
 import java.util.*
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executor
@@ -142,35 +140,6 @@ var ServerData.serverResourcePack
         resourceMode = value
     }
 //#endif
-
-val minecraftDirectory: File
-    get() {
-        return when (os) {
-            OperatingSystem.WINDOWS -> File(System.getenv("APPDATA"), ".minecraft")
-            OperatingSystem.MACOS -> File(
-                System.getProperty("user.home"),
-                "Library/Application Support/minecraft"
-            )
-            else -> File(System.getProperty("user.home"), ".minecraft")
-        }
-    }
-
-val globalEssentialDirectory: Path
-    get() {
-        return when (os) {
-            OperatingSystem.WINDOWS -> Paths.get(System.getenv("APPDATA"), "gg.essential.mod")
-            OperatingSystem.MACOS -> Paths.get(
-                System.getProperty("user.home"),
-                "Library", "Application Support", "gg.essential.mod"
-            )
-            else -> {
-                val xdgDataHome = System.getenv("XDG_DATA_HOME")?.let { Paths.get(it) }
-                    ?: Paths.get(System.getProperty("user.home"), ".local", "share")
-
-                xdgDataHome / "gg.essential.mod"
-            }
-        }
-    }
 
 fun MCMinecraft.setSession(session: USession) {
     (this as MinecraftExt).setSession(session.toMC())

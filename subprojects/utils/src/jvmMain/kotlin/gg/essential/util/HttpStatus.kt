@@ -9,19 +9,12 @@
  * commercialize, or otherwise exploit, or create derivative works based
  * upon, this file or any other in this repository, all of which is reserved by Essential.
  */
-package gg.essential.connectionmanager.common.packet.checkout;
+package gg.essential.util
 
-import gg.essential.connectionmanager.common.packet.Packet;
-import gg.essential.lib.gson.annotations.SerializedName;
-import org.jetbrains.annotations.NotNull;
+object HttpStatus {
+    // 2xx
+    const val OK = 200
 
-public class ClientCheckoutClaimCoinsPacket extends Packet {
-
-    @SerializedName("claim_id")
-    private final @NotNull String claimId;
-
-    public ClientCheckoutClaimCoinsPacket(@NotNull String claimId) {
-        this.claimId = claimId;
-    }
-
+    const val FORBIDDEN = 403
+    const val NOT_FOUND = 404
 }

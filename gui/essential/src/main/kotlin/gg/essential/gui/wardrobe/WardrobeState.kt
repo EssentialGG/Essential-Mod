@@ -501,6 +501,7 @@ class WardrobeState(
     val currentlyEditingCosmeticCategoryId = mutableStateOf<CosmeticCategoryId?>(null)
     val currentlyEditingFeaturedPageCollectionId = mutableStateOf<FeaturedPageCollectionId?>(null)
     val currentlyEditingImplicitOwnershipId = mutableStateOf<ImplicitOwnershipId?>(null)
+    val currentlyEditingSortWeightCategoryId = mutableStateOf<CosmeticCategoryId?>(null)
 
     val currentlyEditingCosmetic = stateBy { currentlyEditingCosmeticId()?.let { id -> cosmetics().find { it.id == id } } }
     val currentlyEditingCosmeticBundle = stateBy { currentlyEditingCosmeticBundleId()?.let { id -> bundles().find { it.id == id } } }
@@ -508,6 +509,7 @@ class WardrobeState(
     val currentlyEditingCosmeticCategory = stateBy { currentlyEditingCosmeticCategoryId()?.let { id -> rawCategories().find { it.id == id } } }
     val currentlyEditingFeaturedPageCollection = stateBy { currentlyEditingFeaturedPageCollectionId()?.let { id -> rawFeaturedPageCollections().find { it.id == id } } }
     val currentlyEditingImplicitOwnership = stateBy { currentlyEditingImplicitOwnershipId()?.let { id -> rawImplicitOwnerships().find { it.id == id } } }
+    val currentlyEditingSortWeightCategory = memo { currentlyEditingSortWeightCategoryId()?.let { id -> rawCategories().find { it.id == id } } }
 
     val showingDiagnosticsFor = mutableStateOf<String?>(null) // value is LOCAL_PATH of cosmetic
 
@@ -519,6 +521,7 @@ class WardrobeState(
             currentlyEditingCosmeticType(),
             currentlyEditingCosmeticCategory(),
             currentlyEditingFeaturedPageCollection(),
+            currentlyEditingSortWeightCategory(),
         ).isNotEmpty()
     }
 

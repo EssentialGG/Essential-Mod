@@ -18,9 +18,9 @@ import gg.essential.data.VersionData
 import gg.essential.elementa.components.Window
 import gg.essential.gui.about.components.ChangelogComponent
 import gg.essential.gui.elementa.state.v2.mutableStateOf
-import gg.essential.gui.modals.UpdateAvailableModal
-import gg.essential.gui.modals.UpdateRequiredModal
-import gg.essential.gui.overlay.ModalManager
+import gg.essential.gui.modals.updateAvailableModal
+import gg.essential.gui.modals.updateRequiredModal
+import gg.essential.gui.overlay.ModalFlow
 import gg.essential.lib.gson.Gson
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -89,8 +89,8 @@ object AutoUpdate {
         "Update Available"
     }
 
-    fun createUpdateModal(modalManager: ModalManager) =
-        if (updateAvailable.get()) UpdateAvailableModal(modalManager) else UpdateRequiredModal(modalManager)
+    suspend fun ModalFlow.showUpdateModal() =
+        if (updateAvailable.getUntracked()) updateAvailableModal() else updateRequiredModal()
 
     val changelog: CompletableFuture<String?> by lazy {
         val version = (if (stage3UpdateAvailable) stage3PendingUpdateVersion else stage2PendingUpdateVersion)

@@ -15,35 +15,44 @@ import gg.essential.elementa.components.UIBlock
 import gg.essential.elementa.components.UIContainer
 import gg.essential.elementa.constraints.*
 import gg.essential.elementa.dsl.*
-import gg.essential.elementa.state.State
-import gg.essential.elementa.state.toConstraint
 import gg.essential.gui.EssentialPalette
 import gg.essential.gui.elementa.GuiScaleOffsetConstraint
+import gg.essential.gui.elementa.state.v2.State
+import gg.essential.gui.elementa.state.v2.color.toConstraint
+import gg.essential.gui.elementa.state.v2.mutableStateOf
+import gg.essential.gui.elementa.state.v2.stateOf
+import gg.essential.gui.layoutdsl.Modifier
+import gg.essential.gui.layoutdsl.color
+import gg.essential.gui.layoutdsl.heightAspect
+import gg.essential.gui.layoutdsl.hoverColor
+import gg.essential.gui.layoutdsl.hoverScope
+import gg.essential.gui.layoutdsl.layoutAsBox
+import gg.essential.gui.layoutdsl.width
 import gg.essential.universal.USound
-import gg.essential.gui.util.hoveredState
 import gg.essential.vigilance.utils.onLeftClick
 import java.awt.Color
 
 class Checkbox(
     initialValue: Boolean = false,
-    boxColor: State<Color> = EssentialPalette.BUTTON.state(),
-    checkmarkColor: State<Color> = EssentialPalette.TEXT_HIGHLIGHT.state(),
+    boxColor: State<Color> = stateOf(EssentialPalette.BUTTON),
+    checkmarkColor: State<Color> = stateOf(EssentialPalette.TEXT_HIGHLIGHT),
     checkmarkScaleOffset: Float = 0f,
     private val playClickSound: Boolean = true,
     private val callback: ((Boolean) -> Unit)? = null,
 ) : UIBlock(EssentialPalette.BUTTON) {
 
-    val isChecked = initialValue.state()
-    val boxColorState = boxColor.map { it }
-    val checkmarkColorState = checkmarkColor.map { it }
+    val isChecked = mutableStateOf(initialValue)
+
+    private val checkmark by Checkmark(checkmarkScaleOffset, checkmarkColor).constrain {
+        x = CenterConstraint()
+        y = CenterConstraint()
+    }
 
     init {
-        constrain {
-            width = 9.pixels
-            height = AspectConstraint()
-            color = hoveredState().zip(boxColorState).map { (hovered, color) ->
-                if (hovered) color.brighter() else color
-            }.toConstraint()
+        layoutAsBox(Modifier.width(9f).heightAspect(1f).hoverScope().color(boxColor).hoverColor({ boxColor().brighter() })) {
+            if_(isChecked) {
+                checkmark()
+            }
         }
 
         onLeftClick {click ->
@@ -51,11 +60,6 @@ class Checkbox(
             toggle()
         }
     }
-
-    private val checkmark by Checkmark(checkmarkScaleOffset, checkmarkColorState).constrain {
-        x = CenterConstraint()
-        y = CenterConstraint()
-    }.bindParent(this, isChecked)
 
     fun toggle() {
         isChecked.set { !it }
@@ -71,7 +75,7 @@ class Checkbox(
 private class Checkmark(scaleOffset: Float, color: State<Color>) : UIContainer() {
     init {
         repeat(5) {
-            UIBlock(color).constrain {
+            UIBlock(color.toConstraint()).constrain {
                 x = SiblingConstraint(alignOpposite = true)
                 y = SiblingConstraint()
                 width = AspectConstraint()
@@ -80,7 +84,7 @@ private class Checkmark(scaleOffset: Float, color: State<Color>) : UIContainer()
         }
 
         repeat(2) {
-            UIBlock(color).constrain {
+            UIBlock(color.toConstraint()).constrain {
                 x = SiblingConstraint(alignOpposite = true)
                 y = SiblingConstraint(alignOpposite = true)
                 width = AspectConstraint()

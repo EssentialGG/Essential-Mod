@@ -12,6 +12,7 @@
 package gg.essential.network.connectionmanager.telemetry;
 
 import gg.essential.Essential;
+import gg.essential.config.EssentialConfig;
 import gg.essential.connectionmanager.common.packet.telemetry.ClientTelemetryPacket;
 import gg.essential.connectionmanager.common.packet.telemetry.ServerRecognizedTelemetryPacket;
 import gg.essential.elementa.state.v2.ReferenceHolder;
@@ -85,6 +86,9 @@ public class TelemetryManager implements NetworkedManager {
             .create();
         connectionManager.registerPacketHandler(ServerRecognizedTelemetryPacket.class, (packet)->{
                 setRecognizedTelemetryKeys(packet.getRecognizedTelemetry());
+                if (packet.getAcceptedTelemetryCategories() != null) {
+                    EssentialConfig.INSTANCE.getCollectOptionalTelemetryWithSource().set(new kotlin.Pair<>(packet.getAcceptedTelemetryCategories().contains("OPTIONAL"), false));
+                }
                 return Unit.INSTANCE;
         });
         Essential.EVENT_BUS.register(this);

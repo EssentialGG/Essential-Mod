@@ -16,6 +16,7 @@ import gg.essential.api.gui.Slot
 import gg.essential.commands.EssentialCommandRegistry
 import gg.essential.config.EssentialConfig.autoUpdate
 import gg.essential.config.EssentialConfig.autoUpdateState
+import gg.essential.config.EssentialConfig.collectOptionalTelemetryWithSource
 import gg.essential.config.EssentialConfig.discordRichPresenceState
 import gg.essential.config.EssentialConfig.essentialEnabledState
 import gg.essential.config.EssentialConfig.friendRequestPrivacyState
@@ -23,6 +24,7 @@ import gg.essential.config.EssentialConfig.ownCosmeticsVisibleStateWithSource
 import gg.essential.connectionmanager.common.packet.cosmetic.ClientCosmeticsUserEquippedVisibilityTogglePacket
 import gg.essential.connectionmanager.common.packet.relationships.privacy.FriendRequestPrivacySettingPacket
 import gg.essential.connectionmanager.common.packet.response.ResponseActionPacket
+import gg.essential.connectionmanager.common.packet.telemetry.ClientTelemetryCollectionCategoriesUpdatePacket
 import gg.essential.data.OnboardingData
 import gg.essential.data.OnboardingData.hasAcceptedTos
 import gg.essential.elementa.components.Window
@@ -30,13 +32,14 @@ import gg.essential.gui.EssentialPalette
 import gg.essential.gui.elementa.state.v2.ReferenceHolderImpl
 import gg.essential.gui.elementa.state.v2.onChange
 import gg.essential.gui.modal.discord.DiscordActivityStatusModal
-import gg.essential.gui.modals.TOSModal
+import gg.essential.gui.modals.ensurePrerequisites
 import gg.essential.gui.notification.Notifications
 import gg.essential.gui.notification.error
 import gg.essential.gui.notification.sendTosNotification
 import gg.essential.gui.vigilancev2.VigilanceV2SettingsGui
 import gg.essential.util.AutoUpdate
 import gg.essential.util.GuiUtil
+import kotlinx.coroutines.launch
 
 object McEssentialConfig {
     private val referenceHolder = ReferenceHolderImpl()
@@ -67,7 +70,7 @@ object McEssentialConfig {
                     "Unable to establish connection with the Essential Network."
                 )
             } else {
-                fun showTOS() = GuiUtil.pushModal { TOSModal(it, unprompted = false, requiresAuth = true, {}) }
+                fun showTOS() = GuiUtil.launchModalFlow { ensurePrerequisites() }
                 if (GuiUtil.openedScreen() == null) {
                     // Show a notification when we're not in any menu, so it's less intrusive
                     sendTosNotification { showTOS() }
@@ -114,6 +117,34 @@ object McEssentialConfig {
                     }
                 }
                 // Unsuccessful packet means the correct value is already set, so do nothing
+            }
+        }
+
+        var lastCollectOptionalTelemetryFromSystemSource = true
+
+        fun restoreCollectOptionalTelemetryFromSystemSource() {
+            collectOptionalTelemetryWithSource.set(lastCollectOptionalTelemetryFromSystemSource to false)
+        }
+
+        collectOptionalTelemetryWithSource.onChange(referenceHolder) { (accepted, updateInfra) ->
+            if (!updateInfra) {
+                lastCollectOptionalTelemetryFromSystemSource = accepted
+                return@onChange
+            }
+            val connectionManager = Essential.getInstance().connectionManager
+            if (!connectionManager.isAuthenticated) {
+                displayNotConnectedInformation()
+                restoreCollectOptionalTelemetryFromSystemSource()
+                return@onChange
+            }
+            val acceptedCategories = if (accepted) setOf("REQUIRED", "OPTIONAL") else setOf("REQUIRED")
+            val packet = ClientTelemetryCollectionCategoriesUpdatePacket(acceptedCategories)
+            connectionManager.connectionScope.launch {
+                val successful = connectionManager.call(packet).awaitResponseActionPacket()
+                if (!successful) {
+                    restoreCollectOptionalTelemetryFromSystemSource()
+                    Notifications.error("Error", "Failed to toggle Collect Optional Telemetry. Please try again.")
+                }
             }
         }
 

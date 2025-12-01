@@ -12,76 +12,71 @@
 package gg.essential.gui.modals
 
 import gg.essential.Essential
-import gg.essential.elementa.state.BasicState
-import gg.essential.gui.common.modal.ConfirmDenyModal
-import gg.essential.gui.common.modal.Modal
-import gg.essential.gui.common.modal.configure
-import gg.essential.gui.common.not
+import gg.essential.gui.common.OutlineButtonStyle
+import gg.essential.gui.common.modal.EssentialModal2
+import gg.essential.gui.common.textStyle
 import gg.essential.gui.elementa.state.v2.State
 import gg.essential.gui.elementa.state.v2.await
-import gg.essential.gui.elementa.state.v2.combinators.map
+import gg.essential.gui.elementa.state.v2.combinators.letState
 import gg.essential.gui.elementa.state.v2.effect
-import gg.essential.gui.elementa.state.v2.toV1
+import gg.essential.gui.layoutdsl.Arrangement
+import gg.essential.gui.layoutdsl.LayoutScope
+import gg.essential.gui.layoutdsl.Modifier
+import gg.essential.gui.layoutdsl.row
+import gg.essential.gui.layoutdsl.shadow
+import gg.essential.gui.layoutdsl.tag
+import gg.essential.gui.layoutdsl.text
+import gg.essential.gui.layoutdsl.width
+import gg.essential.gui.layoutdsl.wrappedText
 import gg.essential.gui.notification.Notifications
 import gg.essential.gui.notification.error
 import gg.essential.gui.overlay.ModalFlow
 import gg.essential.gui.overlay.ModalManager
 import gg.essential.network.connectionmanager.ConnectionManager
 import gg.essential.gui.util.pollingStateV2
-import kotlinx.coroutines.launch
 
 class NotAuthenticatedModal(
     modalManager: ModalManager,
     private val skipAuthCheck: Boolean = false,
-    private val successCallback: Modal.() -> Unit = {},
-    private val failureCallback: Modal.() -> Unit = {},
-) : ConfirmDenyModal(modalManager, false) {
+    private val triedConnecting: Boolean = false,
+    private val continuation: ModalFlow.ModalContinuation<Boolean>
+) : EssentialModal2(modalManager, false) {
 
     private val connectionManager = Essential.getInstance().connectionManager
-    private val connecting = connectionManager.connectionStatus.map { it == null }.toV1(this)
-    private val triedConnect = BasicState(false)
+    private val connecting = connectionManager.connectionStatus.letState { it == null }
     private val authenticated = pollingStateV2 { connectionManager.isAuthenticated }
     private val status = State {
         authenticated() && connectionManager.suspensionManager.isLoaded() && connectionManager.rulesManager.isLoaded()
     }
-    private val buttonText = connecting.zip(triedConnect).map { (connect, tried) ->
-        if (connect) "Connecting..." else if (tried) "Retry" else "Connect"
+    private val buttonText = State {
+        if (connecting()) "Connecting..." else if (triedConnecting) "Retry" else "Connect"
     }
     private var unregisterEffect: (() -> Unit)? = null
+    private var hasResumed = false
 
-    constructor(
-        modalManager: ModalManager,
-        skipAuthCheck: Boolean,
-        continuation: ModalFlow.ModalContinuation<Boolean>,
-    ) : this(
-        modalManager,
-        skipAuthCheck,
-        { replaceWith(continuation.resumeImmediately(true)) },
-        { modalManager.queueModal(continuation.resumeImmediately(false)) },
-    )
+    override fun LayoutScope.layoutBody() {
+        wrappedText("You are not connected to the Essential Network. This is required to continue.", centered = true)
+    }
 
-    init {
-        configure {
-            contentText = "You are not connected to the Essential Network. This is required to continue."
-        }
-
-        bindPrimaryButtonText(buttonText)
-        bindConfirmAvailable(!connecting)
-
-        primaryButtonAction = {
-            coroutineScope.launch {
-                connectionManager.forceImmediateReconnect()
-                when (connectionManager.connectionStatus.await { it != null }) {
-                    ConnectionManager.Status.SUCCESS -> {}
-                    ConnectionManager.Status.MOJANG_UNAUTHORIZED -> {
-                        replaceWith(AccountNotValidModal(modalManager, successCallback = successCallback, failureCallback = failureCallback))
-                    }
-
-                    else -> {
-                        Notifications.error("Connection Error", "")
-                        triedConnect.set(true)
-                    }
-                }
+    override fun LayoutScope.layoutButtons() {
+        row(Arrangement.spacedBy(8f)) {
+            cancelButton("Cancel") {
+                hasResumed = true
+                replaceWith(continuation.resumeImmediately(false))
+            }
+            outlineButton(
+                Modifier
+                    .width(91f)
+                    .shadow()
+                    .tag(PrimaryAction),
+                style = { OutlineButtonStyle.BLUE },
+                disabled = connecting,
+                action = {
+                    hasResumed = true
+                    replaceWith(continuation.resume(true))
+                },
+            ) { currentStyle ->
+                text(buttonText, Modifier.textStyle(currentStyle))
             }
         }
     }
@@ -92,20 +87,38 @@ class NotAuthenticatedModal(
         // Immediately move on if a connection is established and authenticated
         unregisterEffect = effect(this) {
             if (status()) {
-                successCallback.invoke(this@NotAuthenticatedModal)
-                replaceWith(null)
+                hasResumed = true
+                // TODO: Use tri-state to properly handle early return states
+                replaceWith(continuation.resumeImmediately(true))
             }
         }
     }
 
     override fun onClose() {
         unregisterEffect?.invoke()
-        if (!status.getUntracked() && connectionManager.connectionStatus.getUntracked() != ConnectionManager.Status.MOJANG_UNAUTHORIZED) {
-            failureCallback.invoke(this)
+        if (!hasResumed) {
+            modalManager.queueModal(continuation.resumeImmediately(false))
         }
     }
 }
 
-suspend fun ModalFlow.notAuthenticatedModal(skipAuthCheck: Boolean = false): Boolean =
-    awaitModal { NotAuthenticatedModal(modalManager, skipAuthCheck, it) }
+suspend fun ModalFlow.notAuthenticatedModal(): Boolean {
+    val connectionManager = Essential.getInstance().connectionManager
+    var triedConnecting = false
+    while (awaitModal { NotAuthenticatedModal(modalManager, skipAuthCheck = false, triedConnecting, it) }) {
+        connectionManager.forceImmediateReconnect()
+        when (connectionManager.connectionStatus.await { it != null }) {
+            ConnectionManager.Status.SUCCESS -> return true
+            ConnectionManager.Status.MOJANG_UNAUTHORIZED -> return accountNotValidModal()
+
+            else -> {
+                Notifications.error("Connection Error", "")
+                triedConnecting = true
+            }
+
+        }
+
+    }
+    return false
+}
 

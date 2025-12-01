@@ -21,12 +21,6 @@ fun RepositoryHandler.minecraft() = maven("https://libraries.minecraft.net")
 
 fun RepositoryHandler.mixin() = maven("https://repo.spongepowered.org/repository/maven-releases/")
 
-fun RepositoryHandler.modMenu() = maven("https://maven.terraformersmc.com/releases/") {
-    content {
-        includeGroup("com.terraformersmc")
-    }
-}
-
 // Documentation: https://docs.modrinth.com/maven
 fun RepositoryHandler.modrinth() = maven("https://api.modrinth.com/maven") {
     content {

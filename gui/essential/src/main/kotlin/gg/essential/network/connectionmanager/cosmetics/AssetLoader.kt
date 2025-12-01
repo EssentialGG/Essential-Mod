@@ -28,6 +28,8 @@ import gg.essential.util.LimitedExecutor
 import gg.essential.util.httpClient
 import gg.essential.util.image.bitmap.Bitmap
 import gg.essential.util.image.bitmap.fromOrThrow
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
@@ -45,12 +47,7 @@ import java.util.Base64
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
-import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.PriorityBlockingQueue
-import java.util.concurrent.ThreadFactory
-import java.util.concurrent.ThreadPoolExecutor
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
 class AssetLoader(private val cachePath: Path) {
@@ -58,14 +55,7 @@ class AssetLoader(private val cachePath: Path) {
         private val logger = LoggerFactory.getLogger(AssetLoader::class.java)
     }
 
-    private val pool = ThreadPoolExecutor(
-        0, Int.MAX_VALUE,
-        10L, TimeUnit.SECONDS,
-        LinkedBlockingQueue(),
-        AtomicInteger().let { threadId ->
-            ThreadFactory { Thread(it, "Essential Asset Loader " + threadId.incrementAndGet()) }
-        },
-    )
+    private val pool = Dispatchers.IO.asExecutor()
     private val networkExecutor = LimitedExecutor(pool, 10, PriorityBlockingQueue())
     private val diskExecutor = LimitedExecutor(pool, 10, PriorityBlockingQueue())
 

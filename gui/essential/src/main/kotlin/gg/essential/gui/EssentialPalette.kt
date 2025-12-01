@@ -706,6 +706,9 @@ object EssentialPalette {
     val MC_FOLDER_8X7: ImageFactory = ResourceImageFactory("/assets/essential/textures/menu/mc_folder.png")
 
     @JvmField
+    val MC_FOLDER_7X6: ImageFactory = ResourceImageFactory("/assets/essential/textures/menu/mc_folder_7x6.png")
+
+    @JvmField
     val MESSAGES_7X: ImageFactory = ResourceImageFactory("/assets/essential/textures/menu/messages.png")
 
     @JvmField

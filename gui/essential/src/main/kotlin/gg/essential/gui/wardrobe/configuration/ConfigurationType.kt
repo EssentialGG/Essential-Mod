@@ -25,17 +25,22 @@ import gg.essential.mod.cosmetics.CosmeticTier
 import gg.essential.mod.cosmetics.database.GitRepoCosmeticsDatabase
 import gg.essential.model.util.Instant
 import gg.essential.network.connectionmanager.cosmetics.*
+import java.time.ZoneId
 
 class ConfigurationType<I, T> private constructor(
     val displayPlural: String,
     val displaySingular: String = displayPlural.dropLast(1),
     val stateSupplier: (WardrobeState) -> Triple<MutableState<I?>, State<T?>, ListState<T>>,
+    val groupingSupplier: (List<T>) -> List<ConfigurationMenu.Grouping<T>> = { list -> list.map { ConfigurationMenu.Single(it) } },
     val idAndNameMapper: (T) -> Pair<I, String>,
     val comparator: Comparator<T> = Comparator.comparing { idAndNameMapper(it).second },
-    val updateHandler: (CosmeticsDataWithChanges, I, T?) -> Unit,
-    val resetHandler: (CosmeticsDataWithChanges, I) -> Unit,
-    val createHandler: (ModalManager, CosmeticsDataWithChanges, WardrobeState) -> Modal
+    val updateHandler: ((CosmeticsDataWithChanges, I, T?) -> Unit)? = null,
+    val resetHandler: ((CosmeticsDataWithChanges, I) -> Unit)? = null,
+    val createHandler: ((ModalManager, CosmeticsDataWithChanges, WardrobeState) -> Modal)? = null,
 ) {
+
+    val canReset = resetHandler != null
+    val canUpdate = updateHandler != null
 
     init {
         VALUES.add(this)
@@ -152,6 +157,10 @@ class ConfigurationType<I, T> private constructor(
         val FEATURED_PAGE_LAYOUT_COLLECTIONS = ConfigurationType(
             displayPlural = "Featured page collections",
             stateSupplier = { Triple(it.currentlyEditingFeaturedPageCollectionId, it.currentlyEditingFeaturedPageCollection, it.rawFeaturedPageCollections) },
+            groupingSupplier = { list ->
+                list.groupBy { collection -> collection.availability?.after?.atZone(ZoneId.of("UTC"))?.let { "${it.month.name} ${it.year}" } }
+                    .flatMap { (date, list) -> if(date == null) list.map { ConfigurationMenu.Single(it) } else listOf(ConfigurationMenu.Multi(date, list)) }
+            },
             idAndNameMapper = { it.id to it.id },
             comparator = compareByDescending { it.availability?.after ?: Instant.MAX },
             updateHandler = { data, id, new -> data.updateFeaturedPageCollection(id, new) },
@@ -200,6 +209,13 @@ class ConfigurationType<I, T> private constructor(
                     }
                 }
             }
+        )
+
+        // Allows a much easier way of editing the sorting values for items
+        val SORT_WEIGHT = ConfigurationType(
+            displayPlural = "Sort Weight",
+            stateSupplier = { Triple(it.currentlyEditingSortWeightCategoryId, it.currentlyEditingSortWeightCategory, it.rawCategories) },
+            idAndNameMapper = { it.id to it.id },
         )
     }
 }

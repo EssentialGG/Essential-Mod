@@ -34,6 +34,15 @@ class MutableCosmeticsData : CosmeticsData {
     override val implicitOwnerships: MutableListState<ImplicitOwnership> = mutableListStateOf()
     override val cosmetics: MutableListState<Cosmetic> = mutableListStateOf()
 
+    fun clear() {
+        categories.clear()
+        types.clear()
+        bundles.clear()
+        featuredPageCollections.clear()
+        implicitOwnerships.clear()
+        cosmetics.clear()
+    }
+
     private val refHolder = ReferenceHolderImpl()
     private val categoriesMap = categories.asMap(refHolder) { it.id to it }
     private val typesMap = types.asMap(refHolder) { it.id to it }

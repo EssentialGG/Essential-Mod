@@ -64,7 +64,9 @@ public class IntegrationTestsPlugin implements IMixinConfigPlugin {
 
     @Override
     public void preApply(String targetClassName, ClassNode targetClass, String mixinClassName, IMixinInfo mixinInfo) {
-        enableInjectionCounting(mixinInfo);
+        if (ENABLED) {
+            enableInjectionCounting(mixinInfo);
+        }
     }
 
     @Override
@@ -74,10 +76,6 @@ public class IntegrationTestsPlugin implements IMixinConfigPlugin {
     private static final Set<IMixinConfig> injectionCountingEnabled = Collections.newSetFromMap(new IdentityHashMap<>());
 
     public static void enableInjectionCounting(IMixinInfo mixinInfo) {
-        if (!ENABLED) {
-            return;
-        }
-
         IMixinConfig config = mixinInfo.getConfig();
         if (!injectionCountingEnabled.add(config)) {
             return;

@@ -32,6 +32,7 @@ import gg.essential.event.EventHandler;
 import gg.essential.event.client.InitializationEvent;
 import gg.essential.event.client.PostInitializationEvent;
 import gg.essential.event.client.PreInitializationEvent;
+import gg.essential.event.client.ReAuthEvent;
 import gg.essential.event.essential.TosAcceptedEvent;
 import gg.essential.event.render.RenderTickEvent;
 import gg.essential.forge.EssentialForgeMod;
@@ -46,7 +47,6 @@ import gg.essential.gui.notification.Notifications;
 import gg.essential.handlers.OptionsScreenOverlay;
 import gg.essential.gui.overlay.OverlayManager;
 import gg.essential.gui.overlay.OverlayManagerImpl;
-import gg.essential.gui.wardrobe.Wardrobe;
 import gg.essential.handlers.*;
 import gg.essential.handlers.discord.DiscordIntegration;
 import gg.essential.key.EssentialKeybindingRegistry;
@@ -55,6 +55,7 @@ import gg.essential.lib.gson.GsonBuilder;
 import gg.essential.network.connectionmanager.ConnectionManager;
 import gg.essential.network.connectionmanager.skins.PlayerSkinLookup;
 import gg.essential.network.connectionmanager.telemetry.FeatureSessionTelemetry;
+import gg.essential.network.mojang.ManagedMojangProfileApi;
 import gg.essential.sps.McIntegratedServerManager;
 import gg.essential.sps.WindowTitleManager;
 import gg.essential.universal.UMinecraft;
@@ -145,7 +146,7 @@ public class Essential implements EssentialAPI {
     private ImageCache imageCache;
 
     private PlayerWearableManager playerWearableManager;
-    private final MojangSkinManager skinManager = new McMojangSkinManager(() -> Wardrobe.getInstance() != null);
+    private final MojangSkinManager skinManager = new McMojangSkinManager();
     private CosmeticEventEmitter cosmeticEventEmitter;
     private Map<Object, Boolean> dynamicListeners = new HashMap<>();
     private EssentialGameRules gameRules;
@@ -208,7 +209,7 @@ public class Essential implements EssentialAPI {
         loadSessionFactories();
         this.connectionManager.start();
 
-        PlayerSkinLookup.INSTANCE.supplySkinFromGame(USession.Companion.activeNow().getUuid(), skinManager.getActiveSkin());
+        PlayerSkinLookup.INSTANCE.supplySkinFromGame(USession.Companion.activeNow().getUuid(), SkinKt.getSkinFromMinecraft());
 
         dispatchStaticInitializers();
     }
@@ -405,7 +406,7 @@ public class Essential implements EssentialAPI {
     private void loadSessionFactories() {
         try {
             // In order of preference (earlier takes priority)
-            Path savePath = ExtensionsKt.getGlobalEssentialDirectory().resolve("microsoft_accounts.json");
+            Path savePath = MagicPathsKt.getGlobalEssentialDirectory().resolve("microsoft_accounts.json");
             Path oldSavePath = baseDir.toPath().resolve("microsoft_accounts.json");
             final MicrosoftAccountSessionFactory microsoftAccountSessionFactory = new MicrosoftAccountSessionFactory(savePath, oldSavePath);
             Multithreading.runAsync(microsoftAccountSessionFactory::refreshRefreshTokensIfNecessary);
@@ -463,6 +464,13 @@ public class Essential implements EssentialAPI {
         if (!event.isPre()) return;
 
         StateScheduler.updateSystemTime(Instant.now());
+    }
+
+    @Subscribe(priority = 2000) // before any other event which might try to query the api
+    public void invalidateCacheOnReAuth(ReAuthEvent event) {
+        ManagedMojangProfileApi.Companion
+            .forUser(event.getSession().getUuid())
+            .invalidateProfile();
     }
 
     /**

@@ -9,18 +9,12 @@
  * commercialize, or otherwise exploit, or create derivative works based
  * upon, this file or any other in this repository, all of which is reserved by Essential.
  */
-package gg.essential.util
+package gg.essential.mixins.transformers.server;
 
-import gg.essential.mod.Model
-import gg.essential.mod.Skin
-import java.util.*
+import gg.essential.mixins.DummyTarget;
+import org.spongepowered.asm.mixin.Mixin;
 
-fun String.propertyToSkin(): Skin {
-    val skinHolder = JsonHolder(String(Base64.getDecoder().decode(this)))
-        .optJSONObject("textures")
-        .optJSONObject("SKIN")
-    return Skin.fromUrl(
-        url = skinHolder.optString("url"),
-        model = Model.byTypeOrDefault(skinHolder.optJSONObject("metadata").optString("model")),
-    )
+// Minecraft 1.21.9 now has a builtin `pvp` gamerule
+@Mixin(DummyTarget.class)
+public class MinecraftServerMixin_PvPGameRule {
 }

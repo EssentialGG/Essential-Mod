@@ -21,6 +21,7 @@ import gg.essential.gui.elementa.essentialmarkdown.ext.colorattribute.ColorAttri
 import gg.essential.gui.elementa.essentialmarkdown.ext.colorattribute.ColorAttributeExtension
 import gg.essential.gui.elementa.essentialmarkdown.drawables.*
 import java.awt.Color
+import java.net.MalformedURLException
 import java.net.URL
 
 class MarkdownRenderer @JvmOverloads constructor(
@@ -197,7 +198,11 @@ private class MarkdownRendererImpl(
         mark()
         super.visit(image)
         val fallback = unmarkAndCollect()
-        drawables.add(gg.essential.gui.elementa.essentialmarkdown.drawables.ImageDrawable(md, URL(image.destination), fallback))
+        try {
+            drawables.add(gg.essential.gui.elementa.essentialmarkdown.drawables.ImageDrawable(md, URL(image.destination), fallback))
+        } catch (e: MalformedURLException) {
+            drawables.addAll(fallback)
+        }
     }
 
     override fun visit(indentedCodeBlock: IndentedCodeBlock) {

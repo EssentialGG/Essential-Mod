@@ -22,9 +22,9 @@ import java.nio.charset.StandardCharsets;
 
 public class LoginUtil {
     private static final String JOIN_URL = System.getProperty(
-        "essential.mojang_join_url",
-        "https://sessionserver.mojang.com/session/minecraft/join"
-    );
+        "minecraft.api.session.host",
+        "https://sessionserver.mojang.com"
+    ) + "/session/minecraft/join";
 
     public static int joinServer(String token, String uuid, String serverHash) {
         try {

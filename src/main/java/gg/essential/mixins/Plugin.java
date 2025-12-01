@@ -223,7 +223,9 @@ public class Plugin implements IMixinConfigPlugin {
 
     @Override
     public void preApply(String targetClassName, ClassNode targetClass, String mixinClassName, IMixinInfo mixinInfo) {
-        IntegrationTestsPlugin.enableInjectionCounting(mixinInfo);
+        if (inOurDevEnv || IntegrationTestsPlugin.ENABLED) {
+            IntegrationTestsPlugin.enableInjectionCounting(mixinInfo);
+        }
 
         for (EssentialTransformer transformer : transformerMap.get(targetClassName)) {
             transformer.preApply(targetClass);
