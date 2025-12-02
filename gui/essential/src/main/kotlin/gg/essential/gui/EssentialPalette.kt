@@ -16,6 +16,7 @@ import gg.essential.elementa.components.UIImage
 import gg.essential.elementa.state.BasicState
 import gg.essential.elementa.state.State
 import gg.essential.elementa.utils.withAlpha
+import gg.essential.gui.elementa.state.v2.stateOf
 import gg.essential.gui.friends.message.v2.SendState
 import gg.essential.gui.image.ImageFactory
 import gg.essential.gui.image.ImageGeneratorSettings
@@ -25,6 +26,8 @@ import java.awt.Color
 import java.awt.image.BufferedImage
 import java.util.concurrent.CompletableFuture
 import kotlin.random.Random
+
+import gg.essential.gui.elementa.state.v2.State as StateV2
 
 object EssentialPalette {
 
@@ -520,6 +523,19 @@ object EssentialPalette {
     }
 
     /* Utilities for colors */
+    fun getTextColor(hovered: StateV2<Boolean>, enabled: StateV2<Boolean> = stateOf(true)): StateV2<Color> =
+        StateV2 {
+            if (enabled()) {
+                if(hovered()) {
+                    TEXT_HIGHLIGHT
+                } else {
+                    TEXT
+                }
+            } else {
+                TEXT_DISABLED
+            }
+        }
+
     fun getTextColor(hovered: State<Boolean>, enabled: State<Boolean>): State<Color> {
         return hovered.zip(enabled).map { (hovered, enabled) ->
             if (enabled) {

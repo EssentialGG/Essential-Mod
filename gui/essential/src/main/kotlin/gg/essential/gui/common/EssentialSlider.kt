@@ -13,15 +13,27 @@ package gg.essential.gui.common
 
 import gg.essential.elementa.components.UIBlock
 import gg.essential.elementa.components.UIContainer
-import gg.essential.elementa.constraints.CenterConstraint
-import gg.essential.elementa.dsl.*
-import gg.essential.elementa.state.BasicState
-import gg.essential.elementa.state.State
-import gg.essential.elementa.state.toConstraint
+import gg.essential.elementa.dsl.provideDelegate
 import gg.essential.gui.EssentialPalette
+import gg.essential.gui.elementa.state.v2.State
+import gg.essential.gui.elementa.state.v2.combinators.letState
+import gg.essential.gui.elementa.state.v2.combinators.map
+import gg.essential.gui.elementa.state.v2.mutableStateOf
+import gg.essential.gui.elementa.state.v2.onChange
+import gg.essential.gui.layoutdsl.Alignment
+import gg.essential.gui.layoutdsl.Modifier
+import gg.essential.gui.layoutdsl.alignHorizontal
+import gg.essential.gui.layoutdsl.alignVertical
+import gg.essential.gui.layoutdsl.color
+import gg.essential.gui.layoutdsl.fillHeight
+import gg.essential.gui.layoutdsl.fillWidth
+import gg.essential.gui.layoutdsl.layout
+import gg.essential.gui.layoutdsl.then
+import gg.essential.gui.layoutdsl.tooltip
+import gg.essential.gui.layoutdsl.whenTrue
+import gg.essential.gui.layoutdsl.width
 import gg.essential.universal.USound
-import gg.essential.util.bindEssentialTooltip
-import gg.essential.gui.util.hoveredState
+import gg.essential.gui.util.hoveredStateV2
 import gg.essential.vigilance.utils.onLeftClick
 import kotlin.math.round
 
@@ -31,31 +43,14 @@ abstract class EssentialSlider(
 
     private val notchWidth = 3
 
-    val fraction = BasicState(initialValueFraction)
+    val fraction = mutableStateOf(initialValueFraction)
     private val updates = mutableListOf<(Float) -> Unit>()
 
-    private val sliderBar by UIBlock(EssentialPalette.BUTTON_HIGHLIGHT).constrain {
-        width = 100.percent
-        height = 100.percent - 2.pixels
-        y = CenterConstraint()
-    } childOf this
+    private val sliderBar by UIBlock(EssentialPalette.BUTTON_HIGHLIGHT)
 
-    private val sliderNotch by UIBlock().constrain {
-        width = notchWidth.pixels
-        height = 100.percent
-        y = CenterConstraint()
-        x = basicXConstraint {
-            it.parent.getLeft() + fraction.get() * (it.parent.getWidth() - notchWidth)
-        }
-    } childOf this
+    private val sliderNotch by UIBlock()
 
-    private val sliderCovered by UIBlock(EssentialPalette.ACCENT_BLUE).constrain {
-        height = 100.percent - 2.pixels
-        width = basicWidthConstraint {
-            sliderNotch.getLeft() - this@EssentialSlider.getLeft()
-        }
-        y = CenterConstraint()
-    } childOf this
+    private val sliderCovered by UIBlock(EssentialPalette.ACCENT_BLUE)
 
     private var hoveredState: State<Boolean>
 
@@ -63,7 +58,7 @@ abstract class EssentialSlider(
         // Elementa's onMouseDrag does not check whether the mouse is within the component
         // So we need to do that ourselves. We want to ignore any drag that does not start within
         // this component
-        val mouseHeld = BasicState(false)
+        val mouseHeld = mutableStateOf(false)
 
         onLeftClick {
             USound.playButtonPress()
@@ -80,19 +75,20 @@ abstract class EssentialSlider(
                 updateSlider(mouseX)
             }
         }
-        hoveredState = hoveredState() or sliderNotch.hoveredState() or mouseHeld
+        hoveredState = State { hoveredStateV2()() || mouseHeld() }
 
-        sliderNotch.setColor(EssentialPalette.getTextColor(hoveredState).toConstraint())
-    }
-
-    override fun afterInitialization() {
-        super.afterInitialization()
-        // Kotlin's properties set in a constructor don't have their values written to
-        // until after the parent object is initialized. If this was in the constructor,
-        // the result of reduceFractionToDisplay would not yield the expected result
-        sliderNotch.bindEssentialTooltip(hoveredState, fraction.map { fraction ->
-            reduceFractionToDisplay(fraction)
-        })
+        this.layout {
+            sliderBar(Modifier.fillWidth().fillHeight(padding = 1f).alignVertical(Alignment.Center)) {
+                sliderCovered(Modifier.fillHeight().then(State { Modifier.fillWidth(fraction()) }))
+            }
+            sliderNotch(
+                Modifier.width(notchWidth.toFloat())
+                    .fillHeight()
+                    .alignHorizontal { parentSize, _ -> fraction.get() * (parentSize - notchWidth) }
+                    .color(EssentialPalette.getTextColor(hoveredState))
+                    .whenTrue(hoveredState, Modifier.tooltip(fraction.letState { reduceFractionToDisplay(it) }))
+            )
+        }
     }
 
     /**
@@ -135,7 +131,7 @@ class IntEssentialSlider(
     }
 
     init {
-        intValue.onSetValue {
+        intValue.onChange(this) {
             for (update in updates) {
                 update(it)
             }
