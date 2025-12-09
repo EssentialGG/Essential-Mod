@@ -24,6 +24,7 @@ fun Request.execute(): Pair<Int, String> {
         val response = httpCall(this@execute)
         val code = response.code()
         if (code == 429) {
+            response.close()
             // If we are rate-limited, there is no other useful information that we can get, and we should just bail out.
             throw AuthenticationException.Ratelimited()
         }

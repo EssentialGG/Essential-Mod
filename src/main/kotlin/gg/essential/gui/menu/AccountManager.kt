@@ -31,7 +31,7 @@ import gg.essential.gui.notification.error
 import gg.essential.gui.notification.iconAndMarkdownBody
 import gg.essential.gui.overlay.ModalManager
 import gg.essential.handlers.account.WebAccountManager
-import gg.essential.network.connectionmanager.ConnectionManager
+import gg.essential.network.connectionmanager.ConnectionManagerStatus
 import gg.essential.universal.UMinecraft
 import gg.essential.util.GuiUtil
 import gg.essential.util.USession
@@ -86,19 +86,17 @@ class AccountManager {
      * This will refresh the session and re-establish the connection.
      */
     fun login(uuid: UUID) {
-        if (USession.active.get().uuid != uuid) {
-            val isSwitching = mutableStateOf(true)
-            val modalManager = GuiUtil.pushModal { AccountSwitchingModal(it, isSwitching) }
-            refreshSession(uuid) { session, error ->
-                if (error == null) {
-                    monitorSwitching(modalManager.coroutineScope, isSwitching, session.username)
-                } else {
-                    isSwitching.set(false)
-                    Essential.logger.error("Account Error: $error")
-                    Notifications.error("Account Error", "Something went wrong\nduring login.")
-                }
-                refreshAccounts()
+        val isSwitching = mutableStateOf(true)
+        val modalManager = GuiUtil.pushModal { AccountSwitchingModal(it, isSwitching) }
+        refreshSession(uuid) { session, error ->
+            if (error == null) {
+                monitorSwitching(modalManager.coroutineScope, isSwitching, session.username)
+            } else {
+                isSwitching.set(false)
+                Essential.logger.error("Account Error: $error")
+                Notifications.error("Account Error", "Something went wrong\nduring login.")
             }
+            refreshAccounts()
         }
     }
 
@@ -107,9 +105,9 @@ class AccountManager {
             val connectionStatus = Essential.getInstance().connectionManager.connectionStatus
             // Stop switching if there is a connection error, cosmetics have finished loading or after a 10-second delay
             raceOf(
-                { connectionStatus.await { it != null && it != ConnectionManager.Status.SUCCESS } },
+                { connectionStatus.await { it != null && it != ConnectionManagerStatus.Success } },
                 {
-                    connectionStatus.awaitValue(ConnectionManager.Status.SUCCESS)
+                    connectionStatus.awaitValue(ConnectionManagerStatus.Success)
                     Essential.getInstance().connectionManager.cosmeticsManager.cosmeticsLoaded.awaitValue(true)
                 },
                 { delay(10.seconds) }
@@ -145,7 +143,7 @@ class AccountManager {
         @JvmOverloads
         fun refreshCurrentSession(
             force: Boolean = false,
-            callback: ((session: USession, error: String?) -> Unit)? = null
+            callback: ((session: USession, throwable: Throwable?) -> Unit)? = null
         ) {
             refreshSession(USession.activeNow().uuid, force, callback)
         }
@@ -162,13 +160,13 @@ class AccountManager {
         fun refreshSession(
             uuid: UUID,
             force: Boolean = false,
-            callback: ((session: USession, error: String?) -> Unit)? = null
+            callback: ((session: USession, throwable: Throwable?) -> Unit)? = null
         ) {
             val mc = UMinecraft.getMinecraft()
 
-            fun error(message: String, throwable: Throwable? = null) {
-                Essential.logger.error(message, throwable)
-                callback?.invoke(USession.activeNow(), message)
+            fun error(throwable: Throwable) {
+                Essential.logger.error("Failed to refresh session: ${throwable.message}", throwable)
+                callback?.invoke(USession.activeNow(), throwable)
             }
 
             // Check if UUID is in the managed session factory first
@@ -177,22 +175,20 @@ class AccountManager {
             if (factory != null) {
                 // If so, then refresh the session
                 CompletableFuture.supplyAsync { factory.refresh(factory.sessions[uuid]!!, force) }
-                    .whenCompleteAsync({ session, err ->
+                    .whenCompleteAsync({ session, error ->
                         if (session != null) {
                             Essential.logger.info("Successfully refreshed session token.")
                             UMinecraft.getMinecraft().setSession(session)
                             callback?.invoke(session, null)
                         } else {
-                            err?.let {
-                                error("Failed to refresh session: ${it.message}", it)
-                            }
+                            error?.let { error(it) }
                         }
                     }, mc.executor)
             } else {
                 // Otherwise, check if it's in the initial session, which we can simply activate
                 val initialSession =
                     Essential.getInstance().sessionFactories.find { uuid in it.sessions } as? InitialSessionFactory
-                        ?: return error("Failed to refresh session: Unknown account")
+                        ?: return error(UnknownAccountException())
                 UMinecraft.getMinecraft().setSession(initialSession.sessions[uuid]!!)
                 callback?.invoke(initialSession.sessions[uuid]!!, null)
             }
@@ -206,6 +202,8 @@ class AccountManager {
             }
         }
     }
+
+    class UnknownAccountException : Exception("Unknown account")
 
     data class AccountInfo(val uuid: UUID, val name: String)
 }

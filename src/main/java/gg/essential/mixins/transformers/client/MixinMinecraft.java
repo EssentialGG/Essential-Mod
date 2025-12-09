@@ -188,7 +188,9 @@ public abstract class MixinMinecraft implements MinecraftExt {
     //$$ // Note: This is targeted after the cancelTasks call, such that any tasks we schedule from the event
     //$$ //       won't immediately be cancelled (which could otherwise result in the game locking up, e.g. when
     //$$ //       scheduling a resource pack reload which will then never finish).
-    //#if MC>=12005
+    //#if MC>=12111
+    //$$ @Inject(method = "disconnect(Lnet/minecraft/client/gui/screen/Screen;ZZ)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/MinecraftClient;cancelTasks()V", shift = At.Shift.AFTER))
+    //#elseif MC>=12005
     //$$ @Inject(method = "disconnect(Lnet/minecraft/client/gui/screen/Screen;Z)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/MinecraftClient;cancelTasks()V", shift = At.Shift.AFTER))
     //#else
     //$$ @Inject(method = "unloadWorld(Lnet/minecraft/client/gui/screen/Screen;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;dropTasks()V", shift = At.Shift.AFTER))
@@ -344,7 +346,9 @@ public abstract class MixinMinecraft implements MinecraftExt {
     //#else
     private static final String LAUNCH_INTEGRATED_SERVER = "launchIntegratedServer";
     //#endif
-    //#if MC>=12005
+    //#if MC>=12111
+    //$$ private static final String STOP_INTEGRATED_SERVER = "disconnect(Lnet/minecraft/client/gui/screen/Screen;ZZ)V";
+    //#elseif MC>=12005
     //$$ private static final String STOP_INTEGRATED_SERVER = "disconnect(Lnet/minecraft/client/gui/screen/Screen;Z)V";
     //#elseif MC>=11600
     //$$ private static final String STOP_INTEGRATED_SERVER = "unloadWorld(Lnet/minecraft/client/gui/screen/Screen;)V";

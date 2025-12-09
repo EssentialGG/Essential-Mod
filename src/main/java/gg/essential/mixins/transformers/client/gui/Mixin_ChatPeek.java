@@ -23,15 +23,21 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 @Mixin(GuiNewChat.class)
 public abstract class Mixin_ChatPeek {
 
+    //#if MC>=12111
+    //$$ private static final String RENDER = "render(Lnet/minecraft/client/gui/hud/ChatHud$Backend;IIZ)V";
+    //#else
+    private static final String RENDER = "drawChat";
+    //#endif
+
     @Shadow @Final
     private Minecraft mc;
 
-    @ModifyVariable(method = "drawChat", at = @At("HEAD"), ordinal = 0, argsOnly = true)
+    @ModifyVariable(method = RENDER, at = @At("HEAD"), ordinal = 0, argsOnly = true)
     private int essential$modifyUpdateCounter(int updateCounter) {
         return Essential.getInstance().getKeybindingRegistry().isHoldingChatPeek() ? 0 : updateCounter;
     }
 
-    @ModifyVariable(method = "drawChat", at = @At("STORE"),
+    @ModifyVariable(method = RENDER, at = @At("STORE"),
         //#if MC>=11903
         //$$ ordinal = 3
         //#else

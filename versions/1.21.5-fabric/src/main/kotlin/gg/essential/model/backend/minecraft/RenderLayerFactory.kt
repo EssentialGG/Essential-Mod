@@ -28,6 +28,12 @@ import net.minecraft.client.render.RenderLayer
 import net.minecraft.util.Identifier
 import net.minecraft.util.TriState
 
+//#if MC>=12111
+//$$ import net.minecraft.client.render.LayeringTransform
+//$$ import net.minecraft.client.render.OutputTarget
+//$$ import net.minecraft.client.render.RenderSetup
+//#endif
+
 /** see usage in [MinecraftRenderBackend] for further context
  * prior to 1.21.5 we used a wrapper [RenderLayer] class to handle the creation of these render layers, however with each
  * version mojang has made it more difficult to create custom render layers, so we now use the actual [RenderLayer] classes
@@ -36,7 +42,11 @@ import net.minecraft.util.TriState
  * This is also required in 1.21.6+ for compatibility with Iris shaders, as they now require additional implementation if
  * we had continued using [RenderLayer] wrapper classes rather than building and using a [RenderLayer.MultiPhase] normally
  */
+//#if MC>=12111
+//$$ abstract class RenderLayerFactory {
+//#else
 abstract class RenderLayerFactory : RenderLayer("dummy", 0, false, false, {}, {}) {
+//#endif
     companion object {
 
         //#if FABRIC || FORGE
@@ -89,6 +99,15 @@ abstract class RenderLayerFactory : RenderLayer("dummy", 0, false, false, {}, {}
         fun createEmissiveArmorLayer(texture: Identifier): RenderLayer =
             createRenderLayer(
                 "armor_translucent_emissive",
+                //#if MC>=12111
+                //$$ RenderSetup.builder(RenderPipelines.ENTITY_EYES)
+                //$$     .crumbling()
+                //$$     .translucent()
+                //$$     .texture("Sampler0", texture)
+                //$$     .layeringTransform(LayeringTransform.VIEW_OFFSET_Z_LAYERING)
+                //$$     .outlineMode(RenderSetup.OutlineMode.AFFECTS_OUTLINE)
+                //$$     .build()
+                //#else
                 DEFAULT_BUFFER_SIZE,
                 true,
                 true,
@@ -97,6 +116,7 @@ abstract class RenderLayerFactory : RenderLayer("dummy", 0, false, false, {}, {}
                     .texture(texture, false)
                     .set(VIEW_OFFSET_Z_LAYERING, Layering::class.java)
                     .build(true)
+                //#endif
             )
 
         private val entityTranslucentCullPipeline = RenderPipelines.ENTITY_TRANSLUCENT.toBuilder().withCull(true).build()
@@ -107,6 +127,16 @@ abstract class RenderLayerFactory : RenderLayer("dummy", 0, false, false, {}, {}
         fun createEntityTranslucentCullLayer(texture: Identifier): RenderLayer =
             createRenderLayer(
                 "entity_translucent_cull",
+                //#if MC>=12111
+                //$$ RenderSetup.builder(entityTranslucentCullPipeline)
+                //$$     .crumbling()
+                //$$     .translucent()
+                //$$     .texture("Sampler0", texture)
+                //$$     .useOverlay()
+                //$$     .useLightmap()
+                //$$     .outlineMode(RenderSetup.OutlineMode.AFFECTS_OUTLINE)
+                //$$     .build()
+                //#else
                 DEFAULT_BUFFER_SIZE,
                 true,
                 true,
@@ -116,6 +146,7 @@ abstract class RenderLayerFactory : RenderLayer("dummy", 0, false, false, {}, {}
                     .set(ENABLE_OVERLAY_COLOR, Overlay::class.java)
                     .set(ENABLE_LIGHTMAP, Lightmap::class.java)
                     .build(true)
+                //#endif
             )
 
         private val particleAdditivePipeline = RenderPipelines.TRANSLUCENT_PARTICLE.toBuilder()
@@ -126,7 +157,11 @@ abstract class RenderLayerFactory : RenderLayer("dummy", 0, false, false, {}, {}
             //#endif
 
         //#if MC>=12109
+        //#if MC>=12111
+        //$$ private val PARTICLES_TARGET = OutputTarget("particles") {
+        //#else
         //$$ private val PARTICLES_TARGET = Target("particles") {
+        //#endif
         //$$     val mc = net.minecraft.client.MinecraftClient.getInstance()
         //$$     mc.worldRenderer.particlesFramebuffer ?: mc.framebuffer
         //$$ }
@@ -140,23 +175,46 @@ abstract class RenderLayerFactory : RenderLayer("dummy", 0, false, false, {}, {}
                 Add -> particleAdditivePipeline
             }
 
+            //#if MC>=12111
+            //$$ val builder = RenderSetup.builder(pipeline)
+            //$$     .texture("Sampler0", texture)
+            //$$     .useLightmap()
+            //$$     .outputTarget(PARTICLES_TARGET)
+            //$$
+            //$$ if (renderPass.material != Cutout) builder.outputTarget(PARTICLES_TARGET)
+            //#else
             val builder = MultiPhaseParameters.builder()
                 .texture(texture, false)
                 .set(ENABLE_LIGHTMAP, Lightmap::class.java)
 
             if (renderPass.material != Cutout) builder.set(PARTICLES_TARGET, Target::class.java) // only diff between cutout and translucent
+            //#endif
 
 
             return createRenderLayer(
                 renderPass.material.name.lowercase() + "_particle",
+                //#if MC>=12111
+                //$$ builder.build(),
+                //#else
                 DEFAULT_BUFFER_SIZE,
                 false,
                 false,
                 pipeline,
                 builder.build(false)
+                //#endif
             )
         }
 
+        //#if MC>=12111
+        //$$ // `of` is package-private, so we use reflection to invoke it
+        //$$ private fun createRenderLayer(name: String, renderSetup: RenderSetup) =
+        //$$     RenderLayer::class.java.declaredMethods.first {
+        //$$         it.returnType == RenderLayer::class.java && it.parameterTypes.contentEquals(arrayOf(
+        //$$             String::class.java,
+        //$$             RenderSetup::class.java,
+        //$$         ))
+        //$$     }.apply { isAccessible = true }.invoke(null, name, renderSetup) as RenderLayer
+        //#else
         // [RenderLayer.MultiPhase] is inaccessible, so we use reflection to invoke the static method "of(): RenderLayer.MultiPhase"
         private fun createRenderLayer(name: String, size: Int, hasCrumbling: Boolean, translucent: Boolean, pipeline: RenderPipeline, params: MultiPhaseParameters) =
             RenderLayer::class.java.declaredMethods
@@ -197,5 +255,6 @@ abstract class RenderLayerFactory : RenderLayer("dummy", 0, false, false, {}, {}
                         && it.parameterTypes.contentEquals(arrayOf(Boolean::class.java)) }
                 .apply { isAccessible = true }
                 .invoke(this, affectsOutline) as MultiPhaseParameters
+        //#endif
     }
 }

@@ -12,6 +12,9 @@
 package gg.essential.network.connectionmanager
 
 import gg.essential.Essential
+import gg.essential.minecraftauth.exception.AuthenticationException
+import gg.essential.minecraftauth.exception.MinecraftAuthenticationException
+import gg.essential.minecraftauth.minecraft.session.MinecraftSessionService
 import gg.essential.config.EssentialConfig
 import gg.essential.connectionmanager.common.packet.Packet
 import gg.essential.connectionmanager.common.util.LoginUtil
@@ -21,13 +24,13 @@ import gg.essential.gui.elementa.state.v2.State
 import gg.essential.gui.elementa.state.v2.await
 import gg.essential.gui.elementa.state.v2.awaitValue
 import gg.essential.gui.elementa.state.v2.mutableStateOf
+import gg.essential.gui.menu.AccountManager
 import gg.essential.gui.menu.AccountManager.Companion.refreshCurrentSession
 import gg.essential.network.CMConnection
 import gg.essential.network.connectionmanager.Connection.KnownCloseReason
-import gg.essential.network.connectionmanager.ConnectionManager.Status
 import gg.essential.util.Client
 import gg.essential.util.ExponentialBackoff
-import gg.essential.util.LoginUtil.joinServer
+import gg.essential.util.HostsFileUtil
 import gg.essential.util.USession
 import gg.essential.util.await
 import kotlinx.coroutines.CoroutineScope
@@ -64,11 +67,11 @@ abstract class ConnectionManagerKt : CMConnection {
 
     override val connectionScope = CoroutineScope(SupervisorJob() + Dispatchers.Client)
 
-    private val mutableConnectionStatus = mutableStateOf<Status?>(null)
-    val connectionStatus: State<Status?> = mutableConnectionStatus
+    private val mutableConnectionStatus = mutableStateOf<ConnectionManagerStatus?>(null)
+    val connectionStatus: State<ConnectionManagerStatus?> = mutableConnectionStatus
 
     val outdated: Boolean
-        get() = connectionStatus.get() == Status.OUTDATED
+        get() = connectionStatus.get() == ConnectionManagerStatus.Outdated
 
     protected val mutableConnectionUriState = mutableStateOf<String?>(null)
     val connectionUriState: State<String?> = mutableConnectionUriState
@@ -105,7 +108,7 @@ abstract class ConnectionManagerKt : CMConnection {
                 // We are in charge, but once we start this, we must finish it. So we'll launch a job, which will
                 // continue to run even if `forceImmediateReconnect` is cancelled, into our internal scope to finish it.
                 connectLoopJob.cancel()
-                mutableConnectionStatus.set(Status.CANCELLED)
+                mutableConnectionStatus.set(ConnectionManagerStatus.Cancelled)
                 scope.launch {
                     connectLoopJob.join()
                     connectLoopJob = scope.launch(Dispatchers.Unconfined) { connectLoop() }
@@ -124,14 +127,14 @@ abstract class ConnectionManagerKt : CMConnection {
             updateStatus(null)
 
             if (!OnboardingData.hasAcceptedTos()) {
-                updateStatus(Status.NO_TOS)
+                updateStatus(ConnectionManagerStatus.TOSNotAccepted)
                 LOGGER.info("Waiting for Terms Of Service to be accepted before attempting connection")
                 Essential.EVENT_BUS.await<TosAcceptedEvent>()
                 continue
             }
 
             if (!EssentialConfig.essentialEnabledState.get()) {
-                updateStatus(Status.ESSENTIAL_DISABLED)
+                updateStatus(ConnectionManagerStatus.EssentialDisabled)
                 LOGGER.info("Waiting for Essential to be re-enabled in its settings before attempting connection")
                 withContext(Dispatchers.Client) {
                     EssentialConfig.essentialEnabledState.awaitValue(true)
@@ -139,13 +142,33 @@ abstract class ConnectionManagerKt : CMConnection {
                 continue
             }
 
+            if (HostsFileUtil.containsRulesForMojangServers) {
+                updateStatus(ConnectionManagerStatus.Error.HostsFileModified)
+                LOGGER.info("Found redirection rules for Mojang servers in hosts file, not attempting to connect")
+                return
+            }
+
             if (java.minecraftHook.session == "undefined") {
                 // Session token not yet set, refresh session before connecting
                 LOGGER.info("Fetching/refreshing initial MC session token")
-                suspendCoroutine { continuation ->
-                    refreshCurrentSession(false) { _: USession?, _: String? ->
-                        continuation.resume(Unit)
+                val error = suspendCoroutine { continuation ->
+                    refreshCurrentSession(false) { _: USession?, throwable ->
+                        continuation.resume(throwable)
                     }
+                }
+
+                if (error != null) {
+                    LOGGER.info("Failed to fetch/refresh initial MC session token, waiting for new user-supplied token.")
+
+                    updateStatus(when (error) {
+                        is AccountManager.UnknownAccountException ->
+                            // This is not the exception that occurred, but to the UI it's the same problem.
+                            ConnectionManagerStatus.Error.AuthenticationFailure(AuthenticationException.InvalidCredentials())
+
+                        else -> ConnectionManagerStatus.Error.AuthenticationFailure(error)
+                    })
+                    USession.active.await { it.token != "undefined" }
+                    continue
                 }
             }
 
@@ -157,42 +180,57 @@ abstract class ConnectionManagerKt : CMConnection {
             LOGGER.info("Authenticating to Mojang as {} ({})", userName, uuid)
             val sharedSecret = LoginUtil.generateSharedSecret()
             val sessionHash = LoginUtil.computeHash(sharedSecret)
-            val statusCode = withContext(Dispatchers.IO) {
-                joinServer(token, uuid.toString().replace("-", ""), sessionHash)
-            }
-            if (statusCode != 204) {
-                if (statusCode == 429) {
-                    // On a delay due to rate-limiting
-                    val delay = 5.seconds
-                    LOGGER.warn("Got rate-limit by Mojang, waiting {} before re-trying", delay)
-                    delay(delay.inWholeMilliseconds)
-                    continue
-                } else if (statusCode == 403) {
-                    LOGGER.info("Session token appears to be invalid, trying to automatically refresh it")
-                    val error = withContext(Dispatchers.Client) {
-                        suspendCoroutine { continuation ->
-                            refreshCurrentSession(true) { _: USession?, error: String? ->
-                                continuation.resume(error)
-                            }
+
+            try {
+
+                withContext(Dispatchers.IO) {
+                    MinecraftSessionService.joinServer(token, uuid, sessionHash)
+                }
+
+            } catch (joinServerException: AuthenticationException.Ratelimited) {
+
+                val delay = 5.seconds
+                LOGGER.warn("Got rate-limit by Mojang, waiting {} before re-trying", delay)
+                delay(delay.inWholeMilliseconds)
+                continue
+
+            } catch (joinServerException: AuthenticationException.InvalidCredentials) {
+
+                LOGGER.info("Session token appears to be invalid, trying to automatically refresh it")
+                val error = withContext(Dispatchers.Client) {
+                    suspendCoroutine { continuation ->
+                        refreshCurrentSession(true) { _: USession?, throwable ->
+                            continuation.resume(throwable)
                         }
                     }
-                    if (error != null) {
-                        // If we can't refresh the token, only re-try once we get a new one
-                        LOGGER.info("Failed to authenticate to Mojang, waiting for new user-supplied session token")
-                        updateStatus(Status.MOJANG_UNAUTHORIZED)
-                        USession.active.await { it != session }
-                        continue
-                    }
-                } else {
-                    LOGGER.warn("Got unexpected reply from Mojang: {}", statusCode)
                 }
+                if (error != null) {
+                    LOGGER.warn("User's Minecraft access token has expired, waiting for new user-supplied token.")
+                    updateStatus(ConnectionManagerStatus.Error.AuthenticationFailure(error))
+                    USession.active.await { it != session }
+                }
+                continue
+
+            } catch (joinServerException: MinecraftAuthenticationException.InsufficientPrivileges) {
+
+                LOGGER.warn("User is not allowed to join multiplayer sessions, aborting connection attempts.")
+                updateStatus(ConnectionManagerStatus.Error.AuthenticationFailure(joinServerException))
+                USession.active.await { it != session }
+                continue
+
+            } catch (joinServerException: Exception) {
+
+                LOGGER.warn("Got unexpected reply from Mojang:", joinServerException)
+                updateStatus(ConnectionManagerStatus.Error.AuthenticationFailure(joinServerException))
                 val delay = mojangBackoff.increment()
                 if (delay.isPositive()) {
                     LOGGER.info("Waiting {} before re-trying", delay)
                     delay(delay.inWholeMilliseconds)
                 }
                 continue
+
             }
+
             mojangBackoff.reset()
 
             LOGGER.info("Connecting to Essential Connection Manager...")
@@ -203,14 +241,21 @@ abstract class ConnectionManagerKt : CMConnection {
                 when (val result = wrapper.connect(uuid, userName, sharedSecret)) {
                     ConnectResult.Outdated -> {
                         LOGGER.error("Client version is no longer supported. Will no longer try to connect.")
-                        updateStatus(Status.OUTDATED)
+                        updateStatus(ConnectionManagerStatus.Outdated)
                         return
                     }
                     is ConnectResult.Failed -> {
                         val delay = connectBackoff.increment()
+
                         LOGGER.warn("Failed to connect ({}), re-trying in {}", result.info, delay)
-                        updateStatus(Status.GENERAL_FAILURE)
+                        if (result.info.knownReason == KnownCloseReason.DNS_FAILED) {
+                            updateStatus(ConnectionManagerStatus.Error.DNSFailure)
+                        } else {
+                            updateStatus(ConnectionManagerStatus.Error.GeneralFailure)
+                        }
+
                         delay(delay.inWholeMilliseconds)
+
                         continue
                     }
                     is ConnectResult.Suspended -> {
@@ -230,7 +275,7 @@ abstract class ConnectionManagerKt : CMConnection {
                     withContext(Dispatchers.Client) {
                         completeConnection(wrapper.connection)
                     }
-                    updateStatus(Status.SUCCESS)
+                    updateStatus(ConnectionManagerStatus.Success)
 
                     coroutineScope {
                         launch {
@@ -293,7 +338,7 @@ abstract class ConnectionManagerKt : CMConnection {
         }
     }
 
-    private suspend fun updateStatus(status: Status?) {
+    private suspend fun updateStatus(status: ConnectionManagerStatus?) {
         withContext(Dispatchers.Client) {
             mutableConnectionStatus.set(status)
         }
@@ -301,7 +346,7 @@ abstract class ConnectionManagerKt : CMConnection {
 
     private suspend fun handleSuspension(result: CloseInfo) {
         LOGGER.error("User is permanently suspended. Will no longer try to connect for this session.")
-        updateStatus(Status.USER_SUSPENDED)
+        updateStatus(ConnectionManagerStatus.UserSuspended)
         withContext(Dispatchers.Client) {
             java.suspensionManager.setPermanentlySuspended(result.reason)
         }

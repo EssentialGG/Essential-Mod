@@ -188,6 +188,14 @@ abstract class EssentialProxyElement<T : UIComponent>(
         vanillaRender(context)
     }
 
+    //#if MC>=12111
+    //$$ // Note: This method is misnamed, it's actually responsible for drawing the entire content. See `ButtonWidget.Text`
+    //$$ override fun drawIcon(context: DrawContext, mouseX: Int, mouseY: Int, deltaTicks: Float) {
+    //$$     drawButton(context)
+    //$$     drawLabel(context.getHoverListener(this, DrawContext.HoverType.NONE))
+    //$$ }
+    //#endif
+
     private fun updateProxyState() {
         if (!proxyInControl ) {
             if (positionStateSetByEssential?.matches(this) == false || hasProxyContentBeenModified) {

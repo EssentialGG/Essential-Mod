@@ -51,7 +51,9 @@ import static gg.essential.network.connectionmanager.ice.util.IWishMixinAllowedF
  */
 @Mixin(NetworkManager.class)
 public abstract class Mixin_RedirectToLocalConnection {
-    //#if MC>=12001
+    //#if MC>=12111
+    //$$ private static final String CONNECT = "connect(Ljava/net/InetSocketAddress;Lnet/minecraft/network/NetworkingBackend;Lnet/minecraft/network/ClientConnection;)Lio/netty/channel/ChannelFuture;";
+    //#elseif MC>=12001
     //$$ private static final String CONNECT = "connect(Ljava/net/InetSocketAddress;ZLnet/minecraft/network/ClientConnection;)Lio/netty/channel/ChannelFuture;";
     //#else
     private static final String CONNECT = "createNetworkManagerAndConnect";

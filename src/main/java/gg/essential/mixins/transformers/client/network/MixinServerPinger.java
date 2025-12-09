@@ -27,7 +27,9 @@ import static gg.essential.mixins.ext.client.multiplayer.ServerDataExtKt.getExt;
 @Mixin(ServerPinger.class)
 public abstract class MixinServerPinger {
 
-    //#if MC>=12005
+    //#if MC>=12111
+    //$$ private static final String CONNECT = "Lnet/minecraft/network/ClientConnection;connect(Ljava/net/InetSocketAddress;Lnet/minecraft/network/NetworkingBackend;Lnet/minecraft/util/profiler/MultiValueDebugSampleLogImpl;)Lnet/minecraft/network/ClientConnection;";
+    //#elseif MC>=12005
     //$$ private static final String CONNECT = "Lnet/minecraft/network/ClientConnection;connect(Ljava/net/InetSocketAddress;ZLnet/minecraft/util/profiler/MultiValueDebugSampleLogImpl;)Lnet/minecraft/network/ClientConnection;";
     //#elseif MC>=12002
     //$$ private static final String CONNECT = "Lnet/minecraft/network/ClientConnection;connect(Ljava/net/InetSocketAddress;ZLnet/minecraft/util/profiler/PerformanceLog;)Lnet/minecraft/network/ClientConnection;";

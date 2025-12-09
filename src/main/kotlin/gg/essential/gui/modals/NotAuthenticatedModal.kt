@@ -32,7 +32,7 @@ import gg.essential.gui.notification.Notifications
 import gg.essential.gui.notification.error
 import gg.essential.gui.overlay.ModalFlow
 import gg.essential.gui.overlay.ModalManager
-import gg.essential.network.connectionmanager.ConnectionManager
+import gg.essential.network.connectionmanager.ConnectionManagerStatus
 import gg.essential.gui.util.pollingStateV2
 
 class NotAuthenticatedModal(
@@ -108,8 +108,8 @@ suspend fun ModalFlow.notAuthenticatedModal(): Boolean {
     while (awaitModal { NotAuthenticatedModal(modalManager, skipAuthCheck = false, triedConnecting, it) }) {
         connectionManager.forceImmediateReconnect()
         when (connectionManager.connectionStatus.await { it != null }) {
-            ConnectionManager.Status.SUCCESS -> return true
-            ConnectionManager.Status.MOJANG_UNAUTHORIZED -> return accountNotValidModal()
+            ConnectionManagerStatus.Success -> return true
+            is ConnectionManagerStatus.Error.AuthenticationFailure -> return accountNotValidModal()
 
             else -> {
                 Notifications.error("Connection Error", "")

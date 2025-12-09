@@ -45,7 +45,7 @@ import gg.essential.gui.layoutdsl.wrappedText
 import gg.essential.gui.overlay.ModalFlow
 import gg.essential.gui.overlay.ModalManager
 import gg.essential.gui.util.focusable
-import gg.essential.network.connectionmanager.ConnectionManager
+import gg.essential.network.connectionmanager.ConnectionManagerStatus
 import gg.essential.universal.USound
 import gg.essential.util.AutoUpdate.showUpdateModal
 import gg.essential.util.openInBrowser
@@ -178,17 +178,17 @@ suspend fun ModalFlow.tosModal(): Boolean {
             val connectionManager = Essential.getInstance().connectionManager
             val status = connectionManager.connectionStatus
                 .letState { status ->
-                    if (status == ConnectionManager.Status.NO_TOS) return@letState null
-                    if (status != ConnectionManager.Status.SUCCESS) return@letState status
+                    if (status == ConnectionManagerStatus.TOSNotAccepted) return@letState null
+                    if (status != ConnectionManagerStatus.Success) return@letState status
                     if (!connectionManager.suspensionManager.isLoaded()) return@letState null
                     if (!connectionManager.rulesManager.isLoaded()) return@letState null
-                    ConnectionManager.Status.SUCCESS
+                    ConnectionManagerStatus.Success
                 }.await { it != null }
 
             when {
                 connectionManager.outdated -> showUpdateModal()
-                status == ConnectionManager.Status.MOJANG_UNAUTHORIZED -> return accountNotValidModal()
-                status != ConnectionManager.Status.SUCCESS -> return notAuthenticatedModal()
+                status is ConnectionManagerStatus.Error.AuthenticationFailure -> return accountNotValidModal()
+                status != ConnectionManagerStatus.Success -> return notAuthenticatedModal()
             }
         }
     }

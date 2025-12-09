@@ -26,6 +26,7 @@ import gg.essential.util.MagicPathsKt;
 import gg.essential.util.Multithreading;
 import kotlin.Lazy;
 import kotlin.LazyKt;
+import kotlin.Pair;
 import org.java_websocket.client.DnsResolver;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
@@ -39,6 +40,7 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.net.InetAddress;
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -111,6 +113,8 @@ public class Connection extends WebSocketClient {
         CM_HOST_URI = uri;
     }
 
+    private static Pair<UUID, String> latestReconnectToken;
+
     @NotNull
     private final Executor sendExecutor = new LimitedExecutor(Multithreading.getPool(), 1, new ConcurrentLinkedQueue<>());
 
@@ -118,9 +122,11 @@ public class Connection extends WebSocketClient {
     @NotNull
     private final Callbacks callbacks;
     private final ConnectionCodec codec = new ConnectionCodec(this::log);
+    private UUID user;
 
     private int usingProtocol = 1;
     private ScheduledFuture<?> timeoutTask;
+    private Exception lastWebsocketException = null;
 
     private static final int MAX_PROTOCOL = 9;
 
@@ -145,6 +151,9 @@ public class Connection extends WebSocketClient {
     @Override
     public void onOpen(@NotNull final ServerHandshake serverHandshake) {
         this.usingProtocol = Integer.parseInt(serverHandshake.getFieldValue("Essential-Protocol-Version"));
+
+        String reconnectToken = serverHandshake.getFieldValue("Essential-Authentication-Token");
+        latestReconnectToken = reconnectToken != null ? new Pair<>(user, reconnectToken) : null;
 
         scheduleTimeout();
 
@@ -175,11 +184,14 @@ public class Connection extends WebSocketClient {
             knownReason = KnownCloseReason.OUTDATED;
         } else if (code == 4008) {
             knownReason = KnownCloseReason.SUSPENDED;
+        } else if (this.lastWebsocketException instanceof UnknownHostException) {
+            knownReason = KnownCloseReason.DNS_FAILED;
         } else {
             knownReason = null;
         }
 
         this.callbacks.onClose(new CloseInfo(code, reason, remote, knownReason));
+        this.lastWebsocketException = null;
     }
 
     @Override
@@ -222,6 +234,7 @@ public class Connection extends WebSocketClient {
     @Override
     public void onError(@NotNull final Exception e) {
         Essential.logger.error("Critical error occurred on connection management. ", e);
+        this.lastWebsocketException = e;
     }
 
     /**
@@ -245,11 +258,18 @@ public class Connection extends WebSocketClient {
     }
 
     public void setupAndConnect(UUID uuid, String userName, byte[] secret) {
+        this.user = uuid;
+
         byte[] colon = ":".getBytes(StandardCharsets.UTF_8);
         byte[] name = userName.getBytes(StandardCharsets.UTF_8);
         byte[] nameSecret = Bytes.concat(name, colon, secret);
         String encoded = Base64.getEncoder().encodeToString(nameSecret);
         this.addHeader("Authorization", "Basic " + encoded);
+
+        Pair<UUID, String> reconnectToken = latestReconnectToken;
+        if (reconnectToken != null && reconnectToken.getFirst().equals(uuid)) {
+            this.addHeader("Essential-Authentication-Token", reconnectToken.getSecond());
+        }
 
         String protocolProperty = System.getProperty("essential.cm.protocolVersion");
         if (protocolProperty == null) {
@@ -387,6 +407,7 @@ public class Connection extends WebSocketClient {
     public enum KnownCloseReason {
 
         OUTDATED,
-        SUSPENDED
+        SUSPENDED,
+        DNS_FAILED,
     }
 }

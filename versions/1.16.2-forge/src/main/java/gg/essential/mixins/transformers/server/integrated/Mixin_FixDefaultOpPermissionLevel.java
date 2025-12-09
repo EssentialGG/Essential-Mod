@@ -17,10 +17,19 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+//#if MC>=12111
+//$$ import net.minecraft.command.permission.LeveledPermissionPredicate;
+//#endif
+
 @Mixin(IntegratedServer.class)
 public class Mixin_FixDefaultOpPermissionLevel {
     @Inject(method = "getOpPermissionLevel", at = @At("HEAD"), cancellable = true)
+    //#if MC>=12111
+    //$$ private void essential$setOpPermissionLevelTo4(CallbackInfoReturnable<LeveledPermissionPredicate> cir) {
+    //$$     cir.setReturnValue(LeveledPermissionPredicate.OWNERS);
+    //#else
     private void essential$setOpPermissionLevelTo4(CallbackInfoReturnable<Integer> cir) {
         cir.setReturnValue(4);
+    //#endif
     }
 }

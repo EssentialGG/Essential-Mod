@@ -148,25 +148,11 @@ public class ConnectionManager extends ConnectionManagerKt {
     private boolean modsSent = false;
     private int previouslyConnectedProtocol = 1;
 
-    public enum Status {
-        NO_TOS,
-        ESSENTIAL_DISABLED,
-        OUTDATED,
-        USER_SUSPENDED,
-        CANCELLED,
-        ALREADY_CONNECTED,
-        NO_RESPONSE,
-        INVALID_RESPONSE,
-        MOJANG_UNAUTHORIZED,
-        GENERAL_FAILURE,
-        SUCCESS,
-    }
-
     public ConnectionManager(
-        @NotNull final MinecraftHook minecraftHook,
-        File baseDir,
-        Lwjgl3Loader lwjgl3,
-        State<@Nullable McIntegratedServerManager> integratedServerManager
+            @NotNull final MinecraftHook minecraftHook,
+            File baseDir,
+            Lwjgl3Loader lwjgl3,
+            State<@Nullable McIntegratedServerManager> integratedServerManager
     ) {
         this.minecraftHook = minecraftHook;
         this.subscriptionManager = new SubscriptionManager(this);

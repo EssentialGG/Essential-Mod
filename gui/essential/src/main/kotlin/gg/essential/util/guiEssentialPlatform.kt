@@ -93,8 +93,6 @@ interface GuiEssentialPlatform {
 
     fun identifierFromTexture(texture: RenderBackend.Texture): UIdentifier
 
-    fun bindTexture(textureUnit: Int, identifier: UIdentifier)
-
     fun getGlId(identifier: UIdentifier): Int
 
     fun playSound(identifier: UIdentifier)

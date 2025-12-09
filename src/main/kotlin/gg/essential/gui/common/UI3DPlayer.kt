@@ -399,7 +399,7 @@ open class UI3DPlayer(
         //$$             .putMat4f(projectionMatrix.peek().model)
         //$$             .get(),
         //$$     )
-        //$$ }.slice(0, RenderSystem.PROJECTION_MATRIX_UBO_SIZE)
+        //$$ }.slice()
         //$$ RenderSystem.setProjectionMatrix(projectionMatrixBuffer, ProjectionType.PERSPECTIVE)
         //#elseif MC>=12102
         //$$ val orgProjectionMatrix = RenderSystem.getProjectionMatrix()
@@ -595,7 +595,11 @@ open class UI3DPlayer(
             //$$ val dispatcher = MinecraftClient.getInstance().entityRenderDispatcher
             //$$ val renderer = dispatcher.getRenderer(p)
             //$$ val state = renderer.getAndUpdateRenderState(p, 1f)
+            //#if MC>=12111
+            //$$ // Hitboxes are now drawn by EntityHitboxDebugRenderer, independently from the entity renderer
+            //#else
             //$$ state.hitbox = null
+            //#endif
             //$$
             //$$ val restoreLighting = setupPlayerLight()
             //$$ val stack = applyCamera(dispatcher)
@@ -721,7 +725,7 @@ open class UI3DPlayer(
         //$$             .putVec3(Vector3f(-0.2f, 1.0f, 0.7f).normalize().mulDirection(matrix))
         //$$             .get(),
         //$$     )
-        //$$ }.slice(0, DiffuseLighting.UBO_SIZE)
+        //$$ }.slice()
         //$$ val orgShaderLights = RenderSystem.getShaderLights()
         //$$ RenderSystem.setShaderLights(shaderLights)
         //#elseif MC>=12005
@@ -832,12 +836,16 @@ open class UI3DPlayer(
     }
 
     private fun bindWhiteLightMapTexture() {
+        //#if MC>=12111
+        //$$ // RenderLayer now always binds the lightmap texture of its configured RenderSetup
+        //#else
         //#if MC>=11600
         //$$ val lightMapTextureUnit = 2
         //#else
         val lightMapTextureUnit = 1
         //#endif
         UGraphics.bindTexture(lightMapTextureUnit, identifier("essential", "textures/white.png"))
+        //#endif
     }
 
     private inner class FallbackPlayer {

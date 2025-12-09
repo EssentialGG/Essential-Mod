@@ -191,10 +191,6 @@ class GuiEssentialPlatformImpl : GuiEssentialPlatform {
         return (texture as MinecraftRenderBackend.MinecraftTexture).identifier.toU()
     }
 
-    override fun bindTexture(textureUnit: Int, identifier: UIdentifier) {
-        UGraphics.bindTexture(textureUnit, identifier.toMC())
-    }
-
     override fun getGlId(identifier: UIdentifier): Int {
         val textureManager = Minecraft.getMinecraft().textureManager
         //#if MC<16000

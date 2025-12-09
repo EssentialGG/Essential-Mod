@@ -376,6 +376,10 @@ public abstract class MixinServerListEntryNormal
         return true;
     }
 
+    //#if MC>=12111
+    //$$ @Inject(method = "mouseClicked", at = @At(value = "CONSTANT", args = "intValue=32"), cancellable = true)
+    //$$ private void onMousePressed(CallbackInfoReturnable<Boolean> cir, @Local(ordinal = 0) int relativeX, @Local(ordinal = 1) int relativeY) {
+    //#else
     //#if MC>=11600
     //$$ @Inject(method = "mouseClicked", at = @At(value = "CONSTANT", args = "doubleValue=32.0"), cancellable = true)
     //#if MC>=12109
@@ -386,6 +390,7 @@ public abstract class MixinServerListEntryNormal
     //#else
     @Inject(method = "mousePressed", at = @At("HEAD"), cancellable = true)
     private void handleMousePressed(int slotIndex, int mouseX, int mouseY, int mouseEvent, int relativeX, int relativeY, CallbackInfoReturnable<Boolean> cir) {
+    //#endif
     //#endif
         if (getExt(this.server).getEssential$showDownloadIcon()) {
             int listWidth = ((GuiMultiplayerAccessor) this.owner).getServerListSelector().getListWidth();

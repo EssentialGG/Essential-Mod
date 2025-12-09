@@ -83,7 +83,11 @@ internal class TemporaryTextureAllocator(
             height,
             1,
             1
-        ).apply { setTextureFilter(FilterMode.NEAREST, false) }
+        ).apply {
+            //#if MC<12111
+            setTextureFilter(FilterMode.NEAREST, false)
+            //#endif
+        }
         var depthTexture = gpuDevice.createTexture(
             { "Pre-rendered depth texture" },
             GpuTexture.USAGE_RENDER_ATTACHMENT,

@@ -104,7 +104,11 @@ public abstract class Mixin_DragDropUI_ServerListEntry {
     //#else
     //$$ @ModifyVariable(method = MOUSE_CLICKED, at = @At(value = "STORE"), ordinal = 2)
     //#endif
+    //#if MC>=12111
+    //$$ private int captureRelativeMouseCoordinatesX(final int value, @Share("relativeX") LocalDoubleRef relativeXSet) {
+    //#else
     //$$ private double captureRelativeMouseCoordinatesX(final double value, @Share("relativeX") LocalDoubleRef relativeXSet) {
+    //#endif
     //$$     if (EssentialConfig.INSTANCE.getEssentialEnabled()) {
     //$$         // do nothing, just to capture the relative mouse coordinates
     //$$         relativeXSet.set(value);
@@ -117,7 +121,11 @@ public abstract class Mixin_DragDropUI_ServerListEntry {
     //#else
     //$$ @ModifyVariable(method = MOUSE_CLICKED, at = @At(value = "STORE"), ordinal = 3)
     //#endif
+    //#if MC>=12111
+    //$$ private int captureRelativeMouseCoordinatesY(final int value, @Share("relativeY") LocalDoubleRef relativeYSet) {
+    //#else
     //$$ private double captureRelativeMouseCoordinatesY(final double value, @Share("relativeY") LocalDoubleRef relativeYSet) {
+    //#endif
     //$$     if (EssentialConfig.INSTANCE.getEssentialEnabled()) {
     //$$         // do nothing, just to capture the relative mouse coordinates
     //$$         relativeYSet.set(value);

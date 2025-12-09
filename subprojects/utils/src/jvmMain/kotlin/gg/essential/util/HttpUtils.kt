@@ -74,6 +74,7 @@ suspend fun httpCall(request: Request): Response =
 suspend fun httpGet(url: String, request: (Request.Builder) -> Unit = {}): Response {
     val response = httpCall(Request.Builder().url(url).apply(request).build())
     if(!response.isSuccessful) {
+        response.close()
         throw IOException("Error from '$url': ${response.code()} ${response.message()}")
     }
     return response

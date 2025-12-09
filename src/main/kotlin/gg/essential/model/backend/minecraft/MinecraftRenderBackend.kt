@@ -38,6 +38,10 @@ import java.io.ByteArrayInputStream
 import gg.essential.model.util.UMatrixStack as CMatrixStack
 import gg.essential.model.util.UVertexConsumer as CVertexConsumer
 
+//#if MC>=12111
+//$$ import net.minecraft.client.render.RenderLayers
+//#endif
+
 //#if MC>=12109
 //$$ import net.minecraft.client.render.command.OrderedRenderCommandQueue
 //#endif
@@ -189,7 +193,12 @@ object MinecraftRenderBackend : RenderBackend {
     //$$ //    `alpha < 0.1`, luckily the `eyes` one doesn't, so that's what we'll use.
     //#if MC>=12105
     //$$ // The `eyes` layer now uses regular blending, so we can use it directly
-    //$$ fun getEmissiveLayer(texture: Identifier) = RenderLayer.getEyes(texture)
+    //$$ fun getEmissiveLayer(texture: Identifier) =
+        //#if MC>=12111
+        //$$ RenderLayers.eyes(texture)
+        //#else
+        //$$ RenderLayer.getEyes(texture)
+        //#endif
     //#else
     //$$ private val emissiveLayers = mutableMapOf<ResourceLocation, RenderType>()
     //$$ fun getEmissiveLayer(texture: ResourceLocation) = emissiveLayers.getOrPut(texture) {
@@ -258,6 +267,10 @@ object MinecraftRenderBackend : RenderBackend {
     //$$     override fun overlay(u: Int, v: Int): VertexConsumer = this
     //$$     override fun light(u: Int, v: Int): VertexConsumer = this
     //$$     override fun normal(x: Float, y: Float, z: Float): VertexConsumer = this
+        //#if MC>=12111
+        //$$ override fun color(argb: Int): VertexConsumer = this
+        //$$ override fun lineWidth(width: Float): VertexConsumer = this
+        //#endif
     //$$ }
     //#endif
     //#else

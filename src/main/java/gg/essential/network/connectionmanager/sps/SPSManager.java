@@ -76,6 +76,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+//#if MC>=12111
+//$$ import net.minecraft.world.rule.GameRule;
+//#endif
+
 //#if MC>=12109
 //$$ import net.minecraft.server.PlayerConfigEntry;
 //#endif
@@ -686,6 +690,23 @@ public class SPSManager extends StateCallbackManager<IStatusManager> implements 
         final IntegratedServer integratedServer = UMinecraft.getMinecraft().getIntegratedServer();
         if (integratedServer != null) {
             getExecutor(integratedServer).execute(() -> {
+                //#if MC>=12111
+                //$$ gameRules.accept(new net.minecraft.world.rule.GameRuleVisitor() {
+                //$$     @Override
+                //$$     public void visitBoolean(GameRule<Boolean> rule) {
+                //$$         String valueStr = immutableGameRules.get(rule.toString());
+                //$$         if (valueStr == null) return;
+                //$$         gameRules.setValue(rule, Boolean.parseBoolean(valueStr), integratedServer);
+                //$$     }
+                //$$
+                //$$     @Override
+                //$$     public void visitInt(GameRule<Integer> rule) {
+                //$$         String valueStr = immutableGameRules.get(rule.toString());
+                //$$         if (valueStr == null) return;
+                //$$         gameRules.setValue(rule, Integer.parseInt(valueStr), integratedServer);
+                //$$     }
+                //$$ });
+                //#else
                 //#if MC<=11202
                 immutableGameRules.forEach(gameRules::setOrCreateGameRule);
                 //#else
@@ -712,6 +733,7 @@ public class SPSManager extends StateCallbackManager<IStatusManager> implements 
                 //$$         }
                 //$$     }
                 //$$ });
+                //#endif
                 //#endif
             });
         }

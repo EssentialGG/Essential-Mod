@@ -19,7 +19,11 @@ import net.minecraft.util.ResourceLocation
 
 //#if MC>=11600
 //$$ import gg.essential.util.identifier
+//#if MC>=12111
+//$$ import net.minecraft.client.render.RenderLayers
+//#else
 //$$ import net.minecraft.client.renderer.RenderType
+//#endif
 //$$ import net.minecraft.client.renderer.IRenderTypeBuffer
 //$$ import net.minecraft.client.Minecraft
 //#endif
@@ -46,7 +50,11 @@ class TextRenderTypeVertexConsumer(private val vertexConsumer: UVertexConsumer, 
         //$$ @JvmStatic
         //$$ @JvmOverloads
         //$$ fun createWithTexture(provider: IRenderTypeBuffer, texture: ResourceLocation, seeThrough: Boolean = false): TextRenderTypeVertexConsumer {
-        //$$     val type = if (seeThrough) RenderType.getTextSeeThrough(texture) else RenderType.getText(texture)
+            //#if MC>=12111
+            //$$ val type = if (seeThrough) RenderLayers.textSeeThrough(texture) else RenderLayers.text(texture)
+            //#else
+            //$$ val type = if (seeThrough) RenderType.getTextSeeThrough(texture) else RenderType.getText(texture)
+            //#endif
         //$$     val consumer = UVertexConsumer.of(provider.getBuffer(type))
         //$$
         //$$     return TextRenderTypeVertexConsumer(consumer, true)

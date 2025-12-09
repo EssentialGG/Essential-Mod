@@ -64,7 +64,13 @@ class TintVanillaButtonsEffect {
         private val pageHeight: Int = UResolution.viewportHeight,
     ) {
         val guiRenderState = GuiRenderState()
-        val drawContext = DrawContext(UMinecraft.getMinecraft(), guiRenderState)
+        val drawContext = DrawContext(
+            UMinecraft.getMinecraft(),
+            guiRenderState,
+            //#if MC>=12111
+            //$$ 0, 0, // mouse pos for tooltips, which our scheme doesn't support anyway
+            //#endif
+        )
         private val texture = AdvancedDrawContext.textureAllocator.allocate(pageWidth, pageHeight)
 
         // List of free spaces in this page, initialized with the full page size

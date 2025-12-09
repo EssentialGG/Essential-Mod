@@ -12,7 +12,6 @@
 package gg.essential.connectionmanager.common.util;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.math.BigInteger;
 import java.security.MessageDigest;
@@ -44,12 +43,7 @@ public class LoginUtil {
         return bytes;
     }
 
-    @Nullable
     public static String computeHash(byte @NotNull [] sharedSecret) {
-        if (sharedSecret.length != SHARED_SECRET_LENGTH) {
-            return null;
-        }
-
         // buf = sharedSecret + SHARED_CONSTANT
         byte[] buf = Arrays.copyOf(sharedSecret, sharedSecret.length + SHARED_CONSTANT.length);
         System.arraycopy(SHARED_CONSTANT, 0, buf, sharedSecret.length, SHARED_CONSTANT.length);

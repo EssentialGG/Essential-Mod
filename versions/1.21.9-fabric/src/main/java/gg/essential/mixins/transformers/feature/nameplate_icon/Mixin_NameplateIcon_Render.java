@@ -14,6 +14,7 @@ package gg.essential.mixins.transformers.feature.nameplate_icon;
 import com.llamalad7.mixinextras.sugar.Local;
 import gg.essential.mixins.impl.LabelCommandExt;
 import gg.essential.model.backend.minecraft.MinecraftRenderBackend;
+import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.render.command.LabelCommandRenderer;
 import net.minecraft.client.render.command.OrderedRenderCommandQueueImpl;
 import gg.essential.cosmetics.CosmeticsRenderState;
@@ -43,7 +44,11 @@ public class Mixin_NameplateIcon_Render<T extends Entity> {
         //       Ideally we refactor our nametag drawing method, but the vanilla code doesn't seem correct right now
         //       either, so I'm not yet sure how exactly to "correctly" integrate our code into it.
         VertexConsumerProvider vertexConsumerProvider = (renderLayer) -> {
+            //#if MC>=12111
+            //$$ if (renderLayer.getRenderPipeline() == RenderPipelines.RENDERTYPE_TEXT_SEETHROUGH) {
+            //#else
             if ("text_see_through".equals(renderLayer.getName())) {
+            //#endif
                 return immediate.getBuffer(renderLayer);
             } else {
                 return MinecraftRenderBackend.NullMcVertexConsumer.INSTANCE;
@@ -65,7 +70,11 @@ public class Mixin_NameplateIcon_Render<T extends Entity> {
     ) {
         // FIXME see similar FIXME above
         VertexConsumerProvider vertexConsumerProvider = (renderLayer) -> {
+            //#if MC>=12111
+            //$$ if (renderLayer.getRenderPipeline() == RenderPipelines.RENDERTYPE_TEXT) {
+            //#else
             if ("text".equals(renderLayer.getName())) {
+            //#endif
                 return immediate.getBuffer(renderLayer);
             } else {
                 return MinecraftRenderBackend.NullMcVertexConsumer.INSTANCE;

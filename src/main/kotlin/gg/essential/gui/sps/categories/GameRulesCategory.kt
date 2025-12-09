@@ -38,6 +38,10 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.resources.I18n
 import net.minecraft.world.GameRules
 
+//#if MC>=12111
+//$$ import net.minecraft.world.rule.GameRuleCategory
+//#endif
+
 class GameRulesCategory : WorldSettingsCategory(
     "Game Rules",
     "No game rules found",
@@ -46,10 +50,12 @@ class GameRulesCategory : WorldSettingsCategory(
 
     // The integrated server should always be running if this UI is opened
     private val gameRules = Minecraft.getMinecraft().integratedServer!!
-        //#if MC<=11202
-        .getWorld(0).gameRules
-        //#else
+        //#if MC>=12111
+        //$$ .saveProperties.gameRules
+        //#elseif MC>=11600
         //$$ .gameRules
+        //#else
+        .getWorld(0).gameRules
         //#endif
 
     private val gameRuleSettings = mutableMapOf<String, String>()
@@ -67,7 +73,12 @@ class GameRulesCategory : WorldSettingsCategory(
         val categories = mutableMapOf<Category, CategoryComponent>()
         var anyPinned = BasicState(false)
 
+        //#if MC>=12111
+        //$$ gameRules.streamRules().forEach { rule ->
+        //$$     val value = gameRules.getValue(rule)
+        //#else
         (gameRules as MixinGameRulesAccessor).rules.forEach { (rule, value) ->
+        //#endif
             // Pinned entry is bound to this state instead of directly to pinnedState because
             // we want to be able to lock the scroll position when showing/hiding it
             val delayedPinState = BasicState(rule.toString() in pinnedGameRules)
@@ -99,7 +110,20 @@ class GameRulesCategory : WorldSettingsCategory(
                 }
             }
 
+            //#if MC>=12111
+            //$$ val category = when (rule.category) {
+            //$$     GameRuleCategory.PLAYER -> Category.PLAYER
+            //$$     GameRuleCategory.MOBS -> Category.MOBS
+            //$$     GameRuleCategory.SPAWNING -> Category.SPAWNING
+            //$$     GameRuleCategory.DROPS -> Category.DROPS
+            //$$     GameRuleCategory.UPDATES -> Category.WORLD_UPDATES
+            //$$     GameRuleCategory.CHAT -> Category.CHAT
+            //$$     GameRuleCategory.MISC -> Category.MISCELLANEOUS
+            //$$     else -> Category.OTHER
+            //$$ }
+            //#else
             val category = Category.fromRule(rule.toString())
+            //#endif
             categories.getOrPut(category) {
                 CategoryComponent(category).also {
                     it.componentName = category.name
@@ -126,8 +150,13 @@ class GameRulesCategory : WorldSettingsCategory(
     private fun getTitle(
         rule: GameRuleKey,
     ): String {
-        return I18n.format("gamerule.$rule").let {
-            if (it == "gamerule.$rule") {
+        //#if MC>=12111
+        //$$ val key = rule.translationKey
+        //#else
+        val key = "gamerule.$rule"
+        //#endif
+        return I18n.format(key).let {
+            if (it == key) {
                 "$rule" // Using placeholder because type changes from string on 1.16+
             } else {
                 it
@@ -145,8 +174,13 @@ class GameRulesCategory : WorldSettingsCategory(
         pinState: State<Boolean>,
     ): SpsOption? {
         val ruleName = getTitle(rule)
-        val ruleDescription = I18n.format("gamerule.${rule}.description").let {
-            if (it == "gamerule.${rule}.description") {
+        //#if MC>=12111
+        //$$ val ruleDescriptionKey = rule.translationKey + ".description"
+        //#else
+        val ruleDescriptionKey= "gamerule.${rule}.description"
+        //#endif
+        val ruleDescription = I18n.format(ruleDescriptionKey).let {
+            if (it == ruleDescriptionKey) {
                 "No description available."
             } else {
                 it
@@ -159,7 +193,11 @@ class GameRulesCategory : WorldSettingsCategory(
             PinState(pinnedComponent, pinState),
         )
 
+        //#if MC>=12111
+        //$$ val currentValue = gameRules.getValue(rule).toString()
+        //#else
         val currentValue = gameRules.getString(rule).toString()
+        //#endif
 
         val gameRuleState = createGameRuleState(
             rule,
@@ -186,7 +224,9 @@ class GameRulesCategory : WorldSettingsCategory(
             gameRuleSettings[rule.toString()] = value
             spsManager.updateWorldGameRules(gameRules, gameRuleSettings)
         }
-        //#if MC<=11202
+        //#if MC>=12111
+        //$$ return if (value is Boolean) {
+        //#elseif MC<=11202
         return if (value.type == GameRules.ValueType.BOOLEAN_VALUE) {
         //#else
         //$$ return if (value is GameRules.BooleanValue) {
@@ -196,7 +236,9 @@ class GameRulesCategory : WorldSettingsCategory(
                     onSetValue { update(it.toString()) }
                 })
             }
-        //#if MC<=11202
+        //#if MC>=12111
+        //$$ } else if (value is Int) {
+        //#elseif MC<=11202
         } else if (value.type == GameRules.ValueType.NUMERICAL_VALUE) {
         //#else
         //$$ } else if (value is GameRules.IntegerValue) {
@@ -250,7 +292,23 @@ class GameRulesCategory : WorldSettingsCategory(
             height = ChildBasedSizeConstraint()
         } childOf titleContainer
 
-        private val title by EssentialUIText(I18n.format("gamerule.category.${category.name.lowercase()}")).constrain {
+        //#if MC>=12111
+        //$$ private val i18nName = when (category) {
+        //$$     Category.PLAYER -> "minecraft.player"
+        //$$     Category.MOBS -> "minecraft.mobs"
+        //$$     Category.SPAWNING -> "minecraft.spawning"
+        //$$     Category.DROPS -> "minecraft.drops"
+        //$$     Category.WORLD_UPDATES -> "minecraft.updates"
+        //$$     Category.CHAT -> "minecraft.chat"
+        //$$     Category.MISCELLANEOUS -> "minecraft.misc"
+        //$$     Category.OTHER -> "other"
+        //$$     Category.PINNED -> "pinned"
+        //$$ }
+        //#else
+        private val i18nName = category.name.lowercase()
+        //#endif
+
+        private val title by EssentialUIText(I18n.format("gamerule.category.$i18nName")).constrain {
             x = CenterConstraint()
             textScale = GuiScaleOffsetConstraint()
             color = EssentialPalette.TEXT.toConstraint()
@@ -389,13 +447,17 @@ class GameRulesCategory : WorldSettingsCategory(
     }
 }
 /** Utility type aliases for dealing with game rules across different versions */
-//#if MC<=11202
+//#if MC>=12111
+//$$ typealias GameRuleValue = Any
+//#elseif MC<=11202
 typealias GameRuleValue = MixinGameRulesValueAccessor
 //#else
 //$$ typealias GameRuleValue = GameRules.RuleValue<*>
 //#endif
 
-//#if MC<=11202
+//#if MC>=12111
+//$$ typealias GameRuleKey = net.minecraft.world.rule.GameRule<*>
+//#elseif MC<=11202
 typealias GameRuleKey = String
 //#else
 //$$ typealias GameRuleKey = GameRules.RuleKey<*>

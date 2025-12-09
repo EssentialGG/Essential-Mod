@@ -326,7 +326,11 @@ public class
         // entry
         //#if MC>=12106
         //$$ GuiRenderState guiRenderState = new GuiRenderState();
-        //$$ DrawContext context = new DrawContext(MinecraftClient.getInstance(), guiRenderState);
+        //$$ DrawContext context = new DrawContext(MinecraftClient.getInstance(), guiRenderState
+            //#if MC>=12111
+            //$$ , event.getMouseX(), event.getMouseY()
+            //#endif
+        //$$ );
         //#if MC>=12109
         //$$ int orgX = draggedEntryState.entry.getX();
         //$$ int orgY = draggedEntryState.entry.getY();
@@ -343,6 +347,9 @@ public class
         //$$ draggedEntryState.entry.setHeight(orgHeight);
         //#else
         //$$ draggedEntryState.entry.render(context, 0, y, x, width, height, event.getMouseX(), event.getMouseY(), true, event.getPartialTicks());
+        //#endif
+        //#if MC>=12111
+        //$$ context.drawDeferredElements();
         //#endif
         //$$ renderGuiRenderStateToRenderTarget(matrixStack, guiRenderState);
         //#elseif MC>=12000
