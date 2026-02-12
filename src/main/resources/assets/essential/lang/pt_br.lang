@@ -1,0 +1,354 @@
+# Essential Translations
+## Menus
+# Friends Menu
+gui.menu.friends.titletext=Amigos
+
+# Cosmetic Studio Menu
+gui.menu.cosmeticstudio.next=Próximo Cosmético
+gui.menu.cosmeticstudio.previous=Cosmético Anterior
+gui.menu.cosmeticstudio.previewnone=Sem Pré-visualização
+gui.menu.cosmeticstudio.togglespin=Alternar Rotação
+gui.menu.cosmeticstudio.togglefollowmouse=Alternar Seguir o Mouse
+gui.menu.cosmeticstudio.resetspin=Redefinir Rotação
+gui.menu.cosmeticstudio.previewing=Pré-visualizando:
+gui.menu.cosmeticstudio.none=Nenhum
+gui.menu.cosmeticstudio.adjustposition=Ajustar Posição:
+
+studio.BACK=Voltar
+studio.EARS=Orelhas
+studio.FACE=Rosto
+studio.FULL_BODY=Traje
+studio.HAT=Chapéu
+studio.PET=Pet
+studio.TAIL=Cauda
+studio.ARMS=Braços
+studio.SUITS=Trajes
+studio.SHOES=Sapatos
+studio.PANTS=Calças
+studio.WINGS=Asas
+studio.FEATURED=Destaques
+studio.OWNED=Possuídos
+studio.CAPE=Capa
+studio.PARTNER=Parceiros
+studio.NEW=Novos
+studio.SHOULDERS=Ombros
+studio.test=Evento de Teste
+studio.100T=100 Ladrões
+studio.INSANE=InsaneCraft
+studio.HALLOWEEN=Assustador
+studio.TEAMSEAS=#TeamSeas
+studio.RED=(RED)
+studio.WINTER=Inverno
+studio.EFFECT=Efeito
+studio.FLAME=Chama
+studio.HACKER=Hacker
+
+## Configuration
+# Configuration Names
+gui.config.name.friendnotifications=Notificações de Amigos
+gui.config.name.messagereceivednotifications=Notificações de Mensagens Recebidas
+gui.config.name.messagegroupupdate=Atualizações de Grupo de Mensagens
+
+# Configuration Descriptions
+gui.config.description.displayfriendnotifs=Exibir notificações para ações de amigos
+gui.config.description.displaymessagenotifs=Exibir notificações para mensagens recebidas
+gui.config.description.displaygroupupdates=Exibir notificações para atualizações de grupos
+
+# Configuration Categories
+gui.config.category.notifications=Notificações
+
+# Configuration Subcategories
+gui.config.subcategory.friends=Amigos
+gui.config.subcategory.messages=Mensagens
+
+## Feedback
+# Command Feedback
+command.feedback.refreshpurchases=Atualizando seu perfil
+
+# Keybind Feedback
+keybind.feedback.lookatplayerfriend=Olhe para um jogador para adicioná-lo como amigo!
+keybind.feedback.alreadyfriends=Vocês já são amigos!
+keybind.feedback.blockedbyplayerfriend=Você não pode adicionar este jogador como amigo, pois ele o bloqueou!
+keybind.feedback.hasplayerblockedfriend=Você não pode adicionar este jogador como amigo, pois você o bloqueou! Tente desbloqueá-lo primeiro.
+keybind.feedback.alreadypendingfriendrequest=Você já enviou um pedido de amizade para ele!
+keybind.feedback.sendingfriendrequest=Enviando um pedido de amizade para %s
+keybind.feedback.lookatplayermessage=Olhe para um jogador para enviar uma mensagem!
+keybind.feedback.notfriendedmessage=Você não pode enviar mensagens para este jogador a menos que sejam amigos no Essential! Tente adicioná-lo como amigo primeiro!
+keybind.feedback.openconversationmessage=Tentando abrir conversa com %s
+
+## Keybinds
+keybind.name.ESSENTIAL_FRIENDS=Abrir Gui de Amigos
+keybind.name.COSMETIC_STUDIO=Abrir Guarda-roupa
+Open Cosmetic Studio=Abrir Guarda-roupa
+keybind.name.ZOOM=Zoom
+keybind.name.COSMETICS_VISIBILITY_TOGGLE=Mostrar/Ocultar Meus Cosméticos
+Cosmetic Visibility Toggle=Mostrar/Ocultar Meus Cosméticos
+keybind.name.CHAT_PEEK=Espiar Chat
+keybind.name.INVITE_FRIENDS=Convidar Amigos
+keybind.name.SCREENSHOT_MANAGER=Gerenciador de Capturas de Tela
+# Emote Keybinds
+keybind.name.EMOTE_WHEEL=Abrir Roda de Emotes
+keybind.name.EMOTE_SLOT_1=Tocar Emote Superior Esquerdo
+keybind.name.EMOTE_SLOT_2=Tocar Emote Superior do Meio
+keybind.name.EMOTE_SLOT_3=Tocar Emote Superior Direito
+keybind.name.EMOTE_SLOT_4=Tocar Emote do Meio Esquerdo
+keybind.name.EMOTE_SLOT_5=Tocar Emote do Meio Direito
+keybind.name.EMOTE_SLOT_6=Tocar Emote Inferior Esquerdo
+keybind.name.EMOTE_SLOT_7=Tocar Emote Inferior do Meio
+keybind.name.EMOTE_SLOT_8=Tocar Emote Inferior Direito
+
+keybind.error.nonplayer=Este jogador não é válido!
+
+## Notifications
+# Notification Titles
+notification.title.message=Mensagem
+notification.title.friends=Amigos
+notification.title.messages=Mensagens
+notification.title.failedgroupcreation=Falha na Criação de Grupo
+notification.title.groupcreated=Grupo Criado
+
+# Notification Messages - Friends
+notification.message.acceptedfriend=Agora você é amigo de %s!
+notification.message.removedfriend=Você não é mais amigo de %s!
+notification.message.sentfriendrequest=%s enviou uma solicitação de amizade!
+notification.message.cancelledfriendrequest=Solicitação de amizade %s %s cancelada!
+notification.message.cancelledfriendrequestto=para
+notification.message.cancelledfriendrequestfrom=de
+notification.message.deniedfriendrequest=%s negou sua solicitação de amizade!
+notification.message.deniedfriendrequest_alt=Solicitação de amizade negada por %s
+notification.message.blockedfriendrequest=%s bloqueou você!
+notification.message.hasblockedfriendrequest=%s foi bloqueado!
+notification.message.unblockedfriendrequest=%s desbloqueou você!
+notification.message.hasunblockedfriendrequest=%s foi desbloqueado!
+notification.message.requestsuccess=Solicitação de amizade para %s foi enviada com sucesso
+
+# Notification Messages - Messaging
+notification.message.newmessage=Mensagem de %s em %s
+notification.message.newmessage_dm=Mensagem de %s
+notification.message.groupcreated=Grupo criado!
+
+# Cosmetics
+cosmetics.WINGS=Asas
+cosmetics.DRAGON_COMPANION=Companheiro Dragão
+cosmetics.DRAGON_HEAD=Cabeça de Dragão
+cosmetics.FEZ_HAT=Chapéu Fez
+cosmetics.LEGO_HAT=Chapéu de Lego
+cosmetics.TOP_HAT=Cartola
+cosmetics.CUSTOM_CAPE_STATIC=Capa Personalizada Estática
+cosmetics.CUSTOM_CAPE_DYNAMIC=Capa Personalizada Dinâmica
+cosmetics.NITRO_CAPE=Capa Nitro
+cosmetics.EXAMPLE_CAPE=Capa de Exemplo
+cosmetics.TAB_DOT=Ponto de Aba
+cosmetics.HEAD_TEXT=Texto na Cabeça
+cosmetics.COLONIST_HAT=Chapéu de Colonizador
+cosmetics.JETPACK=Jetpack
+cosmetics.GENERIC_BACKPACK=Mochila Genérica
+cosmetics.DOG_BACKPACK=Mochila de Cachorro
+cosmetics.AIRPODS=AirPods
+cosmetics.TAN_BACKPACK=Mochila Bege
+cosmetics.ELEPHANT_BACKPACK=Mochila de Elefante
+cosmetics.FEATHER_TOPHAT=Cartola com Pena
+cosmetics.EARS=Orelhas
+cosmetics.HEADSET=Headset
+cosmetics.SUNGLASSES=Óculos de Sol
+cosmetics.CUSTOM_SKIN_STATIC=Skin Personalizada Estática
+cosmetics.CUSTOM_SKIN_DYNAMIC=Skin Personalizada Dinâmica
+cosmetics.LEGO_MAESTRO_CAPE=Capa do Lego Maestro
+cosmetics.FLIP=Virar
+cosmetics.DOG_FILTER=Filtro de Cachorro
+cosmetics.TURTLE_BACKPACK=Mochila de Tartaruga
+cosmetics.MONKEY_BACKPACK=Mochila de Macaco
+cosmetics.KING_CROWN=Coroa do Rei
+cosmetics.QUEEN_CROWN=Coroa da Rainha
+cosmetics.FLOWER_CROWN=Coroa de Flores
+cosmetics.FIRE_JETPACK=Jetpack de Fogo
+cosmetics.WATER_JETPACK=Jetpack de Água
+cosmetics.MAGIC_JETPACK=Jetpack Mágico
+cosmetics.ANGEL_WINGS=Asas de Anjo
+cosmetics.DEMON_WINGS=Asas de Demônio
+cosmetics.HEADPHONES=Fones de Ouvido
+cosmetics.ROBOT_HELPMET=Capacete de Robô
+cosmetics.FROG_HAT=Chapéu de Sapo
+cosmetics.SPACESUIT_HELMET=Capacete de Traje Espacial
+cosmetics.PROPELLER_HAT=Chapéu com Hélice
+cosmetics.FRANKENSTEIN_BOLTS=Parafusos de Frankenstein
+cosmetics.EARMUFFS=Protetores de Ouvido
+cosmetics.HEADBANDS=Faixas de Cabelo
+cosmetics.UNICORN__HORN=Chifre de Unicórnio
+cosmetics.VIKING_HELMET=Capacete Viking
+cosmetics.ARROW_THROUGH_HEAD=Flecha Atravessando a Cabeça
+cosmetics.DEVIL_HORNS=Chifres de Diabo
+cosmetics.COWBOY_HAT=Chapéu de Cowboy
+cosmetics.TALL_COWBOY_HAT=Chapéu de Cowboy Alto
+cosmetics.CAT_EARS=Orelhas de Gato
+cosmetics.RABBIT_EARS=Orelhas de Coelho
+cosmetics.DOG_EARS=Orelhas de Cachorro
+cosmetics.PANDA_EARS=Orelhas de Panda
+cosmetics.KANGAROO_EARS=Orelhas de Canguru
+cosmetics.ALIEN_EARS=Orelhas de Alienígena
+cosmetics.SUPER_TALL_COWBOY_HAT=Chapéu de Cowboy Superalto
+cosmetics.DEAL_WITH_IT_GLASSES=Óculos "Lide com Isso"
+cosmetics.THREE_D_GLASSES=Óculos 3D
+cosmetics.CAT_FILTER=Filtro de Gato
+cosmetics.RABBIT_FILTER=Filtro de Coelho
+cosmetics.MONOCLE=Monóculo
+cosmetics.TIKI_MASK=Máscara Tiki
+cosmetics.BANANA_OUTFIT=Traje de Banana
+cosmetics.ENDER_DRAGON_OUTFIT=Traje de Dragão do End
+cosmetics.SPACE_SUIT=Traje Espacial
+cosmetics.GOATEE=Barbicha
+cosmetics.OLD_DUTCH_BEARD=Barba Velha Holandesa
+cosmetics.SOUL_PATCH=Barbicha
+cosmetics.MUTTON_CHOPS_BEARD=Costeletas
+cosmetics.A_LA_SOUVAROV_BEARD=Barba À La Souvarov
+cosmetics.PHARAOH_HEADDRESS=Touca de Faraó
+cosmetics.VAN_DYKE_BEARD=Barba Van Dyke
+cosmetics.SHORT_BOXED_BEARD=Barba Curta e Bem Definida
+cosmetics.SPARROW_BEARD=Barba de Pirata
+cosmetics.FRANZ_JOSEF_BEARD=Barba Franz Josef
+cosmetics.HOLLYWOOD_BEARD=Barba de Hollywood
+cosmetics.FU_MANCHU_MUSTACHE=Bigode Fu Manchu
+cosmetics.LONG_BOXED_BEARD=Barba Longa e Bem Definida
+cosmetics.PHARAOH_BEARD=Barba de Faraó
+cosmetics.SAMURAI_MASK_HELMET=Máscara de Samurai
+cosmetics.SAMURAI_HELMET=Capacete de Samurai
+cosmetics.DRAGON_TAIL=Cauda de Dragão
+cosmetics.CHEF_HAT=Chapéu de Chef
+cosmetics.FIREFIGHTER_HELMET=Capacete de Bombeiro
+cosmetics.SODA_HAT=Chapéu com Latas de Refrigerante
+cosmetics.SOMBRERO=Sombrero
+cosmetics.CLOWN_MASK=Máscara de Palhaço
+cosmetics.ARMY_HELMET=Capacete do Exército
+cosmetics.PILOT_HAT=Chapéu de Piloto
+cosmetics.PIRATE_HAT=Chapéu de Pirata
+cosmetics.STEAMPUNK_HAT=Chapéu Steampunk
+cosmetics.RASTA_WIG=Perruca Rastafari
+cosmetics.GAS_MASK=Máscara de Gás
+cosmetic.BIONIC_CYBORG_FACE=Biónico
+cosmetic.BITZEL_SOCK_MONKEY.partnername=Bitzel
+cosmetic.HAPICO_FROG.partnername=Hapico
+cosmetic.BIFFLE_MONOCLE.partnername=Biffle
+cosmetic.HENRY_COSMETIC.partnername=Henwy
+cosmetic.JEROME_BEAR_ONESIE.partnername=JeromeASF
+cosmetic.SSUNDEE_FOOT_ONESIE.partnername=SSundee
+cosmetic.SIGILS_STARTER_KIT.partnername=Sigils
+cosmetic.MEFS_TACO_WINGS.partnername=Mefs
+cosmetic.MICHAELMCCHIL_ALESIA_BACKPACK.partnername=Michaelmcchill
+cosmetic.KRINIOS_KEY_WINGS.partnername=Krinios
+
+connectionmanager.friends.EXISTING_REQUEST_IS_PENDING=Você já enviou uma solicitação de amizade para esta pessoa
+connectionmanager.friends.SENDER_TYPE_VERIFIED_SLOT_LIMIT=Você atingiu o número máximo de amigos permitidos. Remova alguns para adicionar mais.
+connectionmanager.friends.TARGET_TYPE_VERIFIED_SLOT_LIMIT=Esta pessoa atingiu o número máximo de amigos permitidos
+connectionmanager.friends.NO_PENDING_REQUEST_TO_VERIFY=Nenhuma solicitação de amizade encontrada para aceitar
+connectionmanager.friends.VERIFIED_RELATIONSHIP_ALREADY_EXISTS=Você já é amigo desta pessoa
+connectionmanager.friends.NO_BLOCKED_RELATIONSHIP_TO_CONVERT=Ocorreu um erro ao bloquear esta pessoa
+connectionmanager.friends.SENDER_BLOCKED_TARGET=Você bloqueou esta pessoa. Desbloqueie-a para enviar uma solicitação de amizade
+connectionmanager.friends.TARGET_BLOCKED_SENDER=Esta pessoa bloqueou você
+connectionmanager.friends.SENDER_TYPE_OUTGOING_SLOT_LIMIT=Você atingiu o número máximo de solicitações de amizade pendentes. Cancele algumas antes de enviar mais
+connectionmanager.friends.TARGET_TYPE_INCOMING_SLOT_LIMIT=Esta pessoa tem solicitações de amizade pendentes demais
+connectionmanager.friends.TARGET_PRIVACY_SETTING_FRIEND_OF_FRIENDS=Esta pessoa só aceita solicitações de amigos em comum
+connectionmanager.friends.TARGET_PRIVACY_SETTING_NO_ONE=Esta pessoa não está aceitando solicitações de amizade no momento
+connectionmanager.friends.TARGET_NOT_EXIST=Jogador não encontrado
+
+## Configurações do mundo
+# Regras do jogo
+gamerule.announceAdvancements=Anunciar conquistas
+gamerule.announceAdvancements.description=Anunciar conquistas no chat.
+gamerule.commandBlocksEnabled=Blocos de comando habilitados
+gamerule.commandBlocksEnabled.description=Habilitar blocos de comando para executar comandos.
+gamerule.commandBlockOutput=Saída do bloco de comando
+gamerule.commandBlockOutput.description=Mostrar saída do bloco de comando para administradores no chat.
+gamerule.disableElytraMovementCheck=Desabilitar verificação de movimento da elytra
+gamerule.disableElytraMovementCheck.description=Evitar tremores da elytra desabilitando o anti-cheat.
+gamerule.disableRaids=Desabilitar invasões
+gamerule.disableRaids.description=Desabilitar invasões em vilas.
+gamerule.doDaylightCycle=Fazer ciclo do dia
+gamerule.doDaylightCycle.description=O dia avança.
+gamerule.doEntityDrops=Fazer entidades droparem
+gamerule.doEntityDrops.description=Entidades não-vivas como minecarts e molduras de itens dropam itens.
+gamerule.doFireTick=Fazer o fogo se espalhar
+gamerule.doFireTick.description=O fogo se espalha e destrói blocos.
+gamerule.doInsomnia=Fazer insônia
+gamerule.doInsomnia.description=Fantasmas aparecem à noite.
+gamerule.doImmediateRespawn=Fazer respawn imediato
+gamerule.doImmediateRespawn.description=Jogadores renascem instantaneamente sem ver a tela de morte.
+gamerule.doLimitedCrafting=Fazer artesanato limitado
+gamerule.doLimitedCrafting.description=Jogadores só podem criar receitas que desbloquearam.
+gamerule.doMobLoot=Fazer mobs droparem itens
+gamerule.doMobLoot.description=Mobs como ovelhas e zumbis dropam itens e XP.
+gamerule.doMobSpawning=Fazer mobs aparecerem
+gamerule.doMobSpawning.description=Mobs aparecem naturalmente.
+gamerule.doPatrolSpawning=Fazer patrulhas aparecerem
+gamerule.doPatrolSpawning.description=Patrulhas aparecem naturalmente.
+gamerule.doTileDrops=Fazer blocos droparem
+gamerule.doTileDrops.description=Blocos dropam itens quando destruídos.
+gamerule.doTraderSpawning=Fazer comerciantes aparecerem
+gamerule.doTraderSpawning.description=Comerciantes itinerantes podem aparecer.
+gamerule.doWeatherCycle=Fazer ciclo do tempo
+gamerule.doWeatherCycle.description=O clima muda naturalmente.
+gamerule.doWardenSpawning=Fazer warden aparecer
+gamerule.doWardenSpawning.description=Wardens podem aparecer.
+gamerule.drowningDamage=Dano por afogamento
+gamerule.drowningDamage.description=Jogadores sofrem dano por afogamento.
+gamerule.fallDamage=Dano por queda
+gamerule.fallDamage.description=Jogadores sofrem dano por queda.
+gamerule.fireDamage=Dano por fogo
+gamerule.fireDamage.description=Jogadores sofrem dano por fogo e lava.
+gamerule.forgiveDeadPlayers=Perdoar jogadores mortos
+gamerule.forgiveDeadPlayers.description=Mobs neutros irritados como Endermen e abelhas param de ficar irritados quando o jogador morre.
+gamerule.freezeDamage=Dano por congelamento
+gamerule.freezeDamage.description=Jogadores sofrem dano por congelamento na neve fofa.
+gamerule.functionCommandLimit=Limite de comandos de função
+gamerule.functionCommandLimit.description=Limite de comandos que /function pode executar.
+gamerule.keepInventory=Manter inventário
+gamerule.keepInventory.description=Jogadores mantêm seu inventário ao morrer.
+gamerule.logAdminCommands=Registrar comandos de administrador
+gamerule.logAdminCommands.description=Incluir comandos de administrador no log do servidor.
+gamerule.maxCommandChainLength=Comprimento máximo da cadeia de comandos
+gamerule.maxCommandChainLength.description=O comprimento máximo de uma cadeia de comandos que pode ser executada por tick.
+gamerule.maxEntityCramming=Máximo de entidades comprimidas
+gamerule.maxEntityCramming.description=A quantidade de mobs que um jogador pode ficar dentro antes de sufocar.
+gamerule.mobGriefing=Destruição de mobs
+gamerule.mobGriefing.description=Mobs podem pegar itens e destruir blocos.
+gamerule.naturalRegeneration=Regeneração natural
+gamerule.naturalRegeneration.description=Jogadores regeneram saúde quando sua fome está cheia o suficiente.
+gamerule.playersSleepingPercentage=Porcentagem de jogadores dormindo
+gamerule.playersSleepingPercentage.description=A porcentagem de jogadores que deve dormir para pular a noite.
+gamerule.pvp=PvP
+gamerule.pvp.description=Jogadores podem lutar com outros jogadores.
+gamerule.randomTickSpeed=Velocidade de ticks aleatórios
+gamerule.randomTickSpeed.description=Quão rápido as plantas crescem, as folhas decaem e o fogo se espalha.
+gamerule.reducedDebugInfo=Informações de depuração reduzidas
+gamerule.reducedDebugInfo.description=Mostrar apenas informações básicas na sobreposição F3.
+gamerule.respawnBlocksExplode=Blocos de respawn explodem
+gamerule.respawnBlocksExplode.description=Impedir que camas e âncoras de respawn explodam em outras dimensões.
+gamerule.sendCommandFeedback=Enviar feedback de comando
+gamerule.sendCommandFeedback.description=Mostrar feedback de comandos no chat.
+gamerule.showBorderEffect=Mostrar efeito da borda
+gamerule.showBorderEffect.description=Mostrar um efeito indicando a localização dos blocos de borda.
+gamerule.showCoordinates=Mostrar coordenadas
+gamerule.showCoordinates.description=Mostrar coordenadas do jogador.
+gamerule.showDeathMessages=Mostrar mensagens de morte
+gamerule.showDeathMessages.description=Mensagens de morte são mostradas no chat quando um jogador morre.
+gamerule.showTags=Mostrar tags
+gamerule.showTags.description=Esconder indicadores de bloqueio de itens e informações de colocar/destruir do lore dos itens.
+gamerule.spawnRadius=Raio de spawn
+gamerule.spawnRadius.description=O raio ao redor do ponto de spawn do mundo onde os jogadores nascem.
+gamerule.spectatorsGenerateChunks=Espectadores geram chunks
+gamerule.spectatorsGenerateChunks.description=Jogadores no modo espectador geram novos chunks.
+gamerule.tntExplodes=TNT explode
+gamerule.tntExplodes.description=TNT explode quando acesa.
+gamerule.universalAnger=Raiva universal
+gamerule.universalAnger.description=Mobs neutros irritados atacam todos os jogadores, não apenas o atacante.
+gamerule.gameLoopFunction=Função de loop do jogo
+
+# Nomes das categorias
+gamerule.category.player=Jogador
+gamerule.category.mobs=Mobs
+gamerule.category.spawning=Aparição
+gamerule.category.drops=Drops
+gamerule.category.world_updates=Atualizações do mundo
+gamerule.category.chat=Chat
+gamerule.category.miscellaneous=Miscelânea
+gamerule.category.other=Outros
+gamerule.category.pinned=Fixado
