@@ -12,6 +12,16 @@
 import essential.*
 import gg.essential.gradle.util.*
 import net.fabricmc.loom.task.RemapJarTask
+import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
+
+// FIXME remove once EGT is updated
+buildscript {
+    configurations.classpath {
+        resolutionStrategy {
+            force("com.github.replaymod:remap:d6af8ab8e")
+        }
+    }
+}
 
 plugins {
     id("base")
@@ -24,16 +34,13 @@ if (version == "unspecified") {
     if ("-SNAPSHOT" !in version.toString()) version = version.toString() + "+g" + commit()
 }
 
-fun commit(): String = try {
-    val stdout = java.io.ByteArrayOutputStream()
-    exec {
+fun commit(): String =
+    providers.exec {
         commandLine("git", "rev-parse", "HEAD")
-        standardOutput = stdout
-    }
-    stdout.toString().trim().slice(0 until 10)
-} catch (e: Throwable) {
-    "unknown"
-}
+    }.standardOutput.asText.map { it.trim().slice(0 until 10) }
+        // FIXME should ideally not read this here because it makes the configuration cache less effective
+        //  but `version` doesn't yet support `Provider`: https://github.com/gradle/gradle/issues/13672
+        .get()
 
 configurePreprocessTree(file("versions"))
 
@@ -58,5 +65,14 @@ allprojects {
     tasks.withType<AbstractArchiveTask> {
         isPreserveFileTimestamps = false
         isReproducibleFileOrder = true
+    }
+}
+
+allprojects {
+    pluginManager.withPlugin("org.jetbrains.kotlin.jvm") {
+        extensions.configure<KotlinJvmProjectExtension> {
+            val (major, minor, patch) = KotlinVersion.minimal.stdlib.split(".")
+            compilerOptions.apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.fromVersion("$major.$minor"))
+        }
     }
 }

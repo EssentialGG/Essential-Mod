@@ -245,6 +245,11 @@ class ParticleSystem(
     fun hasAnythingToRender(): Boolean =
         billboardRenderPasses.isNotEmpty()
 
+    // Needed for java call in Mixin_RenderParticleSystemOfClientWorld & others, due to value class parameter 'lightOverride'
+    fun render(matrixStack: UMatrixStack, cameraPos: Vec3, cameraRot: Quaternion, particleVertexConsumerProvider: VertexConsumerProvider, cameraUuid: UUID, cameraFirstPerson: Boolean, hideParticlesInFirstPerson: Boolean, onlyRenderFromSource: UUID? = null) =
+        render(matrixStack, cameraPos, cameraRot, particleVertexConsumerProvider, cameraUuid, cameraFirstPerson,
+            hideParticlesInFirstPerson, onlyRenderFromSource, null)
+
     fun render(
         matrixStack: UMatrixStack,
         cameraPos: Vec3,
@@ -254,6 +259,7 @@ class ParticleSystem(
         cameraFirstPerson: Boolean,
         hideParticlesInFirstPerson: Boolean,
         onlyRenderFromSource: UUID? = null,
+        lightOverride: Light? = null,
     ) {
         val cameraFacing = vec3(0f, 0f, -1f).rotateBy(cameraRot)
         for ((renderPass, allParticles) in billboardRenderPasses.entries.sortedBy { it.key.material.needsSorting }) {
@@ -271,7 +277,7 @@ class ParticleSystem(
                 if (!renderPass.material.needsSorting) {
                     for (particle in particles) {
                         particle.prepareBillboard(cameraPos, cameraRot)
-                        particle.renderBillboard(matrixStack, vertexConsumer, cameraFacing, cameraUuid, cameraFirstPerson, hideParticlesInFirstPerson)
+                        particle.renderBillboard(matrixStack, vertexConsumer, cameraFacing, cameraUuid, cameraFirstPerson, hideParticlesInFirstPerson, lightOverride)
                     }
                     return@provide
                 }
@@ -301,14 +307,14 @@ class ParticleSystem(
                     // we can use a much simpler sorting when all billboards face the camera, as their distance will
                     // account for all possible overlaps
                     for (particle in particles.sortedByDescending { it.distance }) {
-                        particle.renderBillboard(matrixStack, vertexConsumer, cameraFacing, cameraUuid, cameraFirstPerson, hideParticlesInFirstPerson)
+                        particle.renderBillboard(matrixStack, vertexConsumer, cameraFacing, cameraUuid, cameraFirstPerson, hideParticlesInFirstPerson, lightOverride)
                     }
                     return@provide
                 }
 
                 // more complex translucency sorting is required
                 for (p in translucencySortBillboardParticles(cameraFacing, cameraPos, cameraRot, particles)) {
-                    p.renderBillboard(matrixStack, vertexConsumer, cameraFacing, cameraUuid, cameraFirstPerson, hideParticlesInFirstPerson)
+                    p.renderBillboard(matrixStack, vertexConsumer, cameraFacing, cameraUuid, cameraFirstPerson, hideParticlesInFirstPerson, lightOverride)
                 }
             }
         }
@@ -1328,6 +1334,7 @@ class ParticleSystem(
             cameraUuid: UUID,
             cameraFirstPerson: Boolean,
             hideParticlesInFirstPerson: Boolean,
+            lightOverride: Light?,
         ) {
             // Abide by the particle effect visibility component for the current player.
             if (cameraUuid == emitter.sourceEntity.uuid) {
@@ -1344,7 +1351,7 @@ class ParticleSystem(
 
             val textureSize = vec2(appearance.uv.textureWidth.toFloat(), appearance.uv.textureHeight.toFloat())
             val color = components.particleAppearanceTinting?.color?.eval(molang)?.let(Color::fromVec) ?: Color.WHITE
-            val light = if (components.particleAppearanceLighting != null) {
+            val light = lightOverride ?: if (components.particleAppearanceLighting != null) {
                 emitter.system.lightProvider.query(position)
             } else {
                 Light.MAX_VALUE

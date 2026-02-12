@@ -13,5 +13,9 @@ package gg.essential.network.connectionmanager.features
 
 enum class Feature {
     COSMETIC_PURCHASE,
-    COIN_BUNDLE_PURCHASE
+    COIN_BUNDLE_PURCHASE,
+    WARDROBE,
+    SOCIAL, // blocks social features and by extension, world hosting since there is no inviting players without social features
+    MEDIA,
+    WORLD_HOSTING,
 }

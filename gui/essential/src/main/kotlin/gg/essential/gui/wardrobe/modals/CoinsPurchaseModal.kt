@@ -25,7 +25,9 @@ import gg.essential.gui.common.modal.Modal
 import gg.essential.gui.elementa.state.v2.*
 import gg.essential.gui.elementa.state.v2.combinators.*
 import gg.essential.gui.layoutdsl.*
+import gg.essential.gui.modals.ensurePrerequisites
 import gg.essential.gui.overlay.ModalManager
+import gg.essential.gui.overlay.launchModalFlow
 import gg.essential.gui.wardrobe.WardrobeState
 import gg.essential.gui.wardrobe.components.coinPackImage
 import gg.essential.gui.wardrobe.components.coinsText
@@ -38,7 +40,7 @@ import gg.essential.util.GuiEssentialPlatform.Companion.platform
 import gg.essential.vigilance.utils.onLeftClick
 import kotlin.math.max
 
-class CoinsPurchaseModal private constructor(
+class CoinsPurchaseModal private constructor( // private constructor to ensure checking of prerequisites
     modalManager: ModalManager,
     val state: WardrobeState,
     coinsNeeded: Int? = null,
@@ -235,15 +237,11 @@ class CoinsPurchaseModal private constructor(
 
     companion object {
         fun open(state: WardrobeState, coinsNeeded: Int? = null) {
-            platform.pushModal { create(it, state, coinsNeeded) }
-        }
-
-        fun create(modalManager: ModalManager, state: WardrobeState, coinsNeeded: Int? = null): Modal {
-            return if (platform.disabledFeaturesManager.isFeatureDisabled(Feature.COIN_BUNDLE_PURCHASE)) {
-                StoreDisabledModal(modalManager)
-            } else {
-                CoinsPurchaseModal(modalManager, state, coinsNeeded)
+            launchModalFlow(platform.createModalManager()) {
+                ensurePrerequisites(feature = Feature.COIN_BUNDLE_PURCHASE)
+                awaitModal { CoinsPurchaseModal(modalManager, state, coinsNeeded) }
             }
         }
+
     }
 }

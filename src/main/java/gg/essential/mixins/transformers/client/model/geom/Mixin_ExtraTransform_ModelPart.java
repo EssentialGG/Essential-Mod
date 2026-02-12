@@ -53,12 +53,7 @@ public abstract class Mixin_ExtraTransform_ModelPart implements ExtraTransformHo
 
     //#if MC>=11600
     //$$ @SuppressWarnings("ConstantConditions") // intellij doesn't understand Ext interfaces
-    //$$ // FIXME remap bug: should be able to recognize that this becomes ambiguous and qualify it automatically
-    //#if MC>=11900
-    //$$ @Inject(method = "rotate(Lnet/minecraft/client/util/math/MatrixStack;)V", at = @At("RETURN"))
-    //#else
     //$$ @Inject(method = "translateRotate", at = @At("RETURN"))
-    //#endif
     //$$ private void applyExtraTransformToRender(MatrixStack matrixStack, CallbackInfo ci) {
     //$$     Mat4 extra = this.extra;
     //$$     if (extra != null) {

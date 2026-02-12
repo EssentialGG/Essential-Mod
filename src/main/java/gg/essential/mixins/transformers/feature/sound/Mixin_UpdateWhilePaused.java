@@ -134,12 +134,14 @@ public abstract class Mixin_UpdateWhilePaused {
         }
     }
 
+    //#if MC >= 1.12
     @Group(name = "updateEssentialSounds", min = 1)
     @Inject(method = "setListener(Lnet/minecraft/entity/Entity;F)V", at = @At("RETURN"), remap = false)
     @Dynamic("https://github.com/MinecraftForge/MinecraftForge/commit/6f642ba6ceb1978abdd5d63a5e4227f4cd1afa23")
     private void updateEssentialSounds(Entity player, float partialTicks, CallbackInfo ci) {
         updateEssentialSounds(ci);
     }
+    //#endif
 
     // Hack to get access to `sndSystem` which has package private field type
     @Unique private SoundSystem soundSystem;

@@ -41,8 +41,7 @@ import gg.essential.gui.common.bindEffect
 import gg.essential.gui.elementa.state.v2.ListState
 import gg.essential.gui.elementa.state.v2.State
 import gg.essential.gui.elementa.state.v2.combinators.and
-import gg.essential.gui.elementa.state.v2.combinators.component1
-import gg.essential.gui.elementa.state.v2.combinators.component2
+import gg.essential.gui.elementa.state.v2.combinators.letState
 import gg.essential.gui.elementa.state.v2.combinators.map
 import gg.essential.gui.elementa.state.v2.combinators.not
 import gg.essential.gui.elementa.state.v2.combinators.or
@@ -52,7 +51,6 @@ import gg.essential.gui.elementa.state.v2.memo
 import gg.essential.gui.elementa.state.v2.mutableStateOf
 import gg.essential.gui.elementa.state.v2.onChange
 import gg.essential.gui.elementa.state.v2.stateBy
-import gg.essential.gui.elementa.state.v2.stateDelegatingTo
 import gg.essential.gui.elementa.state.v2.stateOf
 import gg.essential.gui.elementa.state.v2.toListState
 import gg.essential.gui.elementa.state.v2.toV1
@@ -68,9 +66,9 @@ import gg.essential.gui.wardrobe.EmoteWheelPage
 import gg.essential.gui.wardrobe.Item
 import gg.essential.gui.wardrobe.WardrobeCategory
 import gg.essential.gui.wardrobe.WardrobeState
+import gg.essential.gui.modals.FeatureDisabledModal
 import gg.essential.gui.wardrobe.modals.CoinsPurchaseModal
 import gg.essential.gui.wardrobe.modals.PurchaseConfirmationModal
-import gg.essential.gui.wardrobe.modals.StoreDisabledModal
 import gg.essential.gui.wardrobe.purchaseEquippedCosmetics
 import gg.essential.gui.wardrobe.purchaseSelectedBundle
 import gg.essential.gui.wardrobe.purchaseSelectedEmote
@@ -387,7 +385,7 @@ fun LayoutScope.previewWindow(state: WardrobeState, modifier: Modifier, bottomDi
                 }
             }
 
-            val (cosmetics, settings) = memo {
+            val cosmeticsAndSettings = memo {
                 val selectedBundle = state.selectedBundle()
                 val selectedEmote = state.selectedEmote()
                 val equippedOutfit = state.equippedOutfitItem()
@@ -404,6 +402,8 @@ fun LayoutScope.previewWindow(state: WardrobeState, modifier: Modifier, bottomDi
                     .sortedBy { WardrobeCategory.slotOrder.indexOf(it.key) }
                     .map { it.value } to settings.mapValues { it.value.filterIsInstance<CosmeticSetting.Variant>() }
             }
+            val cosmetics = cosmeticsAndSettings.letState { it.first }
+            val settings = cosmeticsAndSettings.letState { it.second }
 
             if_(cosmetics.map { it.isNotEmpty() }) {
                 column(Modifier.fillHeight(padding = bundleListPadding).alignHorizontal(Alignment.End(bundleListPadding))) {
@@ -488,7 +488,8 @@ private fun LayoutScope.playerPreviewInner(state: WardrobeState, modifier: Modif
         )
 
         val dragging = mutableStateOf(false)
-        val hovered = stateDelegatingTo(stateOf<Cosmetic?>(null))
+        val hoveredSource = mutableStateOf(stateOf<Cosmetic?>(null))
+        val hovered = hoveredSource.flatten()
 
         val outlineCosmetic = stateBy {
             listOfNotNull(state.editingCosmetic()?.cosmetic, hovered().takeIf { !dragging() })
@@ -497,7 +498,7 @@ private fun LayoutScope.playerPreviewInner(state: WardrobeState, modifier: Modif
         val cosmeticHoverEffect = CosmeticHoverOutlineEffect(EssentialPalette.GUI_BACKGROUND, outlineCosmetic)
         bindEffect(cosmeticHoverEffect, state.selectedBundle.map { it == null })
 
-        hovered.rebind(cosmeticHoverEffect.hoveredCosmetic)
+        hoveredSource.set(cosmeticHoverEffect.hoveredCosmetic)
 
         val onLeftClick = onLeftClick@{
             if (state.selectedBundle.get() != null) {
@@ -611,7 +612,7 @@ private fun LayoutScope.purchaseBannerContentOld(state: WardrobeState, modifier:
         }.onLeftClick { click ->
             handleClick(click) {
                 if (platform.disabledFeaturesManager.isFeatureDisabled(Feature.COSMETIC_PURCHASE)) {
-                    platform.pushModal { StoreDisabledModal(it) }
+                    platform.pushModal { FeatureDisabledModal.store(it) }
                     return@handleClick
                 }
 

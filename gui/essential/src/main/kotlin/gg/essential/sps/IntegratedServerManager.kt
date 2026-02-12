@@ -47,6 +47,8 @@ interface IntegratedServerManager {
     /** [connectedPlayers] excluding the host */
     val connectedGuests: ListState<UUID>
 
+    val maxPlayers: State<Int?>
+
     /**
      * The JSON which the server will return as its server list status when pinged.
      * May be `null` if the server hasn't prepared a response yet.

@@ -26,14 +26,12 @@ import gg.essential.util.colored
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.lang.reflect.Type
-import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.*
-import java.util.concurrent.CompletableFuture
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.write
@@ -42,8 +40,6 @@ import kotlin.io.path.exists
 
 /** Provides sessions from Microsoft accounts (persisted in the given file, independent of official launcher). */
 class MicrosoftAccountSessionFactory(private val savePath: Path, oldSavePath: Path) : ManagedSessionFactory {
-
-    var latestAuthService: MicrosoftUserAuthentication? = null
 
     private val gson = GsonBuilder().apply {
         registerTypeAdapter(GameProfile::class.java, GameProfileSerializer())
@@ -129,11 +125,10 @@ class MicrosoftAccountSessionFactory(private val savePath: Path, oldSavePath: Pa
         // TODO: maybe log out instead of just letting it expire, then again, it should be fine to just expire
     }
 
-    fun login(future: CompletableFuture<URI>): USession {
+    fun login(oAuthData: MicrosoftUserAuthentication.OAuthData): USession {
         val userAuthService = MicrosoftUserAuthentication()
-        latestAuthService = userAuthService
 
-        val (profile, token) = userAuthService.logIn(future)
+        val (profile, token) = userAuthService.logInViaOAuth(oAuthData)
         val account = MicrosoftAccount(
             profile.id,
             profile.name,
@@ -154,7 +149,7 @@ class MicrosoftAccountSessionFactory(private val savePath: Path, oldSavePath: Pa
         val account = state.accounts.find { it.uuid == session.uuid } ?: throw InvalidCredentialsException()
 
         try {
-            val (profile, token) = account.auth.logIn(CompletableFuture.completedFuture(null), forceRefresh = force)
+            val (profile, token) = account.auth.logIn(forceRefresh = force)
             account.name = profile.name
             account.accessToken = token
         } finally {

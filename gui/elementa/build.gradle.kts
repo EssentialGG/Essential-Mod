@@ -24,6 +24,10 @@ dependencies {
     implementation(kotlin("stdlib-jdk8", KotlinVersion.minimal.stdlib))
     implementation(project(":feature-flags"))
     api(project(":elementa:layoutdsl"))
+
+    api(libs.commonmark)
+    api(libs.commonmark.ext.gfm.strikethrough)
+    api(libs.commonmark.ext.ins)
 }
 
 // We need to use the compatibility mode on old versions because we used to use the old Kotlin defaults for those
@@ -31,9 +35,4 @@ dependencies {
 tasks.compileKotlin.setJvmDefault("all-compatibility")
 
 kotlin.jvmToolchain(8)
-
-tasks.compileKotlin {
-    kotlinOptions {
-        moduleName = "essential" + project.path.replace(':', '-').lowercase()
-    }
-}
+kotlin.compilerOptions.moduleName.set("essential" + project.path.replace(':', '-').lowercase())

@@ -83,11 +83,7 @@ class EssentialAssetResourcePack(private val assetLoader: AssetLoader) : IResour
             //#endif
 
         //#if MC>=11903
-        //#if FABRIC==1
         //$$ return InputSupplier {
-        //#else
-        //$$ return IoSupplier {
-        //#endif
         //$$     future.join().inputStream()
         //$$ }
         //#else

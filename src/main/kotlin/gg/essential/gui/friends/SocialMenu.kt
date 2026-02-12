@@ -48,7 +48,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.*
 
-class SocialMenu @JvmOverloads constructor(
+class SocialMenu(
     channelIdToOpen: Long? = null
 ): InternalEssentialGUI(
     ElementaVersion.V6,

@@ -28,10 +28,11 @@ import gg.essential.gui.elementa.state.v2.combinators.map
 import gg.essential.gui.elementa.state.v2.stateOf
 import gg.essential.gui.elementa.state.v2.toListState
 import gg.essential.gui.layoutdsl.layout
+import gg.essential.gui.modals.ensurePrerequisites
 import gg.essential.gui.notification.Notifications
 import gg.essential.gui.notification.error
+import gg.essential.gui.overlay.launchModalFlow
 import gg.essential.gui.wardrobe.modals.PurchaseConfirmationModal
-import gg.essential.gui.wardrobe.modals.StoreDisabledModal
 import gg.essential.mod.cosmetics.CosmeticOutfit
 import gg.essential.network.connectionmanager.features.Feature
 import gg.essential.util.GuiEssentialPlatform.Companion.platform
@@ -139,15 +140,14 @@ fun WardrobeState.giftCosmeticOrEmote(item: Item.CosmeticOrEmote, giftTo: UUID, 
 }
 
 fun WardrobeState.openPurchaseItemModal(item: Item, primaryAction: () -> Unit) {
-    if (platform.disabledFeaturesManager.isFeatureDisabled(Feature.COSMETIC_PURCHASE)) {
-        platform.pushModal { StoreDisabledModal(it) }
-        return
-    }
+    launchModalFlow(platform.createModalManager()) {
+        ensurePrerequisites(feature = Feature.COSMETIC_PURCHASE)
 
-    if (item is Item.Bundle) {
-        platform.pushModal { PurchaseConfirmationModal.forBundle(it, item, this, primaryAction) }
-    } else if (item is Item.CosmeticOrEmote) {
-        platform.pushModal { PurchaseConfirmationModal.forItem(it, item, this, primaryAction) }
+        if (item is Item.Bundle) {
+            awaitModal<Unit> { PurchaseConfirmationModal.forBundle(modalManager, item, this@openPurchaseItemModal, primaryAction) }
+        } else if (item is Item.CosmeticOrEmote) {
+            awaitModal<Unit> { PurchaseConfirmationModal.forItem(modalManager, item, this@openPurchaseItemModal, primaryAction) }
+        }
     }
 }
 

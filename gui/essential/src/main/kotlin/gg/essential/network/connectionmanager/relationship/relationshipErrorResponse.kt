@@ -86,5 +86,4 @@ fun RelationshipErrorResponse.showToast(uuid: UUID, name: String) = when (this) 
         Notifications.error("Friend request failed", "") {
             markdownBody("${name.replace("_", "\\_").colored(EssentialPalette.TEXT_HIGHLIGHT)} is temporarily suspended.")
         }
-    else -> throw AssertionError() // FIXME: Workaround for compiler bug fixed in Kotlin 2.0
 }

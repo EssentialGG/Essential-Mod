@@ -48,7 +48,7 @@ class CosmeticCategoryConfiguration(
             // Update cosmetics to use the new category
             cosmeticsDataWithChanges.cosmetics.get().forEach { cosmetic ->
                 val order = cosmetic.categories[category.id] ?: return@forEach
-                cosmeticsDataWithChanges.updateCosmetic(cosmetic.id, cosmetic.copy(categories = cosmetic.categories - category.id + (newID to order)))
+                cosmeticsDataWithChanges.updateCosmetic(cosmetic.id, cosmetic.copy(storeInfo = cosmetic.storeInfo.copy(categories = cosmetic.categories - category.id + (newID to order))))
             }
 
             // Delete the old category
@@ -143,7 +143,7 @@ class CosmeticCategoryConfiguration(
         }.onPrimaryAction {
             cosmeticsDataWithChanges.cosmetics.get().forEach { cosmetic ->
                 if (!cosmetic.categories.containsKey(categoryId)) return@forEach
-                cosmeticsDataWithChanges.updateCosmetic(cosmetic.id, cosmetic.copy(categories = cosmetic.categories - categoryId))
+                cosmeticsDataWithChanges.updateCosmetic(cosmetic.id, cosmetic.copy(storeInfo = cosmetic.storeInfo.copy(categories = cosmetic.categories - categoryId)))
             }
             cosmeticsDataWithChanges.unregisterCategory(categoryId)
             state.currentlyEditingCosmeticCategoryId.set(null)

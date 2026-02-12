@@ -15,6 +15,7 @@ import com.google.common.collect.ImmutableSet;
 import com.sparkuniverse.toolbox.chat.model.Message;
 import gg.essential.api.commands.*;
 import gg.essential.commands.engine.EssentialFriend;
+import gg.essential.config.EssentialConfig;
 import gg.essential.connectionmanager.common.packet.Packet;
 import gg.essential.connectionmanager.common.packet.chat.ServerChatChannelMessagePacket;
 import gg.essential.util.MinecraftUtils;
@@ -59,7 +60,7 @@ public class CommandMessage extends Command {
         public void accept(Optional<Packet> packet) {
             if (packet.isPresent() && packet.get() instanceof ServerChatChannelMessagePacket) {
                 Message messageObj = CollectionsKt.first(Arrays.asList(((ServerChatChannelMessagePacket) packet.get()).getMessages()));
-                onConfirm("§dTo " + friend.getIgn() + "§r: " + messageObj.getContents());
+                onConfirm("§dTo " + friend.getIgn() + "§r: " + messageObj.getContents(EssentialConfig.INSTANCE.getChatFilterWithSource().getUntracked().getFirst()));
             } else {
                 onConfirm("Error!");
             }

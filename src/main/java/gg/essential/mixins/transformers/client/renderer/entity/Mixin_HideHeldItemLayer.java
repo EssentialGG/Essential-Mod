@@ -34,9 +34,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(LayerHeldItem.class)
 public class Mixin_HideHeldItemLayer {
 
-
     //#if MC>=11600
-    //$$ private static final String RENDER_LAYER = "render";
+    //$$ private static final String RENDER_LAYER = "render(Lcom/mojang/blaze3d/matrix/MatrixStack;Lnet/minecraft/client/renderer/IRenderTypeBuffer;ILnet/minecraft/entity/LivingEntity;FFFFFF)V";
     //#else
     private static final String RENDER_LAYER = "doRenderLayer";
     //#endif

@@ -65,6 +65,7 @@ import gg.essential.gui.notification.Notifications
 import gg.essential.gui.notification.error
 import gg.essential.gui.wardrobe.Wardrobe
 import gg.essential.gui.wardrobe.WardrobeCategory
+import gg.essential.mixins.impl.client.gui.EssentialScreenMayAllowPlayerInput
 import gg.essential.mod.cosmetics.CosmeticSlot
 import gg.essential.mod.cosmetics.settings.CosmeticProperty
 import gg.essential.mod.cosmetics.settings.CosmeticSetting
@@ -105,7 +106,7 @@ class EmoteWheel : WindowScreen(
     version = ElementaVersion.V10,
     drawDefaultBackground = false,
     restoreCurrentGuiOnClose = false,
-) {
+), EssentialScreenMayAllowPlayerInput {
     private val essential = Essential.getInstance()
     private val cosmeticManager = essential.connectionManager.cosmeticsManager
     private val emoteWheelManager = essential.connectionManager.emoteWheelManager
@@ -135,7 +136,7 @@ class EmoteWheel : WindowScreen(
     init {
         // Allow the player to move while the emote wheel is open
         //#if MC>=12000
-        //$$ // Now handled by Mixin_AllowMovementDuringEmoteWheel
+        //$$ // Now handled by Mixin_AllowMovementDuringScreens
         //#elseif MC>=11602
         //$$ this.passEvents = true
         //#else
@@ -256,6 +257,7 @@ class EmoteWheel : WindowScreen(
         return false
     }
 
+    override fun allowsPlayerInput(): Boolean = true
 
     /**
      * Handles the delay between an emote starting and ending, unequipping the current emote after the delay.

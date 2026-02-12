@@ -1,4 +1,5 @@
 *   eol=lf
+*.bat   text eol=crlf
 *.der   binary
 *.otf	binary
 *.ttf	binary

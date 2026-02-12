@@ -131,7 +131,6 @@ private fun diagnoseCosmeticGenerally(cosmetic: Cosmetic): List<Diagnostic> {
                 is CosmeticProperty.IdIsTarget -> {
                     // TODO could check if target exists, but we don't currently have an good way to get all cosmetics here
                 }
-                else -> throw AssertionError("Type ${property.javaClass} should implement one of the above interfaces.")
             }
         }
     }

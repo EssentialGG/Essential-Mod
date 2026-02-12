@@ -114,30 +114,34 @@ fun InfraCosmeticOutfit.toMod() = CosmeticOutfit(
     name,
     skinTexture?.let { Skin.fromInfra(it) },
     skinId,
-    equippedCosmetics.mapKeys { it.key.toMod() }.toMutableMap(),
-    cosmeticSettings.toModSetting().toMutableMap(),
+    equippedCosmetics.mapKeys { it.key.toMod() },
+    cosmeticSettings.toModSetting(),
     favoritedAt?.toInstant(),
     createdAt.toInstant(),
 )
 
 fun InfraCosmetic.toMod(type: CosmeticType, settings: List<CosmeticProperty>): Cosmetic {
     return Cosmetic(
-        id,
-        type,
-        tier.toMod(),
-        displayNames,
-        assetsMap.mapValues { it.value.toMod() },
-        settings,
-        storePackageId,
-        priceCoins?.let { mapOf("coins" to it.toDouble()) } ?: mapOf(),
-        tags,
-        createdAt.toInstant(),
-        availableAfter?.toInstant(),
-        availableUntil?.toInstant(),
-        showTimerAfter?.toInstant(),
-        skinLayers.toMod(),
-        categories,
-        defaultSortWeight ?: 20,
+        CosmeticBase(
+            id,
+            type,
+            tier.toMod(),
+            displayNames,
+            assetsMap.mapValues { it.value.toMod() },
+            settings,
+        ),
+        CosmeticStoreInfo(
+            storePackageId,
+            priceCoins?.let { mapOf("coins" to it.toDouble()) } ?: mapOf(),
+            tags,
+            createdAt.toInstant(),
+            availableAfter?.toInstant(),
+            availableUntil?.toInstant(),
+            showTimerAfter?.toInstant(),
+            skinLayers.toMod(),
+            categories,
+            defaultSortWeight ?: 20,
+        ),
     )
 }
 

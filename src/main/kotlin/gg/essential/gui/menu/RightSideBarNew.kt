@@ -20,7 +20,6 @@ import gg.essential.elementa.dsl.constrain
 import gg.essential.elementa.dsl.pixels
 import gg.essential.elementa.state.BasicState
 import gg.essential.gui.EssentialPalette
-import gg.essential.gui.about.AboutMenu
 import gg.essential.gui.common.EssentialTooltip
 import gg.essential.gui.common.IconFlag
 import gg.essential.gui.common.MenuButton
@@ -28,7 +27,6 @@ import gg.essential.gui.common.TextFlag
 import gg.essential.gui.common.state
 import gg.essential.gui.elementa.state.v2.State
 import gg.essential.gui.elementa.state.v2.combinators.map
-import gg.essential.gui.elementa.state.v2.combinators.not
 import gg.essential.gui.elementa.state.v2.combinators.zip
 import gg.essential.gui.elementa.state.v2.memo
 import gg.essential.gui.elementa.state.v2.stateOf
@@ -75,6 +73,7 @@ class RightSideBarNew(
     private val isHostingWorld = pollingStateV2 {
         connectionManager.spsManager.localSession != null
     }
+
     // Host button is being removed from the singleplayer menu for now until the new panel is released
     private val hostable = menuType == PauseMenuDisplay.MenuType.MAIN
             // || menuType == PauseMenuDisplay.MenuType.SINGLEPLAYER
@@ -155,7 +154,7 @@ class RightSideBarNew(
                     MenuButton.Alignment.CENTER,
                     stateOf("BETA"),
                 ).onLeftClick {
-                    GuiUtil.openScreen { AboutMenu() }
+                    GuiUtil.openScreen { McEssentialConfig.gui() }
                 }(Modifier.hoverTooltip("Branch: ${VersionData.essentialBranch}", position = EssentialTooltip.Position.ABOVE)
                     .hoverScope())
             } `else` {
@@ -181,7 +180,7 @@ class RightSideBarNew(
 
     private fun LayoutScope.worldSettingsButton() {
         mountWithProxy("world_host",) {
-            if_({ hostableOrHasInviteButton() && worldSettingsVisible()}) {
+            if_({ worldSettingsVisible()}) {
                 MenuButton {
                     GuiUtil.openScreen { WorldShareSettingsGui() }
                 }.constrain {
@@ -197,26 +196,33 @@ class RightSideBarNew(
         }
     }
 
+    private fun LayoutScope.inviteButton() {
+        MenuButton("Invite", textAlignment = MenuButton.Alignment.LEFT) {
+            hostOrInviteButtonPressed()
+        }.constrain {
+            width = BUTTON_WIDTH.pixels
+            height = 20.pixels
+        }.setIcon(EssentialPalette.ENVELOPE_9X7.state(), rightAligned = true, xOffset = -1f)
+            .bindCollapsed(isMinimalV1, 20f)(Modifier.buttonTooltip("Invite"))
+    }
+
+    private fun LayoutScope.hostButton() {
+        MenuButton("Host", textAlignment = MenuButton.Alignment.LEFT) {
+            hostOrInviteButtonPressed()
+        }.constrain {
+            width = BUTTON_WIDTH.pixels
+            height = 20.pixels
+        }.setIcon(EssentialPalette.HOST_5X.state(), rightAligned = true, xOffset = -3f, yOffset = -1f)
+            .bindCollapsed(isMinimalV1, 20f)(Modifier.buttonTooltip("Host"))
+    }
 
     private fun LayoutScope.inviteOrHostButton() {
         mountWithProxy("invite_host") {
             if_({ hostableOrHasInviteButton() && hasInviteButton() }) {
-                MenuButton("Invite", textAlignment = MenuButton.Alignment.LEFT) {
-                    hostOrInviteButtonPressed()
-                }.constrain {
-                    width = BUTTON_WIDTH.pixels
-                    height = 20.pixels
-                }.setIcon(EssentialPalette.ENVELOPE_9X7.state(), rightAligned = true, xOffset = -1f)
-                    .bindCollapsed(isMinimalV1, 20f)(Modifier.buttonTooltip("Invite"))
+                inviteButton()
             } `else` {
                 if_(hostableOrHasInviteButton) {
-                    MenuButton("Host", textAlignment = MenuButton.Alignment.LEFT) {
-                        hostOrInviteButtonPressed()
-                    }.constrain {
-                        width = BUTTON_WIDTH.pixels
-                        height = 20.pixels
-                    }.setIcon(EssentialPalette.HOST_5X.state(), rightAligned = true, xOffset = -3f, yOffset = -1f)
-                        .bindCollapsed(isMinimalV1, 20f)(Modifier.buttonTooltip("Host"))
+                    hostButton()
                 } `else` {
                     buttonPlaceholder()
                 }

@@ -13,51 +13,51 @@ package gg.essential.util;
 
 public class BuildInfo {
     public static final int TARGET_MC_VERSION =
-        //#if MC==10809
+        //#if MC == 1.8.9
         //$$ 10809;
-        //#elseif MC==11202
+        //#elseif MC == 1.12.2
         11202;
-        //#elseif MC==11602
+        //#elseif MC == 1.16.2
         //$$ 11602;
-        //#elseif MC==11701
+        //#elseif MC == 1.17.1
         //$$ 11701;
-        //#elseif MC==11801
+        //#elseif MC == 1.18.1
         //$$ 11801;
-        //#elseif MC==11802
+        //#elseif MC == 1.18.2
         //$$ 11802;
-        //#elseif MC==11900
+        //#elseif MC == 1.19
         //$$ 11900;
-        //#elseif MC==11902
+        //#elseif MC == 1.19.2
         //$$ 11902;
-        //#elseif MC==11903
+        //#elseif MC == 1.19.3
         //$$ 11903;
-        //#elseif MC==11904
+        //#elseif MC == 1.19.4
         //$$ 11904;
-        //#elseif MC==12000
+        //#elseif MC == 1.20
         //$$ 12000;
-        //#elseif MC==12001
+        //#elseif MC == 1.20.1
         //$$ 12001;
-        //#elseif MC==12002
+        //#elseif MC == 1.20.2
         //$$ 12002;
-        //#elseif MC==12004
+        //#elseif MC == 1.20.4
         //$$ 12004;
-        //#elseif MC==12006
+        //#elseif MC == 1.20.6
         //$$ 12006;
-        //#elseif MC==12101
+        //#elseif MC == 1.21.1
         //$$ 12101;
-        //#elseif MC==12103
+        //#elseif MC == 1.21.3
         //$$ 12103;
-        //#elseif MC==12104
+        //#elseif MC == 1.21.4
         //$$ 12104;
-        //#elseif MC==12105
+        //#elseif MC == 1.21.5
         //$$ 12105;
-        //#elseif MC==12106
+        //#elseif MC == 1.21.6
         //$$ 12106;
-        //#elseif MC==12107
+        //#elseif MC == 1.21.7
         //$$ 12107;
-        //#elseif MC==12109
+        //#elseif MC == 1.21.9
         //$$ 12109;
-        //#elseif MC==12111
+        //#elseif MC == 1.21.11
         //$$ 12111;
         //#else
         //$$ ADD_CASE_FOR_NEW_VERSION_TO_ABOVE_LIST;

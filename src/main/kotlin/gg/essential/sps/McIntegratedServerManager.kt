@@ -71,6 +71,7 @@ class McIntegratedServerManager(val server: IntegratedServer) : IntegratedServer
     override val serverPort: MutableState<Int?> = mutableStateOf(null)
     override val thirdPartyVoicePort: MutableState<Int?> = mutableStateOf(null)
     override val connectedPlayers: MutableListState<UUID> = mutableListStateOf()
+    override val maxPlayers: MutableState<Int?> = mutableStateOf(null)
 
     private val hostUuid = USession.activeNow().uuid
     override val connectedGuests: ListState<UUID>
@@ -177,6 +178,7 @@ class McIntegratedServerManager(val server: IntegratedServer) : IntegratedServer
 
                         serverPort.set(port)
                         thirdPartyVoicePort.set(voicePort)
+                        maxPlayers.set(server.maxPlayers)
                     }
                 }
             }

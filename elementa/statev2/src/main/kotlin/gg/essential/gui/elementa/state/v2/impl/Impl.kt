@@ -12,8 +12,6 @@
 package gg.essential.gui.elementa.state.v2.impl
 
 import gg.essential.elementa.state.v2.ReferenceHolder
-import gg.essential.gui.elementa.state.v2.DelegatingMutableState
-import gg.essential.gui.elementa.state.v2.DelegatingState
 import gg.essential.gui.elementa.state.v2.MutableState
 import gg.essential.gui.elementa.state.v2.Observer
 import gg.essential.gui.elementa.state.v2.ReferenceHolderImpl
@@ -24,23 +22,6 @@ internal interface Impl {
     fun <T> mutableState(value: T): MutableState<T>
     fun <T> memo(func: Observer.() -> T): State<T>
     fun effect(referenceHolder: ReferenceHolder, func: Observer.() -> Unit): () -> Unit
-
-    @Suppress("DEPRECATION")
-    fun <T> stateDelegatingTo(state: State<T>): DelegatingState<T> =
-        object : DelegatingState<T> {
-            private val target = mutableStateOf(state)
-            override fun rebind(newState: State<T>) = target.set(newState)
-            override fun Observer.get(): T = target()()
-        }
-
-    @Suppress("DEPRECATION")
-    fun <T> mutableStateDelegatingTo(state: MutableState<T>): DelegatingMutableState<T> =
-        object : DelegatingMutableState<T> {
-            private val target = mutableStateOf(state)
-            override fun set(mapper: (T) -> T) = target.getUntracked().set(mapper)
-            override fun rebind(newState: MutableState<T>) = target.set(newState)
-            override fun Observer.get(): T = target()()
-        }
 
     fun <T> derivedState(
         initialValue: T,

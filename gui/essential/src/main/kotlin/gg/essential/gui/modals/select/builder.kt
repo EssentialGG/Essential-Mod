@@ -193,13 +193,13 @@ class SelectModalBuilder<T>(
         }
     }
 
-    fun onlinePlayers(map: (UUID) -> T, block: SectionLayoutBlock<UUID> = defaultUserRow) {
-        val onlineList = filterFriendsByActivity { it !is PlayerActivity.Offline }
+    fun onlinePlayers(map: (UUID) -> T, block: SectionLayoutBlock<UUID> = defaultUserRow, filter: (ListState<UUID>) -> ListState<UUID> = { it }) {
+        val onlineList = filter(filterFriendsByActivity { it !is PlayerActivity.Offline })
         users("Online", map, onlineList, block)
     }
 
-    fun offlinePlayers(map: (UUID) -> T, block: SectionLayoutBlock<UUID> = defaultUserRow) {
-        val offlineList = filterFriendsByActivity { it is PlayerActivity.Offline }
+    fun offlinePlayers(map: (UUID) -> T, block: SectionLayoutBlock<UUID> = defaultUserRow, filter: (ListState<UUID>) -> ListState<UUID> = { it }) {
+        val offlineList = filter(filterFriendsByActivity { it is PlayerActivity.Offline })
         users("Offline", map, offlineList, block)
         if (whenEmpty == null) {
             emptyTextNoFriends()
@@ -256,15 +256,15 @@ class SelectModalBuilder<T>(
         block: SectionLayoutBlock<Channel> = defaultUserOrGroupRow,
     ) {
         val channelList = messageStates.getObservableChannelList().toStateV2List().mapList { list ->
-                list.filter {
-                    if (it.type == ChannelType.DIRECT_MESSAGE) {
-                        val other = it.getOtherUser()
-                        other == null || !socialStates.isSuspended(other)()
-                    } else {
-                        it.type == ChannelType.GROUP_DIRECT_MESSAGE
-                    }
+            list.filter {
+                if (it.type == ChannelType.DIRECT_MESSAGE) {
+                    val other = it.getOtherUser()
+                    other == null || !socialStates.isSuspended(other)()
+                } else {
+                    it.type == ChannelType.GROUP_DIRECT_MESSAGE
                 }
             }
+        }
         val friendsAndGroupsState =
             stateBy {
                 // Adapted from ChatTab
@@ -386,11 +386,11 @@ class SelectModalBuilder<T>(
     }
 }
 
-fun SelectModalBuilder<UUID>.onlinePlayers(block: SectionLayoutBlock<UUID> = defaultUserRow) =
-    onlinePlayers({ it }, block)
+fun SelectModalBuilder<UUID>.onlinePlayers(block: SectionLayoutBlock<UUID> = defaultUserRow, filter: (ListState<UUID>) -> ListState<UUID> = { it }) =
+    onlinePlayers({ it }, block, filter)
 
-fun SelectModalBuilder<UUID>.offlinePlayers(block: SectionLayoutBlock<UUID> = defaultUserRow) =
-    offlinePlayers({ it }, block)
+fun SelectModalBuilder<UUID>.offlinePlayers(block: SectionLayoutBlock<UUID> = defaultUserRow, filter: (ListState<UUID>) -> ListState<UUID> = { it }) =
+    offlinePlayers({ it }, block, filter)
 
 fun SelectModalBuilder<UUID>.friends(block: SectionLayoutBlock<UUID> = defaultUserRow) =
     friends({ it }, block)

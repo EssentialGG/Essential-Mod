@@ -25,6 +25,8 @@ import gg.essential.model.file.SoundDefinitionsFile
 import gg.essential.network.cosmetics.Cosmetic.Diagnostic
 import gg.essential.util.GuiEssentialPlatform.Companion.platform
 import gg.essential.util.LimitedExecutor
+import gg.essential.util.har.HttpLoggingEventListener
+import gg.essential.util.har.noConsoleLog
 import gg.essential.util.httpClient
 import gg.essential.util.image.bitmap.Bitmap
 import gg.essential.util.image.bitmap.fromOrThrow
@@ -49,6 +51,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
 import java.util.concurrent.PriorityBlockingQueue
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.time.TimeSource
 
 class AssetLoader(private val cachePath: Path) {
     companion object {
@@ -199,6 +202,11 @@ class AssetLoader(private val cachePath: Path) {
     }
 
     private inner class Download(private val assetState: AssetState) : Step(networkExecutor) {
+        private var queueTime: TimeSource.Monotonic.ValueTimeMark? = null
+        override fun onSubmit() {
+            queueTime = TimeSource.Monotonic.markNow()
+        }
+
         override fun run() {
             val bytes = try {
                 when (assetState.info.url.substringBefore(":")) {
@@ -206,7 +214,9 @@ class AssetLoader(private val cachePath: Path) {
                         val request = Request.Builder()
                             .url(assetState.info.url)
                             .header("User-Agent", "Mozilla/4.76 (Essential Asset Downloader)")
+                            .noConsoleLog()
                             .build()
+                        HttpLoggingEventListener.supplyCustomQueueTime(queueTime!!)
                         httpClient.join().newCall(request).execute().use { response ->
                             if (!response.isSuccessful) throw IOException("Unexpected response $response")
                             response.body()!!.bytes()
@@ -259,9 +269,12 @@ class AssetLoader(private val cachePath: Path) {
                 return // too late, task is already executing or done
             }
             if (priority.getAndUpdate { if (it < atLeast) atLeast else it } < atLeast) {
+                onSubmit()
                 executor.execute(PrioritizedJob(atLeast))
             }
         }
+
+        open fun onSubmit() {}
 
         private inner class PrioritizedJob(private val priority: Priority) : Runnable, Comparable<PrioritizedJob> {
             override fun compareTo(other: PrioritizedJob): Int =

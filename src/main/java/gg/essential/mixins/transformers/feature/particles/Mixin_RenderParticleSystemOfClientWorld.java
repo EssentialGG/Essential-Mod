@@ -80,8 +80,7 @@ public abstract class Mixin_RenderParticleSystemOfClientWorld {
     //$$ private static final String RENDER_PARTICLES = "renderParticles(Lcom/mojang/blaze3d/matrix/MatrixStack;Lnet/minecraft/client/renderer/IRenderTypeBuffer$Impl;Lnet/minecraft/client/renderer/LightTexture;Lnet/minecraft/client/renderer/ActiveRenderInfo;FLnet/minecraft/client/renderer/culling/ClippingHelper;)V";
     //#endif
     //#else
-    // TODO remap bug: it thinks the method reference is ambiguous because it doesn't consider the arguments our injector takes
-    //#if MC>=12105
+    //#if MC >= 1.21.4
     //$$ private static final String RENDER_PARTICLES = "renderParticles(Lnet/minecraft/client/render/Camera;FLnet/minecraft/client/render/VertexConsumerProvider$Immediate;)V";
     //#else
     private static final String RENDER_PARTICLES = "renderParticles";

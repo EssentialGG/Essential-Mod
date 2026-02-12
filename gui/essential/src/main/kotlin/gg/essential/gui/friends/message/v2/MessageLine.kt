@@ -25,9 +25,8 @@ import gg.essential.elementa.state.toConstraint
 import gg.essential.gui.EssentialPalette
 import gg.essential.gui.common.FadeEffect
 import gg.essential.gui.common.or
-import gg.essential.gui.elementa.state.v2.combinators.or
+import gg.essential.gui.elementa.state.v2.memo
 import gg.essential.gui.elementa.state.v2.mutableStateOf
-import gg.essential.gui.elementa.state.v2.stateDelegatingTo
 import gg.essential.gui.elementa.state.v2.toV1
 import gg.essential.gui.friends.message.MessageUtils
 import gg.essential.gui.util.hoveredState
@@ -138,9 +137,9 @@ abstract class MessageWrapper(
     val sendingMessageAlpha = 0.7f
 
     protected val dropdownOpen = mutableStateOf(false)
-    protected val actionButtonHovered = stateDelegatingTo(mutableStateOf(false))
+    protected val actionButtonHovered = mutableStateOf(mutableStateOf(false))
 
-    val appearHovered = actionButtonHovered or dropdownOpen
+    val appearHovered = memo { actionButtonHovered()() || dropdownOpen() }
 
     init {
         if (message.sendState == SendState.Sending) {

@@ -39,7 +39,11 @@ public class MixinGuiScreen implements EssentialPostScreenDrawHook, EssentialGui
 
     //#if MC>=11400
     //$$ @Inject(method = {
-    //$$     "init(Lnet/minecraft/client/Minecraft;II)V",
+        //#if MC >= 1.21.11
+        //$$ "init(II)V",
+        //#else
+        //$$ "init(Lnet/minecraft/client/Minecraft;II)V",
+        //#endif
         //#if MC>=11904
         //$$ "resize"
         //#endif

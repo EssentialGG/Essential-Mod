@@ -98,6 +98,7 @@ import gg.essential.util.AutoUpdate
 import gg.essential.util.GuiUtil
 import gg.essential.util.findButtonByLabel
 import gg.essential.gui.util.pollingState
+import gg.essential.network.connectionmanager.features.Feature
 import gg.essential.network.connectionmanager.serverdiscovery.NewServerDiscoveryManager
 import gg.essential.network.connectionmanager.sps.SPSSessionSource
 import gg.essential.network.connectionmanager.suspension.suspensionModal
@@ -405,7 +406,7 @@ class PauseMenuDisplay {
             callback: () -> Unit = {},
         ) {
             GuiUtil.launchModalFlow {
-                ensurePrerequisites(social = true, rules = false)
+                ensurePrerequisites(features = listOf(Feature.WORLD_HOSTING, Feature.SOCIAL), rules = false)
 
                 awaitModal {
                     object : Modal(modalManager) {

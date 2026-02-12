@@ -12,13 +12,17 @@
 package gg.essential.key;
 
 import com.google.common.collect.ImmutableMap;
+import gg.essential.Essential;
 import gg.essential.api.utils.GuiUtil;
 import gg.essential.config.EssentialConfig;
+import gg.essential.event.client.ClientTickEvent;
+import gg.essential.event.gui.GuiKeyTypedEvent;
 import gg.essential.mixins.transformers.client.options.GameOptionsAccessor;
 import gg.essential.mixins.transformers.client.options.KeyBindingAccessor;
 import gg.essential.universal.UKeyboard;
 import gg.essential.universal.UMinecraft;
 import gg.essential.util.GuiEssentialPlatform;
+import me.kbrewster.eventbus.Subscribe;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiMainMenu;
 import net.minecraft.client.settings.GameSettings;
@@ -50,6 +54,7 @@ public class EssentialKeybinding implements GuiEssentialPlatform.Keybind {
     private boolean registeredWithMinecraft = false;
     private boolean pressed = false;
     private boolean requiresEssentialFull = false;
+    private final KeyBindGuiBlocker keyBindGuiBlocker = new KeyBindGuiBlocker();
 
     //#if MC>=12109
     //$$ public EssentialKeybinding(String keyId, KeyBinding.Category category, int keyCode) {
@@ -135,6 +140,7 @@ public class EssentialKeybinding implements GuiEssentialPlatform.Keybind {
 
         if (!pressed && keyDown) {
             pressed = true;
+            keyBindGuiBlocker.block();
             if (onInitialPress != null)
                 onInitialPress.run();
         } else if (pressed && keyDown) {
@@ -150,8 +156,10 @@ public class EssentialKeybinding implements GuiEssentialPlatform.Keybind {
     private void tickWorld() {
         if (getRequiresEssentialFull() && !EssentialConfig.INSTANCE.getEssentialFull()) return;
         if (keyBinding.isPressed() && onInitialPress != null) {
+            keyBindGuiBlocker.block();
             onInitialPress.run();
         } else if (keyBinding.isKeyDown() && onRepeatedHold != null) {
+            keyBindGuiBlocker.block(); // TODO should only be needed in the initial block once this method is fixed
             onRepeatedHold.run();
         } else if (pressed && !keyBinding.isKeyDown() && onRelease != null) {
             onRelease.run();
@@ -265,4 +273,36 @@ public class EssentialKeybinding implements GuiEssentialPlatform.Keybind {
         .put("INVITE_FRIENDS", "Invite Friends")
         //#endif
         .build();
+
+    // Handles blocking the keybind from reaching GUIs until released
+    private class KeyBindGuiBlocker {
+        private boolean registered = false;
+
+        private void block() {
+            if (!registered) {
+                registered = true;
+                Essential.EVENT_BUS.register(this);
+            }
+        }
+
+        // Priority is set this high to run before the one in [OverlayManagerImpl], though this should conceptually run
+        // before any other GuiKeyTypedEvent listener, not just that specific one.
+        @Subscribe(priority = 100)
+        public void keybindBlocker(GuiKeyTypedEvent event) {
+            if (event.getKeyCode() == getKeyCode()) {
+                event.setCancelled(true);
+            }
+        }
+
+        @Subscribe
+        public void keybindBlockerUnRegister(ClientTickEvent event) {
+            // We need to use a tick event (as opposed to onRelease) and UKeyboard (as opposed to KeyBinding.isKeyDown)
+            // because all KeyBindings are internally marked as released when changing screens, but we want to suppress
+            // key events until the actual key is released.
+            if (!UKeyboard.isKeyDown(getKeyCode())) {
+                Essential.EVENT_BUS.unregister(this);
+                registered = false;
+            }
+        }
+    }
 }

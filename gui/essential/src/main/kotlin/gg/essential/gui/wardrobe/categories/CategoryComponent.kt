@@ -70,6 +70,7 @@ class CategoryComponent(
 
     private var updatingCategoryBasedOnScroll = false
     private var updatingScrollBasedOnCategory = false
+    private var updatingScrollBasedOnCategoryPending = false
 
     init {
         val isEmpty = subCategories.zip(wardrobeState.visibleCosmetics) { subCategories, cosmetics ->
@@ -152,7 +153,9 @@ class CategoryComponent(
 
             previousCategory = category
 
+            updatingScrollBasedOnCategoryPending = true
             fun doScroll() {
+                updatingScrollBasedOnCategoryPending = false
                 updatingScrollBasedOnCategory = true
 
                 scroller.animationFrame() // Force recalculate of position to avoid scrolling an incorrect amount
@@ -184,7 +187,7 @@ class CategoryComponent(
         scroller.addScrollAdjustEvent(false) { _, _ ->
             if (!isInComponentTree()) return@addScrollAdjustEvent
             if (WardrobeContainer.scrollingToTop) return@addScrollAdjustEvent
-            if (updatingScrollBasedOnCategory) return@addScrollAdjustEvent
+            if (updatingScrollBasedOnCategory || updatingScrollBasedOnCategoryPending) return@addScrollAdjustEvent
 
             updatedCurrentCategoryBasedOnScrollPosition()
         }

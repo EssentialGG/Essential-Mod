@@ -11,7 +11,6 @@
  */
 package gg.essential.gui.friends.message
 
-import gg.essential.elementa.dsl.provideDelegate
 import gg.essential.gui.EssentialPalette
 import gg.essential.gui.common.OutlineButtonStyle
 import gg.essential.gui.common.modal.EssentialModal2
@@ -42,7 +41,6 @@ import gg.essential.gui.overlay.ModalManager
 import gg.essential.universal.USound
 import gg.essential.util.GuiEssentialPlatform.Companion.platform
 import gg.essential.util.UuidNameLookup
-import gg.essential.util.centered
 import gg.essential.util.onLeftClick
 
 class NewReportMessageModal(modalManager: ModalManager, val message: ClientMessage) : EssentialModal2(modalManager) {

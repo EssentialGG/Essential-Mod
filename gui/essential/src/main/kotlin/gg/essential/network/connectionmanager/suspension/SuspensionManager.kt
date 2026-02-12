@@ -55,13 +55,6 @@ abstract class SuspensionManager(protected val connectionManager: CMConnection) 
         suspension.set(SuspensionStatus(Suspension(reason, null, !EssentialConfig.acknowledgedPermanentSuspension.getUntracked())))
     }
 
-    override fun onConnected() {
-        if (connectionManager.usingProtocol < REQUIRED_PROTOCOL) {
-            suspension.set(SuspensionStatus(null))
-            EssentialConfig.acknowledgedPermanentSuspension.set(false)
-        }
-    }
-
     protected abstract fun isSuspensionShowable(): Boolean
 
     protected abstract fun showSuspension(suspension: Suspension)
@@ -78,10 +71,5 @@ abstract class SuspensionManager(protected val connectionManager: CMConnection) 
     private data class SuspensionStatus(val value: Suspension?) {
 
         fun copy(unseen: Boolean) = SuspensionStatus(value?.copy(unseen = unseen))
-    }
-
-    private companion object {
-
-        const val REQUIRED_PROTOCOL = 9
     }
 }

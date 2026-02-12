@@ -33,6 +33,8 @@ private class LazyConstraint(val constraint: Lazy<SuperConstraint<Float>>): Mast
     override var recalculate = true
     override var constrainTo: UIComponent? = null
 
+    @Suppress("DEPRECATION")
+    @Deprecated("See [ElementaVersion.V8].")
     override fun animationFrame() {
         super.animationFrame()
         constraint.value.animationFrame()

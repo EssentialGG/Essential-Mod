@@ -140,7 +140,8 @@ class Wardrobe(
         }
     }
 
-    private val mainContainerWidthState = stateDelegatingTo(stateOf(0f))
+    private val mainContainerWidthStateSource = mutableStateOf(stateOf(0f))
+    private val mainContainerWidthState = mainContainerWidthStateSource.flatten()
 
     private val collapseTopBarButtonsWidth = 350f
 
@@ -267,7 +268,7 @@ class Wardrobe(
             sendCosmeticsHiddenNotification()
         }
 
-        mainContainerWidthState.rebind(window.pollingStateV2 { mainContainer.getWidth() })
+        mainContainerWidthStateSource.set(window.pollingStateV2 { mainContainer.getWidth() })
 
         state.currentCategory.map { it.superCategory }.onSetValueAndNow(content) { category ->
             when (category) {

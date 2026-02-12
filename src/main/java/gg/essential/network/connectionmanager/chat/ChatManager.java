@@ -18,10 +18,10 @@ import com.sparkuniverse.toolbox.chat.enums.ChannelType;
 import com.sparkuniverse.toolbox.chat.model.Channel;
 import com.sparkuniverse.toolbox.chat.model.Message;
 import gg.essential.Essential;
+import gg.essential.config.EssentialConfig;
 import gg.essential.connectionmanager.common.packet.Packet;
 import gg.essential.connectionmanager.common.packet.chat.*;
 import gg.essential.connectionmanager.common.packet.response.ResponseActionPacket;
-import gg.essential.connectionmanager.common.packet.social.ServerSocialAllowedDomainsPacket;
 import gg.essential.gui.elementa.state.v2.ListKt;
 import gg.essential.gui.elementa.state.v2.MutableState;
 import gg.essential.gui.elementa.state.v2.State;
@@ -56,6 +56,7 @@ import gg.essential.util.StringsKt;
 import gg.essential.util.USession;
 import gg.essential.util.UUIDUtil;
 import gg.essential.util.UuidNameLookup;
+import kotlin.Pair;
 import kotlin.Unit;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -81,8 +82,6 @@ public class ChatManager extends StateCallbackManager<IMessengerManager> impleme
 
     @NotNull
     private final Map<String, Map<String, String>> reportReasons = Maps.newConcurrentMap();
-
-    private @NotNull List<String> allowedDomains = Collections.emptyList();
 
     @NotNull
     private final Set<Long> announcementChannelIds = Sets.newConcurrentHashSet();
@@ -134,8 +133,8 @@ public class ChatManager extends StateCallbackManager<IMessengerManager> impleme
         connectionManager.registerPacketHandler(ServerChatChannelRemovePacket.class, new ServerChatChannelRemovePacketHandler());
         connectionManager.registerPacketHandler(ServerChatChannelMessageReportReasonsPacket.class, new ServerChatChannelMessageReportReasonsPacketHandler());
 
-        connectionManager.registerPacketHandler(ServerSocialAllowedDomainsPacket.class, packet -> {
-            this.allowedDomains = packet.getDomains();
+        connectionManager.registerPacketHandler(ChatUnfilteredContentSettingPacket.class, packet -> {
+            EssentialConfig.INSTANCE.getChatFilterWithSource().set(new Pair<>(!packet.getShowUnfilteredContent(), false));
             return Unit.INSTANCE;
         });
     }
@@ -290,8 +289,6 @@ public class ChatManager extends StateCallbackManager<IMessengerManager> impleme
         this.announcementChannelIds.clear();
         this.reportReasons.clear();
         this.channelEagerMessageResolverMap.clear();
-
-        this.allowedDomains = Collections.emptyList();
 
         for (IMessengerManager callback : getCallbacks()) {
             callback.reset();
@@ -717,15 +714,17 @@ public class ChatManager extends StateCallbackManager<IMessengerManager> impleme
     @Deprecated
     public void updateReadState(Message message, boolean read) {
         if (message.isRead() == read) return;
-        Message messageCopy = new Message(
-            message.getId(),
-            message.getChannelId(),
-            message.getSender(),
-            message.getContents(),
-            read,
-            message.getReplyTargetId(),
-            message.getLastEditTime(),
-            message.getCreatedAt()
+        Message messageCopy;
+        messageCopy = new Message(
+                message.getId(),
+                message.getChannelId(),
+                message.getSender(),
+                message.getContents(),
+                read,
+                message.getReplyTargetId(),
+                message.getLastEditTime(),
+                message.getCreatedAt(),
+                message.getUnfilteredContents()
         );
         upsertMessageToChannel(messageCopy.getChannelId(), messageCopy, false);
 

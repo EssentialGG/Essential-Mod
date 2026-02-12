@@ -61,11 +61,14 @@ public abstract class Mixin_ApplyPoseTransform implements ModelBipedExt {
         ModelBipedUtil.resetPose((ModelBiped) (Object) this);
     }
 
-    //#if MC>=12102
-    //$$ @Inject(method = "setAngles", at = @At("RETURN"))
-    //#else
-    @Inject(method = "setRotationAngles", at = @At(value = "INVOKE", target = COPY_MODEL_ANGLES))
-    //#endif
+    @Inject(
+        method = "setRotationAngles",
+        //#if MC >= 1.21.2
+        //$$ at = @At("RETURN")
+        //#else
+        at = @At(value = "INVOKE", target = COPY_MODEL_ANGLES)
+        //#endif
+    )
     private void applyPoseTransform(
         CallbackInfo ci,
         //#if MC>=12102

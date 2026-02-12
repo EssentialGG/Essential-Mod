@@ -22,7 +22,10 @@ import org.gradle.api.attributes.Attribute
 import org.gradle.kotlin.dsl.*
 import essential.modrinth
 import net.fabricmc.loom.task.RemapJarTask
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+import org.gradle.api.attributes.Usage
 import org.gradle.api.tasks.bundling.Jar
+import org.gradle.language.jvm.tasks.ProcessResources
 
 data class Configurations(
     /**
@@ -43,6 +46,7 @@ open class BundlePlugin : Plugin<Project> {
         val configurations = project.createConfigurations(platform)
         project.createBundleJarTask(platform, configurations)
         when {
+            platform.isLegacyForge -> project.configureForLegacyForge(configurations)
             platform.isFabric -> project.configureForFabricLoader(configurations, platform)
             platform.isModLauncher -> project.configureForModLauncher(configurations, platform)
         }
@@ -82,6 +86,7 @@ private fun Project.createBundleJarTask(platform: Platform, configurations: Conf
         from({ bundle.map { if (it.isDirectory) it else zipTree(it) } }) {
             exclude("META-INF/*.RSA", "META-INF/*.SF", "META-INF/*.DSA")
             exclude("META-INF/services/javax.annotation.processing.Processor")
+            exclude("META-INF/maven/**")
 
             // TODO these should not be published in the first place (did I already fix that?)
             exclude("gg.essential.vigilance.example.ExampleMod")
@@ -119,7 +124,68 @@ private fun Project.createBundleJarTask(platform: Platform, configurations: Conf
 
         from(jij) {
             rename { "META-INF/jars/$it" }
+            // This is the `prebundle` jar from `:loader:mixin`.
+            // Couldn't find a better way to exclude it from our output jar but still have it in IntelliJ.
+            exclude("fatMixinContent.jar")
         }
+    }
+
+    tasks.named<ProcessResources>("processResources") {
+        if (platform.isLegacyForge) {
+            val expansions = mapOf(
+                "version" to version,
+                "jars" to provider {
+                    jij.resolvedConfiguration.resolvedArtifacts.joinToString(",\n") { artifact ->
+                        val id = artifact.moduleVersion.id
+                        """
+                            {
+                                "id": "${id.group}:${id.name}",
+                                "version": "${id.version}",
+                                "file": "META-INF/jars/${artifact.file.name}"
+                            }
+                        """.trimIndent()
+                    }
+                },
+            )
+            inputs.property("expansions", expansions)
+            filesMatching("essential.mod.json") {
+                expand(expansions)
+            }
+        } else {
+            exclude("essential.mod.json")
+        }
+    }
+}
+
+// With EssentialLoader supporting Jar-in-Jar on legacy Forge, we now ship all our public libraries as separate jars in our jar,
+// much like we do on Fabric (just without fabric-language-kotlin).
+private fun Project.configureForLegacyForge(configurations: Configurations) = with(configurations) {
+    bundle.exclude("org.jetbrains.kotlin", "kotlin-stdlib-common") // replaced by kotlin-stdlib
+
+    afterEvaluate { // need to delay so repos and deps are all set up
+        // Find all our api jars
+        project.configurations
+            .detachedConfiguration(dependencies.project(":api:" + project.name, configuration = "apiElements"))
+            .incoming
+            .artifactView {
+                // include kotlin metadata variants (otherwise we only get `-jvm` variants)
+                withVariantReselection()
+                attributes {
+                    attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage::class, "kotlin-metadata"))
+                }
+            }
+            .artifacts
+            .forEach { artifact ->
+                val id = artifact.id.componentIdentifier as? ModuleComponentIdentifier ?: return@forEach
+                // exclude them from the bundled configuration
+                bundle.exclude(group = id.group, module = id.module)
+                // and instead add them to our jij configuration
+                dependencies {
+                    configurations.jij(group = id.group, name = id.module, version = id.version) {
+                        isTransitive = false // transitive dependencies were already resolved by this point
+                    }
+                }
+            }
     }
 }
 

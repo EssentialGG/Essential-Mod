@@ -26,6 +26,7 @@ import gg.essential.cosmetics.SkinId
 import gg.essential.gui.elementa.state.v2.MutableState
 import gg.essential.gui.elementa.state.v2.ReferenceHolderImpl
 import gg.essential.gui.elementa.state.v2.State
+import gg.essential.gui.elementa.state.v2.add
 import gg.essential.gui.elementa.state.v2.clear
 import gg.essential.gui.elementa.state.v2.combinators.map
 import gg.essential.gui.elementa.state.v2.memo
@@ -35,7 +36,6 @@ import gg.essential.gui.elementa.state.v2.onChange
 import gg.essential.gui.elementa.state.v2.remove
 import gg.essential.gui.elementa.state.v2.stateBy
 import gg.essential.gui.elementa.state.v2.toListState
-import gg.essential.mod.Skin
 import gg.essential.mod.cosmetics.CosmeticOutfit
 import gg.essential.mod.cosmetics.CosmeticSlot
 import gg.essential.mod.cosmetics.settings.CosmeticSetting
@@ -43,6 +43,7 @@ import gg.essential.network.CMConnection
 import gg.essential.network.connectionmanager.NetworkedManager
 import gg.essential.network.connectionmanager.queue.PacketQueue
 import gg.essential.network.connectionmanager.queue.SequentialPacketQueue
+import gg.essential.network.connectionmanager.skins.SkinsManager
 import gg.essential.network.cosmetics.toInfra
 import gg.essential.network.cosmetics.toMod
 import gg.essential.network.registerPacketHandler
@@ -60,7 +61,7 @@ class OutfitManager(
     val cosmeticsData: CosmeticsData,
     val unlockedCosmetics: State<Set<CosmeticId>>,
     val equippedOutfitsManager: InfraEquippedOutfitsManager,
-    val skins: State<Map<SkinId, Skin>>
+    val skinsManager: SkinsManager
 ) : NetworkedManager {
 
     private val mutableSelectedOutfitId: MutableState<String?> = mutableStateOf(null)
@@ -69,12 +70,12 @@ class OutfitManager(
 
     private val mutableOutfits = mutableListStateOf<CosmeticOutfit>()
     val outfits = stateBy {
-        val skins = skins()
+        val skins = skinsManager.skins()
         mutableOutfits().sortedWith(
             compareBy<CosmeticOutfit> { it.favoritedSince?.toEpochMilli() }
                 .thenByDescending { it.createdAt.toEpochMilli() }
         ).map { item ->
-            val skin = skins[item.skinId]
+            val skin = skins[item.skinId]?.skin
             item.copy(skin = skin)
         }
     }.toListState()
@@ -125,6 +126,10 @@ class OutfitManager(
         actuallyEquippedCosmetics.onChange(referenceHolder) { (uuid, outfit) ->
             equippedOutfitsManager.update(uuid, outfit)
         }
+    }
+
+    override fun onConnected() {
+        resetState()
     }
 
     override fun resetState() {

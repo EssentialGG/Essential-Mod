@@ -141,7 +141,9 @@ fun LayoutScope.featuredCategory(wardrobeState: WardrobeState, scroller: ScrollC
                 return
             }
 
+            @Suppress("DEPRECATION") // TODO should be able to get rid of this with ScrollComponent V2
             scroller.animationFrame() // Force recalculate of position to avoid scrolling an incorrect amount
+            Window.of(scroller).invalidateCachedConstraints()
 
             val target = content?.findChildrenByTag(CosmeticItemTag::class.java, true) {
                 it.item.itemId == highlightedItem

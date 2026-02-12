@@ -25,6 +25,7 @@ import gg.essential.event.gui.GuiKeyTypedEvent
 import gg.essential.event.gui.GuiMouseReleaseEvent
 import gg.essential.event.gui.MouseScrollEvent
 import gg.essential.event.render.RenderTickEvent
+import gg.essential.mixins.impl.client.gui.EssentialScreenMayAllowPlayerInput
 import gg.essential.universal.UKeyboard
 import gg.essential.universal.UMatrixStack
 import gg.essential.universal.UMouse
@@ -552,6 +553,8 @@ object OverlayManagerImpl : OverlayManager {
         override var rendered: Boolean = true
         override var respectsHideGuiSetting: Boolean = true
         override var unlocksMouse: Boolean = priority == LayerPriority.Modal
+        override var pausesGame: Boolean = true
+        override var allowPlayerInput: Boolean = false
 
         /** Internal. For OverlayManagerImpl only. */
         var passThroughEvent = false
@@ -592,12 +595,30 @@ object OverlayManagerImpl : OverlayManager {
         }
     }
 
-    internal class OverlayInteractionScreen(val layer: Layer) : UScreen() {
+    internal class OverlayInteractionScreen(val layer: Layer) : UScreen(), EssentialScreenMayAllowPlayerInput {
+        // The unlocksMouse layers are the only ones that need this screen to be opened
+        private fun relevantLayers() = layers.filter { it.unlocksMouse }
+
+        override fun allowsPlayerInput() = relevantLayers().all { it.allowPlayerInput }
+
         override fun onKeyPressed(keyCode: Int, typedChar: Char, modifiers: UKeyboard.Modifiers?) {
             // no-op to suppress Esc key
         }
 
+        override fun doesGuiPauseGame(): Boolean {
+            return relevantLayers().any { it.pausesGame }
+        }
+
         override fun onTick() {
+            // Allow the player to move while the screen is open if all unlocksMouse layers allow it.
+            //#if MC>=12000
+            //$$ // Now handled by Mixin_AllowMovementDuringScreens
+            //#elseif MC>=11602
+            //$$ this.passEvents = allowsPlayerInput()
+            //#else
+            this.allowUserInput = allowsPlayerInput()
+            //#endif
+
             // This screen may be active even when its corresponding layer has already been removed.
             // This can e.g. happen if this screen gets replaced by another screen, then the layer is destroyed, and
             // then the other screen restores its previous screen (i.e. this screen).

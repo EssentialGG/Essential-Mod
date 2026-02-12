@@ -59,12 +59,7 @@ open class ResourcePackAdapter(val parent: IResourcePack) : IResourcePack {
         //$$ return if (stream == null || mapper == null) {
         //$$     stream
         //$$ } else {
-        //$$     // FIXME remap bug: doesn't remap SAM class
-            //#if FABRIC==1
-            //$$ InputSupplier {
-            //#else
-            //$$ IoSupplier {
-            //#endif
+        //$$     InputSupplier {
         //$$         mapper.map(stream.get())
         //$$     }
         //$$ }

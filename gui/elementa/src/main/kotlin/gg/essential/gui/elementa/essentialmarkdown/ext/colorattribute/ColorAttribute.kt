@@ -11,7 +11,7 @@
  */
 package gg.essential.gui.elementa.essentialmarkdown.ext.colorattribute
 
-import gg.essential.elementa.impl.commonmark.node.CustomNode
+import org.commonmark.node.CustomNode
 import java.awt.Color
 
 class ColorAttribute(val color: Color) : CustomNode() {

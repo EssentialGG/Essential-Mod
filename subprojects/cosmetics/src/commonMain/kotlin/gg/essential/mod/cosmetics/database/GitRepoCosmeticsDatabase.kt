@@ -39,6 +39,8 @@ import gg.essential.model.util.base64Decode
 import gg.essential.model.util.instant
 import gg.essential.model.util.now
 import gg.essential.network.cosmetics.Cosmetic
+import gg.essential.network.cosmetics.CosmeticBase
+import gg.essential.network.cosmetics.CosmeticStoreInfo
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -339,7 +341,7 @@ class GitRepoCosmeticsDatabase(
         return if (oldType != newType) {
             val updatedCosmetics = cosmetics.values.mapNotNull { cosmetic ->
                 if (cosmetic.type.id == newType.id) {
-                    cosmetic.copy(type = newType)
+                    cosmetic.copy(base = cosmetic.base.copy(type = newType))
                 } else {
                     null
                 }
@@ -1317,44 +1319,52 @@ private suspend fun FileAccess.loadCosmetic(json: Json, metadataFile: Path, asse
             emptyMap(),
         )
     return Cosmetic(
-        override.id ?: fileId.uppercase(), // repo files use lowercase ids, actual ids should be uppercase
-        type,
-        metadata.tier,
-        mapOf("en_us" to fileId, LOCAL_PATH to folder.str) + metadata.displayName,
-        assets,
-        settings ?: emptyList(),
-        metadata.storePackageId,
-        metadata.price,
-        metadata.tags,
-        metadata.availableAfter ?: now(),
-        metadata.availableAfter,
-        metadata.availableUntil,
-        metadata.showTimerAfter,
-        emptyMap(),
-        metadata.categories,
-        metadata.defaultSortWeight ?: 20,
+        CosmeticBase(
+            override.id ?: fileId.uppercase(), // repo files use lowercase ids, actual ids should be uppercase
+            type,
+            metadata.tier,
+            mapOf("en_us" to fileId, LOCAL_PATH to folder.str) + metadata.displayName,
+            assets,
+            settings ?: emptyList(),
+        ),
+        CosmeticStoreInfo(
+            metadata.storePackageId,
+            metadata.price,
+            metadata.tags,
+            metadata.availableAfter ?: now(),
+            metadata.availableAfter,
+            metadata.availableUntil,
+            metadata.showTimerAfter,
+            emptyMap(),
+            metadata.categories,
+            metadata.defaultSortWeight ?: 20,
+        ),
     )
 }
 
 private fun makeErrorCosmetic(metadataFile: Path, diagnostic: Cosmetic.Diagnostic): Cosmetic {
     val folder = metadataFile.parent
     return Cosmetic(
-        folder.str.replace('/', '_').uppercase(),
-        CosmeticType("ERROR", CosmeticSlot.of("ERROR"), mapOf("en_us" to "Error"), emptyMap()),
-        CosmeticTier.COMMON,
-        mapOf("en_us" to folder.str, LOCAL_PATH to folder.str),
-        emptyMap(),
-        emptyList(),
-        -1,
-        emptyMap(),
-        setOf("HAS_ERRORS"),
-        instant(0),
-        instant(0),
-        instant(0),
-        null,
-        emptyMap(),
-        mapOf("ERROR" to 0),
-        0,
+        CosmeticBase(
+            folder.str.replace('/', '_').uppercase(),
+            CosmeticType("ERROR", CosmeticSlot.of("ERROR"), mapOf("en_us" to "Error"), emptyMap()),
+            CosmeticTier.COMMON,
+            mapOf("en_us" to folder.str, LOCAL_PATH to folder.str),
+            emptyMap(),
+            emptyList(),
+        ),
+        CosmeticStoreInfo(
+            -1,
+            emptyMap(),
+            setOf("HAS_ERRORS"),
+            instant(0),
+            instant(0),
+            instant(0),
+            null,
+            emptyMap(),
+            mapOf("ERROR" to 0),
+            0,
+        ),
         listOf(diagnostic),
     )
 }

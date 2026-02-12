@@ -3,6 +3,7 @@ universalcraft = "446"
 elementa = "712"
 vigilance = "306"
 mixinextras = "0.4.0"
+commonmark = "0.17.1"
 
 [libraries]
 universalcraft-standalone = { module = "gg.essential:universalcraft-standalone", version.ref = "universalcraft" }
@@ -12,3 +13,7 @@ vigilance = { module = "gg.essential:vigilance", version.ref = "vigilance" }
 # Do not change this unless you also change on which MC versions we use our relocated slf4j.
 # Also note that `SELF4JServiceProviderImpl.getRequestedApiVersion` may need to be updated when this is changed.
 slf4j-api = { module = "org.slf4j:slf4j-api", version = "2.0.1" }
+
+commonmark = { module = "org.commonmark:commonmark", version.ref = "commonmark" }
+commonmark-ext-gfm-strikethrough = { module = "org.commonmark:commonmark-ext-gfm-strikethrough", version.ref = "commonmark" }
+commonmark-ext-ins = { module = "org.commonmark:commonmark-ext-ins", version.ref = "commonmark" }

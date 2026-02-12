@@ -47,6 +47,7 @@ net.minecraft.client.renderer.texture.Texture net.minecraft.client.renderer.text
 net.minecraft.client.resources.LegacyResourcePackWrapper net.minecraft.client.resources.LegacyV2Adapter
 net.minecraft.client.resources.LegacyResourcePackWrapper locationMap net.minecraft.client.resources.LegacyV2Adapter pack
 net.minecraft.client.resources.SkinManager$ISkinAvailableCallback net.minecraft.client.resources.SkinManager$SkinAvailableCallback
+net.minecraft.client.resources.SkinManager$ISkinAvailableCallback onSkinTextureAvailable() skinAvailable()
 net.minecraft.item.UseAction net.minecraft.item.EnumAction
 net.minecraft.nbt.CompoundNBT net.minecraft.nbt.NBTTagCompound
 net.minecraft.nbt.CompoundNBT put() setTag()

@@ -58,16 +58,6 @@ object VersionData : VersionInfo() {
         }
     }
 
-    // The previous version in which the user viewed the new changelog divider
-    fun getLastSeenChangelog() = state.lastSeenChangelog
-
-    fun updateLastSeenChangelog() {
-        if (getLastSeenChangelog() != essentialVersion) {
-            state = state.copy(lastSeenChangelog = essentialVersion)
-            saveData()
-        }
-    }
-
     private fun saveData() = versionFile.writeText(Essential.GSON.toJson(state))
 
     fun getEssentialPlatform() = platform

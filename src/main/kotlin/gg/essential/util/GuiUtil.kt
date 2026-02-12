@@ -29,6 +29,7 @@ import gg.essential.gui.overlay.OverlayManager
 import gg.essential.gui.overlay.OverlayManagerImpl
 import gg.essential.gui.overlay.launchModalFlow
 import gg.essential.gui.wardrobe.Wardrobe
+import gg.essential.network.connectionmanager.features.Feature
 import gg.essential.universal.GuiScale
 import gg.essential.universal.UMinecraft
 import gg.essential.universal.UScreen
@@ -93,8 +94,10 @@ object GuiUtil : GuiUtil, OverlayManager by OverlayManagerImpl, ModalManager by 
 
     fun <T : GuiScreen> openScreen(type: Class<T>, screen: () -> T, intrusive: Boolean) {
         val screenRequiresTOS = GuiRequiresTOS::class.java.isAssignableFrom(type)
-        val screenRequiresCosmetics = type == Wardrobe::class.java
-        val screenChecksSocialSuspension = type == SocialMenu::class.java
+
+        val features = mutableListOf<Feature>()
+        if (type == Wardrobe::class.java) features.add(Feature.WARDROBE)
+        if (type == SocialMenu::class.java) features.add(Feature.SOCIAL)
 
         if (screenRequiresTOS && !OnboardingData.hasAcceptedTos()) {
             if (openedScreen() == null && !intrusive) {
@@ -107,12 +110,8 @@ object GuiUtil : GuiUtil, OverlayManager by OverlayManagerImpl, ModalManager by 
         }
 
         launchModalFlow {
-            if (screenRequiresTOS) {
-                ensurePrerequisites(
-                    cosmetics = screenRequiresCosmetics,
-                    social = screenChecksSocialSuspension,
-                    rules = false
-                )
+            if (screenRequiresTOS || features.isNotEmpty()) {
+                ensurePrerequisites(rules = false, features = features)
             }
             doOpenScreen(screen)
         }

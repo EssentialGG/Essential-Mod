@@ -13,6 +13,7 @@ package gg.essential.gui.friends.message.v2
 
 import com.sparkuniverse.toolbox.chat.model.Message
 import gg.essential.Essential
+import gg.essential.config.EssentialConfig
 
 /**
  * Creates a message from a network type, excluding the replyTo state.
@@ -23,7 +24,7 @@ fun infraInstanceToClient(message: Message): ClientMessage {
         message.id,
         chatManager.getChannel(message.channelId).get(),
         message.sender,
-        message.contents,
+        message.getContents(EssentialConfig.chatFilterWithSource.getUntracked().first),
         SendState.Confirmed,
         message.replyTargetId?.let {
             MessageRef(message.channelId, it)

@@ -58,4 +58,20 @@ interface Layer {
      * Defaults to `true` for layers with [priority] == [LayerPriority.Modal], and `false` for all others.
      */
     var unlocksMouse: Boolean
+
+    /**
+     * Whether the layer should pause the game.
+     * Setting this to false will only actually apply when in-game and no other [unlocksMouse] layers have their [pausesGame] set to true.
+     * Only applies if [unlocksMouse] is true.
+     * Defaults to true.
+     */
+    var pausesGame: Boolean
+
+    /**
+     * Whether the layer should allow the player to keep moving (WASD) when opened.
+     * Setting this to true will only actually apply when in-game and no other [unlocksMouse] layers have their [allowPlayerInput] set to false.
+     * Only applies if [unlocksMouse] is true.
+     * Defaults to false.
+     */
+    var allowPlayerInput: Boolean
 }

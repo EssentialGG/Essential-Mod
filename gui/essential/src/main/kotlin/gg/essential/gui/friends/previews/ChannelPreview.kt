@@ -15,12 +15,6 @@ import com.sparkuniverse.toolbox.chat.model.Channel
 import gg.essential.elementa.components.UIBlock
 import gg.essential.elementa.constraints.*
 import gg.essential.elementa.dsl.*
-import gg.essential.elementa.impl.commonmark.node.BlockQuote
-import gg.essential.elementa.impl.commonmark.node.Node
-import gg.essential.elementa.impl.commonmark.parser.Parser
-import gg.essential.elementa.impl.commonmark.renderer.NodeRenderer
-import gg.essential.elementa.impl.commonmark.renderer.text.TextContentNodeRendererContext
-import gg.essential.elementa.impl.commonmark.renderer.text.TextContentRenderer
 import gg.essential.gui.EssentialPalette
 import gg.essential.gui.common.ContextOptionMenu
 import gg.essential.gui.common.shadow.ShadowEffect
@@ -48,6 +42,12 @@ import gg.essential.universal.USound
 import gg.essential.util.*
 import gg.essential.util.GuiEssentialPlatform.Companion.platform
 import gg.essential.vigilance.utils.onLeftClick
+import org.commonmark.node.BlockQuote
+import org.commonmark.node.Node
+import org.commonmark.parser.Parser
+import org.commonmark.renderer.NodeRenderer
+import org.commonmark.renderer.text.TextContentNodeRendererContext
+import org.commonmark.renderer.text.TextContentRenderer
 import okhttp3.HttpUrl
 import java.time.Instant
 import java.time.LocalDate

@@ -26,9 +26,11 @@ if (!System.getenv().containsKey("NO_GIT_SUBMODULES")) {
     includeBuild("loader") {
         dependencySubstitution {
             for (variant in listOf("fabric", "launchwrapper", "modlauncher8", "modlauncher9")) {
+                substitute(module("gg.essential:loader-$variant")).using(project(":stage0:$variant"))
                 substitute(module("gg.essential.loader:container-$variant")).using(project(":container:$variant"))
                 substitute(module("gg.essential.loader:stage2-$variant")).using(project(":stage2:$variant"))
             }
+            substitute(module("gg.essential:mixin")).using(project(":mixin"))
         }
     }
 }
@@ -60,7 +62,6 @@ val subprojects = listOf(
     ":lwjgl3",
     ":lwjgl3:impl",
     ":minecraft-auth",
-    ":mixin-compat",
     ":plasmo",
     ":pseudotcp",
     ":quic-connector",

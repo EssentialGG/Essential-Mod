@@ -19,6 +19,6 @@ import gg.essential.gui.elementa.state.v2.State
  */
 class VisibleDependencyPredicate(val visible: State<Boolean>) : (Any?) -> Boolean {
     override fun invoke(any: Any?): Boolean {
-        return visible.get()
+        return visible.getUntracked()
     }
 }

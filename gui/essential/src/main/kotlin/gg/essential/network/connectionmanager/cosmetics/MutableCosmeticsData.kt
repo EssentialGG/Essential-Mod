@@ -20,6 +20,7 @@ import gg.essential.cosmetics.ImplicitOwnership
 import gg.essential.cosmetics.ImplicitOwnershipId
 import gg.essential.gui.elementa.state.v2.*
 import gg.essential.gui.elementa.state.v2.collections.*
+import gg.essential.gui.elementa.state.v2.combinators.letState
 import gg.essential.mod.cosmetics.CosmeticBundle
 import gg.essential.mod.cosmetics.CosmeticCategory
 import gg.essential.mod.cosmetics.CosmeticType
@@ -62,4 +63,11 @@ class MutableCosmeticsData : CosmeticsData {
     override fun getImplicitOwnership(id: ImplicitOwnershipId): ImplicitOwnership? = implicitOwnershipsMap[id]
 
     override fun getCosmetic(id: CosmeticId): Cosmetic? = cosmeticsMap[id]
+
+    private val cosmeticStates = mutableMapOf<CosmeticId, State<Cosmetic?>>()
+
+    override fun cosmetic(id: CosmeticId): State<Cosmetic?> =
+        cosmeticStates.getOrPut(id) {
+            cosmetics.letState { cosmetics -> cosmetics.find { it.id == id } }.memo()
+        }
 }

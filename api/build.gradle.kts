@@ -25,7 +25,7 @@ val mcPlatform = platform.loaderStr
 
 group = "gg.essential"
 base.archivesName.set("EssentialAPI " + project.name)
-tasks.compileKotlin { kotlinOptions.moduleName = "essential-api" }
+kotlin.compilerOptions.moduleName.set("essential-api")
 java.withSourcesJar()
 loom.noRunConfigs() // can't run just the API, only the implementation
 configureDokkaForEssentialApi()

@@ -97,7 +97,9 @@ class ScreenshotItemsSlider(
             scrollToScreenshotId = screenshotId
 
             this.itemsPerRow.set(itemsPerRow)
+            @Suppress("DEPRECATION") // TODO replace entire method with ScrollComponent V2 anchors
             Window.of(scrollComponent).animationFrame()
+            Window.of(scrollComponent).invalidateCachedConstraints()
             closest = getComponentById(screenshotId)
             if (closest != null) {
                 scrollComponent.scrollTo(verticalOffset = offset - (closest.getTop() - top), smoothScroll = false)

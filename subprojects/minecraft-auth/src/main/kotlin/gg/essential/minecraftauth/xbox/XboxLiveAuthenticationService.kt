@@ -19,6 +19,8 @@ import gg.essential.minecraftauth.util.execute
 import gg.essential.minecraftauth.xbox.request.XboxLiveAuthenticationRequest
 import gg.essential.minecraftauth.xbox.response.XboxLiveAuthenticationErrorResponse
 import gg.essential.minecraftauth.xbox.response.XboxLiveTokenResponse
+import gg.essential.util.har.requestBodyContainsSecrets
+import gg.essential.util.har.responseBodyContainsSecrets
 import kotlinx.serialization.encodeToString
 import okhttp3.Request
 import okhttp3.RequestBody
@@ -76,6 +78,8 @@ object XboxLiveAuthenticationService {
     private fun makeRequest(uri: String, request: XboxLiveAuthenticationRequest): XboxLiveTokenResponse {
         val (status, content) = Request.Builder().url(uri)
             .header("Accept", "application/json")
+            .requestBodyContainsSecrets()
+            .responseBodyContainsSecrets()
             .post(RequestBody.create(JSON_MEDIA_TYPE, JSON.encodeToString(request)))
             .build().execute()
 

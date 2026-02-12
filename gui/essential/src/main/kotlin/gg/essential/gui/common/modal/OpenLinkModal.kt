@@ -49,7 +49,7 @@ class OpenLinkModal(
         column(Modifier.fillWidth(), Arrangement.spacedBy(4f)) {
             text("You are about to visit:", Modifier.color(EssentialPalette.TEXT).shadow(Color.BLACK))
             text(
-                uri.host,
+                uri.host ?: uri.toString(),
                 Modifier
                     .color(EssentialPalette.TEXT_HIGHLIGHT)
                     .shadow(Color.BLACK)

@@ -136,7 +136,7 @@ class ParagraphLineImpl(
 
         visibleMessageComponent.onLinkClicked { event ->
             try {
-                OpenLinkModal.openUrl(URI.create(event.url))
+                OpenLinkModal.openUrl(URI(event.url))
                 event.stopImmediatePropagation()
             } catch (e: URISyntaxException) {
                 // Ignored, if the link is invalid we just do nothing

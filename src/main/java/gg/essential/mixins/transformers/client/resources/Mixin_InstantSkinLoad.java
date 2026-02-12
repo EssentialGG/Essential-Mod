@@ -68,12 +68,7 @@ public class Mixin_InstantSkinLoad {
 
             if (texture != null) {
                 String url = String.format(Locale.ROOT, GameProfileManager.SKIN_URL, skin.getHash());
-                // FIXME remap bug: doesn't remap, even with a mapping override (broken since it's an inner class?)
-                //#if MC>=11600
-                //$$ callback.onSkinTextureAvailable(
-                //#else
                 callback.skinAvailable(
-                //#endif
                     MinecraftProfileTexture.Type.SKIN, location, new MinecraftProfileTexture(url, Collections.singletonMap("model", skin.getModel().getType())));
             }
         }

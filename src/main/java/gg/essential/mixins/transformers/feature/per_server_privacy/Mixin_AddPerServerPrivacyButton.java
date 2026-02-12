@@ -54,12 +54,7 @@ public abstract class Mixin_AddPerServerPrivacyButton extends GuiScreen {
     @Final
     private ServerData serverData;
 
-    // FIXME remap bug: even with a mapping declared for this, it is not automatically remapped
-    //#if MC>=11600
-    //$$ @Inject(method = "init", at = @At("RETURN"))
-    //#else
     @Inject(method = "initGui", at = @At("RETURN"))
-    //#endif
     private void initPrivacyButton(CallbackInfo ci) {
         List<GuiButton> buttonList = CollectionsKt.filterIsInstance(
             //#if MC>=11600
@@ -120,12 +115,7 @@ public abstract class Mixin_AddPerServerPrivacyButton extends GuiScreen {
         //#endif
         updatePrivacyButtonLabel();
         //#if MC>=11200
-        // FIXME remap bug: adding a mapping for this breaks other Screen mappings
-        //#if MC>=11700
-        //$$ addDrawableChild(privacyButton);
-        //#else
         addButton(privacyButton);
-        //#endif
         //#else
         //$$ this.buttonList.add(privacyButton);
         //#endif
@@ -159,12 +149,7 @@ public abstract class Mixin_AddPerServerPrivacyButton extends GuiScreen {
         //#endif
     }
 
-    // FIXME remap bug: we have declared a mapping for this, it should automatically be remapped
-    //#if MC>=11600
-    //$$ @Inject(method = "render", at = @At("RETURN"))
-    //#else
     @Inject(method = "drawScreen", at = @At("RETURN"))
-    //#endif
     private void drawPrivacyButtonTooltip(
         //#if MC>=12000
         //$$ DrawContext context,

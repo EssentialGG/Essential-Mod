@@ -18,10 +18,13 @@ import gg.essential.minecraftauth.microsoft.response.MicrosoftAuthorizationError
 import gg.essential.minecraftauth.util.JSON
 import gg.essential.minecraftauth.util.execute
 import gg.essential.util.Sha256
+import gg.essential.util.har.requestBodyContainsSecrets
+import gg.essential.util.har.responseBodyContainsSecrets
 import okhttp3.FormBody
 import okhttp3.HttpUrl
 import okhttp3.Request
 import java.net.URI
+import java.security.SecureRandom
 import java.util.*
 
 object MicrosoftAuthenticationService {
@@ -71,6 +74,13 @@ object MicrosoftAuthenticationService {
     }
 
     /**
+     * Generates a random token for use as `verifier` in [generateAuthorizationURI] and [exchangeCodeForAccessToken].
+     */
+    fun generateVerifierToken(): String {
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(32).also { SecureRandom().nextBytes(it) })
+    }
+
+    /**
      * Generates a URI to be opened on the user's browser to authenticate with Microsoft.
      *
      * @param verifier A string used to secure the grant that also must be passed when retrieving the access token.
@@ -110,6 +120,8 @@ object MicrosoftAuthenticationService {
         bodyBuilder(body)
         val (status, content) = Request.Builder().url(OAUTH_EXCHANGE_URL)
             .header("Accept", "application/json")
+            .requestBodyContainsSecrets()
+            .responseBodyContainsSecrets()
             .post(body
                 .add("client_id", CLIENT_ID)
                 .add("scope", SCOPE)

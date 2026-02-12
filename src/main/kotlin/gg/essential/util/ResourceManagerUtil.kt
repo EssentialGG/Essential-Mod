@@ -56,7 +56,7 @@ object ResourceManagerUtil : IResourceManagerReloadListener {
     //$$     backgroundExecutor: Executor,
     //$$     stage: Synchronizer,
     //$$     gameExecutor: Executor,
-    //$$ ): CompletableFuture<Void> {
+    //$$ ): CompletableFuture<Void?> {
     //#else
     //#if MC<=11202
     override fun onResourceManagerReload(ignored: IResourceManager) {

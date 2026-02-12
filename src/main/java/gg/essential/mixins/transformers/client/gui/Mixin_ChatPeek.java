@@ -23,7 +23,7 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 @Mixin(GuiNewChat.class)
 public abstract class Mixin_ChatPeek {
 
-    //#if MC>=12111
+    //#if MC >= 1.21.11
     //$$ private static final String RENDER = "render(Lnet/minecraft/client/gui/hud/ChatHud$Backend;IIZ)V";
     //#else
     private static final String RENDER = "drawChat";
@@ -33,12 +33,26 @@ public abstract class Mixin_ChatPeek {
     private Minecraft mc;
 
     @ModifyVariable(method = RENDER, at = @At("HEAD"), ordinal = 0, argsOnly = true)
+    //#if MC >= 1.21.11
+    //$$ private boolean essential$visibleMessagesHidden(boolean original) {
+    //$$     return Essential.getInstance().getKeybindingRegistry().isHoldingChatPeek() || original;
+    //$$ }
+    //#else
     private int essential$modifyUpdateCounter(int updateCounter) {
         return Essential.getInstance().getKeybindingRegistry().isHoldingChatPeek() ? 0 : updateCounter;
     }
+    //#endif
 
-    @ModifyVariable(method = RENDER, at = @At("STORE"),
-        //#if MC>=11903
+    @ModifyVariable(method =
+            //#if MC >= 1.21.11
+            //$$ "forEachVisibleLine"
+            //#else
+            RENDER
+            //#endif
+            , at = @At("STORE"),
+        //#if MC >= 1.21.11
+        //$$ ordinal = 0
+        //#elseif MC >= 1.19.3
         //$$ ordinal = 3
         //#else
         ordinal = 1

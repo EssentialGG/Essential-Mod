@@ -454,7 +454,10 @@ fun ScrollComponent.holdScrollVerticalLocation(child: UIComponent, block: () -> 
     val offset = verticalOffset
     val top = child.getTop()
     block()
+    // can't know which one to call, so just call both; holdScrollVerticalLocation should die out with ScrollComponentV2 anyway
+    @Suppress("DEPRECATION")
     animationFrame()
+    Window.of(this).invalidateCachedConstraints()
     val newTop = child.getTop()
     scrollTo(verticalOffset = offset - (newTop - top), smoothScroll = false)
 }

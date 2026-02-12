@@ -21,8 +21,10 @@ import gg.essential.cosmetics.CosmeticBundleId
 import gg.essential.cosmetics.CosmeticCategoryId
 import gg.essential.cosmetics.CosmeticId
 import gg.essential.cosmetics.model.CosmeticStoreBundle
+import gg.essential.gui.elementa.state.v2.State
 import gg.essential.gui.elementa.state.v2.add
 import gg.essential.gui.elementa.state.v2.clear
+import gg.essential.gui.elementa.state.v2.combinators.letState
 import gg.essential.gui.elementa.state.v2.set
 import gg.essential.mod.EssentialAsset
 import gg.essential.mod.cosmetics.CosmeticAssets
@@ -32,6 +34,7 @@ import gg.essential.mod.cosmetics.CosmeticType
 import gg.essential.mod.cosmetics.featured.FeaturedItem
 import gg.essential.mod.cosmetics.featured.FeaturedItemRow
 import gg.essential.network.CMConnection
+import gg.essential.network.cosmetics.Cosmetic
 import gg.essential.network.cosmetics.toMod
 import gg.essential.util.Client
 import gg.essential.util.logExceptions
@@ -107,7 +110,7 @@ class InfraCosmeticsData private constructor(
 
         for ((index, cosmetic) in state.cosmetics.get().withIndex()) {
             if (cosmetic.type.id == type.id && cosmetic.type != type) {
-                state.cosmetics.set(index, cosmetic.copy(type = type))
+                state.cosmetics.set(index, cosmetic.copy(base = cosmetic.base.copy(type = type)))
             }
         }
     }
@@ -254,6 +257,17 @@ class InfraCosmeticsData private constructor(
                 || (activeBundleRequests.anyActive())
                 || ((featuredPageCollectionLoading?.let { Duration.between(it, now).toMillis() < timeoutMs } ?: false))
                 || cosmeticsLoading.anyActive()
+    }
+
+    override fun cosmetic(id: CosmeticId): State<Cosmetic?> {
+        return state.cosmetic(id).letState {
+            if (it == null) {
+                requestCosmeticsIfMissing(listOf(id))
+                null
+            } else {
+                it
+            }
+        }
     }
 
     companion object {

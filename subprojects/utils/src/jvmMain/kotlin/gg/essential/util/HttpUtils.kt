@@ -14,8 +14,13 @@ package gg.essential.util
 
 import gg.essential.data.VersionInfo
 import gg.essential.handlers.CertChain
+import gg.essential.util.har.HarFile
+import gg.essential.util.har.HarFileLogger
+import gg.essential.util.har.HttpLoggingEventListener
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.future.asDeferred
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -25,6 +30,7 @@ import okhttp3.Callback
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
+import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.io.InputStream
 import java.nio.file.Path
@@ -34,12 +40,27 @@ import javax.net.ssl.X509TrustManager
 import kotlin.coroutines.resumeWithException
 import kotlin.io.path.outputStream
 
+private val harFileLogger = HarFileLogger(
+    CoroutineScope(SupervisorJob().also { job ->
+        Runtime.getRuntime().addShutdownHook(Thread {
+            job.cancel()
+            runBlocking { job.join() }
+        })
+    }),
+    HarFile.Creator("Essential", VersionInfo().essentialVersion),
+)
+
 val httpClient: CompletableFuture<OkHttpClient> = CompletableFuture.supplyAsync {
     val (sslContext, trustManagers) = CertChain().loadEmbedded().done()
     val trustManager = trustManagers[0] as X509TrustManager
     OkHttpClient.Builder()
         .sslSocketFactory(sslContext.socketFactory, trustManager)
         .readTimeout(60, TimeUnit.SECONDS)
+        .eventListenerFactory(HttpLoggingEventListener.Factory(
+            LoggerFactory.getLogger("Essential - HTTP"),
+            harFileLogger,
+        ))
+        .addInterceptor(HttpLoggingEventListener.Interceptor())
         .addInterceptor {
             it.proceed(
                 it.request().newBuilder()

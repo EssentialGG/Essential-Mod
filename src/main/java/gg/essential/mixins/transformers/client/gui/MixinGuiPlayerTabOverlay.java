@@ -52,7 +52,9 @@ public class MixinGuiPlayerTabOverlay {
         )
     )
     private int essential$increaseWidthForIcon(int x, @Local NetworkPlayerInfo networkPlayerInfo) {
-        return x;
+        int offset = 0;
+
+        return x + offset;
     }
 
     //#if MC>=12000
@@ -89,6 +91,8 @@ public class MixinGuiPlayerTabOverlay {
 
         OnlineIndicator.drawTabIndicatorOuter(drawContext, networkPlayerInfo, (int) x, (int) y);
 
-        return x;
+        int offset = 0;
+
+        return x + offset;
     }
 }

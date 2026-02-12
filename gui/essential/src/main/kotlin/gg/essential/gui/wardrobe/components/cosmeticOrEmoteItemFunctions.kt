@@ -28,9 +28,9 @@ import gg.essential.gui.notification.warning
 import gg.essential.gui.wardrobe.Item
 import gg.essential.gui.wardrobe.WardrobeCategory
 import gg.essential.gui.wardrobe.WardrobeState
+import gg.essential.gui.modals.FeatureDisabledModal
 import gg.essential.gui.wardrobe.hasEnoughCoins
 import gg.essential.gui.wardrobe.modals.CoinsPurchaseModal
-import gg.essential.gui.wardrobe.modals.StoreDisabledModal
 import gg.essential.gui.wardrobe.openPurchaseItemModal
 import gg.essential.gui.wardrobe.purchaseAndCreateOutfitForBundle
 import gg.essential.gui.wardrobe.purchaseCosmeticOrEmote
@@ -213,7 +213,7 @@ private fun getBundleRightClickOptions(item: Item.Bundle, wardrobeState: Wardrob
 
     fun purchaseOrClaim() {
         if (platform.disabledFeaturesManager.isFeatureDisabled(Feature.COSMETIC_PURCHASE)) {
-            platform.pushModal { StoreDisabledModal(it) }
+            platform.pushModal { FeatureDisabledModal.store(it) }
             return
         }
 
@@ -367,7 +367,7 @@ private fun sendItemPreviewTelemetry(item: Item, category: WardrobeCategory, war
 
 fun claimFreeItemNow(item: Item.CosmeticOrEmote, wardrobeState: WardrobeState) {
     if (platform.disabledFeaturesManager.isFeatureDisabled(Feature.COSMETIC_PURCHASE)) {
-        platform.pushModal { StoreDisabledModal(it) }
+        platform.pushModal { FeatureDisabledModal.store(it) }
         return
     }
 

@@ -25,9 +25,4 @@ dependencies {
 }
 
 kotlin.jvmToolchain(8)
-
-tasks.compileKotlin {
-    kotlinOptions {
-        moduleName = "essential" + project.path.replace(':', '-').lowercase()
-    }
-}
+kotlin.compilerOptions.moduleName.set("essential" + project.path.replace(':', '-').lowercase())

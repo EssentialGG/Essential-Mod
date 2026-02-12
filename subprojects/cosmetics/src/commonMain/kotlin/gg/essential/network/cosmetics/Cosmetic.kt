@@ -33,14 +33,16 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.UseSerializers
 
-@Serializable
-data class Cosmetic(
+data class CosmeticBase(
     val id: String,
     val type: CosmeticType,
     val tier: CosmeticTier,
     val displayNames: Map<String, String>,
     val files: Map<String, EssentialAsset>,
     val allProperties: List<CosmeticProperty>,
+)
+
+data class CosmeticStoreInfo(
     val storePackageId: Int,
     val prices: Map<String, Double>,
     val tags: Set<String>,
@@ -51,8 +53,46 @@ data class Cosmetic(
     val skinLayers: Map<SkinLayer, Boolean>,
     val categories: Map<String, Int>,
     val defaultSortWeight: Int,
+)
+
+data class Cosmetic(
+    val base: CosmeticBase,
+    val storeInfo: CosmeticStoreInfo,
     val diagnostics: List<Diagnostic>? = null, // null means unknown/loading, empty list means no issues
 ) {
+    val id: String
+        get() = base.id
+    val type: CosmeticType
+        get() = base.type
+    val tier: CosmeticTier
+        get() = base.tier
+    val displayNames: Map<String, String>
+        get() = base.displayNames
+    val files: Map<String, EssentialAsset>
+        get() = base.files
+    val allProperties: List<CosmeticProperty>
+        get() = base.allProperties
+    val storePackageId: Int
+        get() = storeInfo.storePackageId
+    val prices: Map<String, Double>
+        get() = storeInfo.prices
+    val tags: Set<String>
+        get() = storeInfo.tags
+    val createdAt: Instant
+        get() = storeInfo.createdAt
+    val availableAfter: Instant?
+        get() = storeInfo.availableAfter
+    val availableUntil: Instant?
+        get() = storeInfo.availableUntil
+    val showTimerAfter: Instant?
+        get() = storeInfo.showTimerAfter
+    val skinLayers: Map<SkinLayer, Boolean>
+        get() = storeInfo.skinLayers
+    val categories: Map<String, Int>
+        get() = storeInfo.categories
+    val defaultSortWeight: Int
+        get() = storeInfo.defaultSortWeight
+
     val baseAssets: CosmeticAssets
     val assetVariants: Map<String, CosmeticAssets>
     init {

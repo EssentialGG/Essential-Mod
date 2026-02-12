@@ -66,7 +66,7 @@ public class ServerWardrobeSettingsPacket extends Packet {
         return currentFeaturedPageConfig;
     }
 
-    public @Nullable Integer getYouNeedMinimumAmount() {
-        return youNeedMinimumAmount;
+    public int getYouNeedMinimumAmount() {
+        return youNeedMinimumAmount != null ? youNeedMinimumAmount : 100;
     }
 }

@@ -36,7 +36,7 @@ private fun CosmeticsDataWithChanges.updateCosmetic(cosmeticId: CosmeticId, func
  */
 fun CosmeticsDataWithChanges.removeCosmeticProperty(cosmeticId: CosmeticId, property: CosmeticProperty) {
     updateCosmetic(cosmeticId) {
-        copy(allProperties = allProperties - property)
+        copy(base = base.copy(allProperties = allProperties - property))
     }
 }
 
@@ -46,7 +46,7 @@ fun CosmeticsDataWithChanges.removeCosmeticProperty(cosmeticId: CosmeticId, prop
  */
 fun CosmeticsDataWithChanges.addCosmeticProperty(cosmeticId: CosmeticId, property: CosmeticProperty) {
     updateCosmetic(cosmeticId) {
-        copy(allProperties = allProperties.removeSingletonPropertyType(property.type) + property)
+        copy(base = base.copy(allProperties = allProperties.removeSingletonPropertyType(property.type) + property))
     }
 }
 
@@ -90,7 +90,7 @@ fun CosmeticsDataWithChanges.setCosmeticSingletonPropertyEnabled(
                 is CosmeticProperty.ExternalHiddenBone,
                 is CosmeticProperty.Unknown -> throw IllegalArgumentException("$type is not a singleton property")
             }
-            copy(allProperties = allProperties - existingProperty + updatedProperty)
+            copy(base = base.copy(allProperties = allProperties - existingProperty + updatedProperty))
         } else {
             val newProperty = when (type) {
                 CosmeticPropertyType.ARMOR_HANDLING -> CosmeticProperty.ArmorHandling(
@@ -178,7 +178,7 @@ fun CosmeticsDataWithChanges.setCosmeticSingletonPropertyEnabled(
                 CosmeticPropertyType.EXTERNAL_HIDDEN_BONE -> throw IllegalArgumentException("$type is not a singleton property")
 
             }
-            copy(allProperties = allProperties + newProperty)
+            copy(base = base.copy(allProperties = allProperties + newProperty))
         }
     }
 }
@@ -186,16 +186,16 @@ fun CosmeticsDataWithChanges.setCosmeticSingletonPropertyEnabled(
 fun CosmeticsDataWithChanges.setCosmeticPriceCoins(cosmeticId: CosmeticId, price: Int?) {
     updateCosmetic(cosmeticId) {
         if (price == null) {
-            copy(prices = prices - "coins")
+            copy(storeInfo = storeInfo.copy(prices = prices - "coins"))
         } else {
-            copy(prices = prices + ("coins" to price.toDouble()))
+            copy(storeInfo = storeInfo.copy(prices = prices + ("coins" to price.toDouble())))
         }
     }
 }
 
 fun CosmeticsDataWithChanges.setCosmeticTier(cosmeticId: CosmeticId, tier: CosmeticTier) {
     updateCosmetic(cosmeticId) {
-        copy(tier = tier)
+        copy(base = base.copy(tier = tier))
     }
 }
 
@@ -204,7 +204,7 @@ fun CosmeticsDataWithChanges.setCosmeticTier(cosmeticId: CosmeticId, tier: Cosme
  */
 fun CosmeticsDataWithChanges.setCosmeticType(cosmeticId: CosmeticId, type: CosmeticTypeId) {
     updateCosmetic(cosmeticId) {
-        copy(type = getType(type)!!)
+        copy(base = base.copy(type = getType(type)!!))
     }
 }
 
@@ -213,7 +213,7 @@ fun CosmeticsDataWithChanges.setCosmeticType(cosmeticId: CosmeticId, type: Cosme
  */
 fun CosmeticsDataWithChanges.setCosmeticDisplayName(cosmeticId: CosmeticId, displayName: String) {
     updateCosmetic(cosmeticId) {
-        copy(displayNames = displayNames + ("en_us" to displayName))
+        copy(base = base.copy(displayNames = displayNames + ("en_us" to displayName)))
     }
 }
 
@@ -222,7 +222,7 @@ fun CosmeticsDataWithChanges.setCosmeticDisplayName(cosmeticId: CosmeticId, disp
  */
 fun CosmeticsDataWithChanges.setCosmeticTags(cosmeticId: CosmeticId, tags: Set<String>) {
     updateCosmetic(cosmeticId) {
-        copy(tags = tags)
+        copy(storeInfo = storeInfo.copy(tags = tags))
     }
 }
 
@@ -231,7 +231,7 @@ fun CosmeticsDataWithChanges.setCosmeticTags(cosmeticId: CosmeticId, tags: Set<S
  */
 fun CosmeticsDataWithChanges.setCosmeticAvailable(cosmeticId: CosmeticId, availableAfter: Instant?, availableUntil: Instant?, showTimerAfter: Instant?) {
     updateCosmetic(cosmeticId) {
-        copy(availableAfter = availableAfter, availableUntil = availableUntil, showTimerAfter = showTimerAfter)
+        copy(storeInfo = storeInfo.copy(availableAfter = availableAfter, availableUntil = availableUntil, showTimerAfter = showTimerAfter))
     }
 }
 
@@ -240,7 +240,7 @@ fun CosmeticsDataWithChanges.setCosmeticAvailable(cosmeticId: CosmeticId, availa
  */
 fun CosmeticsDataWithChanges.setCosmeticDefaultSortWeight(cosmeticId: CosmeticId, defaultSortWeight: Int) {
     updateCosmetic(cosmeticId) {
-        copy(defaultSortWeight = defaultSortWeight)
+        copy(storeInfo = storeInfo.copy(defaultSortWeight = defaultSortWeight))
     }
 }
 
@@ -249,9 +249,9 @@ fun CosmeticsDataWithChanges.setCosmeticDefaultSortWeight(cosmeticId: CosmeticId
  */
 fun CosmeticsDataWithChanges.addToCategory(cosmeticId: CosmeticId, categoryId: CosmeticCategoryId, sortOrder: Int) {
     updateCosmetic(cosmeticId) {
-        copy(categories = categories.toMutableMap().apply {
+        copy(storeInfo = storeInfo.copy(categories = categories.toMutableMap().apply {
             this[categoryId] = sortOrder
-        })
+        }))
     }
 }
 
@@ -260,9 +260,9 @@ fun CosmeticsDataWithChanges.addToCategory(cosmeticId: CosmeticId, categoryId: C
  */
 fun CosmeticsDataWithChanges.removeCosmeticFromCategory(cosmeticId: CosmeticId, categoryId: CosmeticCategoryId) {
     updateCosmetic(cosmeticId) {
-        copy(categories = categories.toMutableMap().apply {
+        copy(storeInfo = storeInfo.copy(categories = categories.toMutableMap().apply {
             remove(categoryId)
-        })
+        }))
     }
 }
 

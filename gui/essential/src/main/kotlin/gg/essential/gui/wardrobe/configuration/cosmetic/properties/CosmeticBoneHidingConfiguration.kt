@@ -73,7 +73,7 @@ class CosmeticBoneHidingConfiguration(
                     val newPropertyList = cosmetic.allProperties.toMutableList()
                     newPropertyList.removeAll(boneHidingProperties)
                     newPropertyList.addAll(propertyList)
-                    cosmeticsDataWithChanges.updateCosmetic(cosmetic.id, cosmetic.copy(allProperties = newPropertyList))
+                    cosmeticsDataWithChanges.updateCosmetic(cosmetic.id, cosmetic.copy(base = cosmetic.base.copy(allProperties = newPropertyList)))
                 }
             }
         }

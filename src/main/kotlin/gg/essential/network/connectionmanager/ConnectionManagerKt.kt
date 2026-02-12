@@ -392,8 +392,8 @@ abstract class ConnectionManagerKt : CMConnection {
                     when (info.knownReason) {
                         KnownCloseReason.OUTDATED -> ConnectResult.Outdated
                         KnownCloseReason.SUSPENDED -> ConnectResult.Suspended(info)
+                        KnownCloseReason.DNS_FAILED,
                         null -> ConnectResult.Failed(info)
-                        else -> throw AssertionError() // FIXME: Workaround for compiler bug fixed in Kotlin 2.0
                     }
                 }
             }

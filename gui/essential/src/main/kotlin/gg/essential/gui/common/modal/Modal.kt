@@ -27,7 +27,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import org.slf4j.LoggerFactory
 
-abstract class Modal(val modalManager: ModalManager) : UIContainer() {
+abstract class Modal(
+    val modalManager: ModalManager,
+    val passThroughKeys: Boolean = false,
+) : UIContainer() {
 
     /**
      * A coroutine scope which lives until this modal is closed.
@@ -95,7 +98,9 @@ abstract class Modal(val modalManager: ModalManager) : UIContainer() {
 
         coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Client)
 
-        windowListListener = Window.of(this).keyTypedListeners.removeFirstOrNull()
+        // Retains the keyTypedListener from [OverlayManagerImpl.LayerImpl] that flags to pass through key events.
+        if (!passThroughKeys) windowListListener = Window.of(this).keyTypedListeners.removeFirstOrNull()
+
         Window.of(this).onKeyType(escapeListener)
 
         modalName?.let { FeatureSessionTelemetry.startEvent(it) }

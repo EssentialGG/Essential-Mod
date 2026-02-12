@@ -34,7 +34,7 @@ public abstract class Mixin_FixKeyBindingCategorySortingNPE {
     // Vanilla sorts its keybindings using an internal map.
     // Since our category isn't in that map, its sorting value will be null which vanilla doesn't handle.
     // To fix that, we add any missing categories on demand.
-    @ModifyArg(method = "compareTo", at = @At(value = "INVOKE", target = "Ljava/util/Map;get(Ljava/lang/Object;)Ljava/lang/Object;"))
+    @ModifyArg(method = "compareTo(Lnet/minecraft/client/settings/KeyBinding;)I", at = @At(value = "INVOKE", target = "Ljava/util/Map;get(Ljava/lang/Object;)Ljava/lang/Object;"))
     private Object ensureCategoryRegistered(Object category) {
         Map<String, Integer> map = Mixin_FixKeyBindingCategorySortingNPE.CATEGORY_ORDER;
         if (category instanceof String && !map.containsKey(category)) {

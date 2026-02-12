@@ -46,6 +46,7 @@ public class Mixin_GuiKeyTypedEvent {
     }
 
     @Inject(method = {
+        //#disable-remap OptiFine's naming is inconsistent with Forge, and it changes arguments, so these mustn't be qualified
         //#if MC>=11904
         //$$ "lambda$onKeyEvent$5",
         //$$ "lambda$keyPress$5",
@@ -53,6 +54,7 @@ public class Mixin_GuiKeyTypedEvent {
         "lambda$onKeyEvent$4",
         "lambda$keyPress$4",
         //#endif
+        //#enable-remap
         "method_1454"
     }, at = @At("HEAD"), cancellable = true, remap = false)
     //#if MC>=11903
@@ -89,6 +91,7 @@ public class Mixin_GuiKeyTypedEvent {
     }
 
     @Inject(method = {
+        //#disable-remap OptiFine's naming is inconsistent with Forge, and it changes arguments, so these mustn't be qualified
         //#if MC>=11904
         //$$ "lambda$onCharEvent$6",
         //$$ "lambda$charTyped$6",
@@ -96,6 +99,7 @@ public class Mixin_GuiKeyTypedEvent {
         "lambda$onCharEvent$5",
         "lambda$charTyped$5",
         //#endif
+        //#enable-remap
         "method_1458"
     }, at = @At("HEAD"), cancellable = true, remap = false)
     //#if MC>=11800 || FORGE==0
@@ -122,6 +126,7 @@ public class Mixin_GuiKeyTypedEvent {
     }
 
     @Inject(method = {
+        //#disable-remap OptiFine's naming is inconsistent with Forge, and it changes arguments, so these mustn't be qualified
         //#if MC>=11904
         //$$ "lambda$onCharEvent$7",
         //$$ "lambda$charTyped$7",
@@ -129,6 +134,7 @@ public class Mixin_GuiKeyTypedEvent {
         "lambda$onCharEvent$6",
         "lambda$charTyped$6",
         //#endif
+        //#enable-remap
         "method_1473"
     }, at = @At("HEAD"), cancellable = true, remap = false)
     //#if MC>=11800 || FORGE==0

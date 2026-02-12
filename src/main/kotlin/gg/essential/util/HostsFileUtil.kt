@@ -27,7 +27,13 @@ object HostsFileUtil {
      * If the file does not exist, or could not be read, null will be returned.
      */
     private fun readHostsFile(): String? {
-        val path = Path(if (os == OperatingSystem.WINDOWS) "C:\\Windows\\System32\\etc\\hosts" else "/etc/hosts")
+        val path = Path(
+            if (os == OperatingSystem.WINDOWS) {
+                "${System.getenv("windir") ?: "C:\\Windows"}\\System32\\drivers\\etc\\hosts"
+            } else {
+                "/etc/hosts"
+            }
+        )
 
         try {
             return path.readText()

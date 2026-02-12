@@ -22,6 +22,7 @@ import gg.essential.gui.skin.createSkinShareModal
 import gg.essential.gui.wardrobe.Item
 import gg.essential.gui.wardrobe.WardrobeState
 import gg.essential.gui.wardrobe.modals.SkinModal
+import gg.essential.network.connectionmanager.features.Feature
 import gg.essential.universal.UDesktop
 import gg.essential.universal.USound
 import gg.essential.util.*
@@ -44,7 +45,7 @@ fun handleSkinRightClick(skin: Item.SkinItem, wardrobeState: WardrobeState, even
         },
         ContextOptionMenu.Option("Share", EssentialPalette.UPLOAD_9X) {
             launchModalFlow(platform.createModalManager()) {
-                ensurePrerequisites(social = true)
+                ensurePrerequisites(Feature.SOCIAL)
                 modalManager.queueModal(createSkinShareModal(modalManager, skin))
             }
         },

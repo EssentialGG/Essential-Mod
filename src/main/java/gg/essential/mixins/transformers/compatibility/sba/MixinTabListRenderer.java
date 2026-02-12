@@ -53,6 +53,9 @@ public class MixinTabListRenderer {
             UDrawContext drawContext = new UDrawContext(new UMatrixStack());
             OnlineIndicator.drawTabIndicatorOuter(drawContext, networkPlayerInfo, (int) x, (int) y);
 
+            float offset = 0;
+
+            return x + offset;
         }
 
         return x;

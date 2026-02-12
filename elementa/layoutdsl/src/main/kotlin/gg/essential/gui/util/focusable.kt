@@ -14,10 +14,8 @@ package gg.essential.gui.util
 import gg.essential.elementa.UIComponent
 import gg.essential.elementa.components.Window
 import gg.essential.gui.elementa.state.v2.State
-import gg.essential.gui.elementa.state.v2.combinators.or
 import gg.essential.gui.elementa.state.v2.mutableStateOf
 import gg.essential.gui.elementa.state.v2.stateOf
-import gg.essential.gui.elementa.state.v2.toV2
 import gg.essential.gui.layoutdsl.Modifier
 import gg.essential.gui.layoutdsl.tag
 import gg.essential.gui.layoutdsl.then
@@ -38,9 +36,9 @@ fun Modifier.focusable(disabled: State<Boolean> = stateOf(false)): Modifier {
 /** Creates a hover scope for this component based on whether it is hovered by the mouse OR it has the Window's focus. */
 private fun UIComponent.makeFocusOrHoverScope() {
     val focused = focusedState()
-    val hovered = hoveredState().toV2()
+    val hovered = hoveredStateV2()
 
-    makeHoverScope(focused or hovered)
+    makeHoverScope { focused() || hovered() }
 }
 
 /** Returns a state indicating whether this component has the [Window]'s focus or not. */

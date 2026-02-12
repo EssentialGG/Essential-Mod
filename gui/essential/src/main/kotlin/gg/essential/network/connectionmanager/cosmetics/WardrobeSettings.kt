@@ -16,26 +16,33 @@ import gg.essential.gui.elementa.state.v2.combinators.*
 
 class WardrobeSettings {
 
-    private val settings: MutableState<Settings?> = mutableStateOf(null)
+    private val _outfitsLimit: MutableState<Int?> = mutableStateOf(null)
+    private val _skinsLimit: MutableState<Int?> = mutableStateOf(null)
+    private val _giftingCoinSpendRequirement: MutableState<Int?> = mutableStateOf(null)
+    private val _youNeedMinimumAmount: MutableState<Int?> = mutableStateOf(null)
 
-    val outfitsLimit = settings.map { it?.outfitsLimit ?: 0 }
-    val skinsLimit = settings.map { it?.skinsLimit ?: 0 }
-    val giftingCoinSpendRequirement = settings.map { it?.giftingCoinSpendRequirement ?: 0 }
-    val youNeedMinimumAmount = settings.map { it?.youNeedMinimumAmount ?: 100 }
+    val outfitsLimit = _outfitsLimit.letState { it ?: 0 }
+    val skinsLimit = _skinsLimit.letState { it ?: 0 }
+    val giftingCoinSpendRequirement = _giftingCoinSpendRequirement.letState { it ?: 0 }
+    val youNeedMinimumAmount = _youNeedMinimumAmount.letState { it ?: 0 }
 
-    fun populateSettings(outfitLimit: Int, skinsLimit: Int, giftingCoinSpendRequirement: Int, youNeedMinimumAmount: Int?) {
-        settings.set(Settings(outfitLimit, skinsLimit, giftingCoinSpendRequirement, youNeedMinimumAmount))
-    }
+    fun populateOutfitsLimit(limit: Int) =
+        _outfitsLimit.set(limit)
+
+    fun populateSkinsLimit(limit: Int) =
+        _skinsLimit.set(limit)
+
+    fun populateGiftingCoinSpendRequirement(requirement: Int) =
+        _giftingCoinSpendRequirement.set(requirement)
+
+    fun populateYouNeedMinimumAmount(amount: Int) =
+        _youNeedMinimumAmount.set(amount)
 
     fun isSettingsLoaded(): Boolean {
-        return settings.get() != null
+        return _outfitsLimit.getUntracked() != null &&
+                _skinsLimit.getUntracked() != null &&
+                _giftingCoinSpendRequirement.getUntracked() != null &&
+                _youNeedMinimumAmount.getUntracked() != null
     }
-
-    private data class Settings(
-        val outfitsLimit: Int,
-        val skinsLimit: Int,
-        val giftingCoinSpendRequirement: Int,
-        val youNeedMinimumAmount: Int?
-    )
 
 }

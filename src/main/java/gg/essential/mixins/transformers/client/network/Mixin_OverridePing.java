@@ -42,20 +42,7 @@ public class Mixin_OverridePing {
     private ServerData server;
 
     @Inject(
-        // FIXME remap bug: should be able to remap these
-        //#if FABRIC
-        //#if MC>=12002
-        //$$ method = "onPingResult",
-        //#else
-        //$$ method = "onPong",
-        //#endif
-        //#else
-        //#if MC>=11700
-        //$$ method = "handlePongResponse",
-        //#else
         method = "handlePong",
-        //#endif
-        //#endif
         at = @At(value = "FIELD", target = "Lnet/minecraft/client/multiplayer/ServerData;pingToServer:J", shift = At.Shift.AFTER)
     )
     private void overridePing(CallbackInfo ci) {

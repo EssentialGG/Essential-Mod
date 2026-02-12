@@ -33,6 +33,9 @@ import java.awt.Color
 class ModalManagerImpl(
     private val overlayManager: OverlayManager,
     private val backgroundColor: Color = Color.BLACK.withAlpha(150),
+    val pausesGame: Boolean = true, // @see [Layer.pausesGame]
+    val allowPlayerInput: Boolean = false, // @see [Layer.allowPlayerInput]
+    val doFadeInTransition: Boolean = true,
 ) : ModalManager {
     override val coroutineScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Client)
 
@@ -87,10 +90,15 @@ class ModalManagerImpl(
                 height = 100.percentOfWindow()
             } childOf window
 
-            isCurrentlyFadingIn = true
-            FadeInTransition(defaultEssentialModalFadeTime).transition(window) {
-                isCurrentlyFadingIn = false
+            if (doFadeInTransition) {
+                isCurrentlyFadingIn = true
+                FadeInTransition(defaultEssentialModalFadeTime).transition(window) {
+                    isCurrentlyFadingIn = false
+                }
             }
+
+            this.pausesGame = this@ModalManagerImpl.pausesGame
+            this.allowPlayerInput = this@ModalManagerImpl.allowPlayerInput
 
             this@ModalManagerImpl.layer = this
         }

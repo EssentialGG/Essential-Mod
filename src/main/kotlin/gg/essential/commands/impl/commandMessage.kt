@@ -15,6 +15,7 @@ import gg.essential.Essential
 import gg.essential.commands.engine.EssentialFriend
 import gg.essential.gui.modals.ensurePrerequisites
 import gg.essential.network.connectionmanager.EarlyResponseHandler
+import gg.essential.network.connectionmanager.features.Feature
 import gg.essential.util.GuiUtil
 import java.util.*
 import kotlin.coroutines.cancellation.CancellationException
@@ -22,7 +23,7 @@ import kotlin.coroutines.cancellation.CancellationException
 fun handleMessageCommand(friend: EssentialFriend, message: String, handler: EarlyResponseHandler) {
     GuiUtil.launchModalFlow {
         try {
-            ensurePrerequisites(social = true)
+            ensurePrerequisites(Feature.SOCIAL)
         } catch (exception: CancellationException) {
             handler.accept(Optional.empty())
             throw exception

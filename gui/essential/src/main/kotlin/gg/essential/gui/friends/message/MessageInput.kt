@@ -27,6 +27,7 @@ import gg.essential.gui.common.IconButton
 import gg.essential.gui.common.input.UIMultilineTextInput
 import gg.essential.gui.elementa.state.v2.MutableState
 import gg.essential.gui.elementa.state.v2.State
+import gg.essential.gui.elementa.state.v2.clear
 import gg.essential.gui.elementa.state.v2.combinators.map
 import gg.essential.gui.elementa.state.v2.effect
 import gg.essential.gui.elementa.state.v2.memo
@@ -39,11 +40,14 @@ import gg.essential.gui.friends.message.v2.ClientMessage
 import gg.essential.gui.friends.state.SocialStates
 import gg.essential.gui.image.ImageFactory
 import gg.essential.gui.layoutdsl.*
+import gg.essential.gui.modals.FeatureDisabledModal
 import gg.essential.gui.notification.Notifications
 import gg.essential.gui.notification.warning
+import gg.essential.network.connectionmanager.features.Feature
 import gg.essential.universal.ChatColor
 import gg.essential.universal.UKeyboard
 import gg.essential.universal.USound
+import gg.essential.util.GuiEssentialPlatform.Companion.platform
 import gg.essential.util.UuidNameLookup
 import gg.essential.util.scrollGradient
 import gg.essential.vigilance.utils.onLeftClick
@@ -330,6 +334,14 @@ class MessageInput(
             Notifications.warning("Too many characters", "You have exceeded the\n$charLimit character limit.")
             return
         }
+
+        if (screenshotAttachmentManager.hasSelectedImages.getUntracked()
+                && platform.disabledFeaturesManager.isFeatureDisabled(Feature.MEDIA)) {
+            screenshotAttachmentManager.selectedImages.clear()
+            platform.pushModal { FeatureDisabledModal.media(it) }
+            return
+        }
+
         //Keep calling the replacement until there are no more changes
         //&sect&sect;; will pass the filter because on the first pass
         // &sect; is replaced but still leaves &sect;

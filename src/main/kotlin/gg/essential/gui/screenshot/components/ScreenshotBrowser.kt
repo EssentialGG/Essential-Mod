@@ -44,7 +44,7 @@ import gg.essential.universal.UMinecraft
 import gg.essential.util.*
 import java.nio.file.Path
 
-class ScreenshotBrowser(editPath: Path? = null): InternalEssentialGUI(
+class ScreenshotBrowser(editPath: Path? = null) : InternalEssentialGUI(
     ElementaVersion.V6,
     "Pictures",
     discordActivityDescription = "Browsing pictures",

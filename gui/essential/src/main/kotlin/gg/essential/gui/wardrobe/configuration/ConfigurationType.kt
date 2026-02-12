@@ -158,8 +158,33 @@ class ConfigurationType<I, T> private constructor(
             displayPlural = "Featured page collections",
             stateSupplier = { Triple(it.currentlyEditingFeaturedPageCollectionId, it.currentlyEditingFeaturedPageCollection, it.rawFeaturedPageCollections) },
             groupingSupplier = { list ->
-                list.groupBy { collection -> collection.availability?.after?.atZone(ZoneId.of("UTC"))?.let { "${it.month.name} ${it.year}" } }
-                    .flatMap { (date, list) -> if(date == null) list.map { ConfigurationMenu.Single(it) } else listOf(ConfigurationMenu.Multi(date, list)) }
+                // Sorts collections as:
+                // - DEFAULT (exact id match) is separate and at the top as standalone thing (no group)
+                // - Templates (group, anything with "template" in name)
+                // - Other (group, everything without availability, and not a template or 'default')
+                // - everything else grouped by month+year
+                val defaultCollection = "default"
+                val otherGroupName = "Other/Testing"
+                val templateGroupName = "Templates"
+                list.groupBy { collection ->
+                    when {
+                        collection.id.equals(defaultCollection, ignoreCase = true) -> defaultCollection
+                        collection.id.contains("template", ignoreCase = true) -> templateGroupName
+                        else -> collection.availability?.after?.atZone(ZoneId.of("UTC"))?.let { "${it.month.name} ${it.year}" } ?: otherGroupName
+                    }
+                }.mapNotNull { (name, list) ->
+                    when (name) {
+                        defaultCollection -> list.firstOrNull()?.let { ConfigurationMenu.Single(it) }
+                        else -> ConfigurationMenu.Multi(name, null, list)
+                    }
+                }.sortedBy {
+                    when {
+                        it is ConfigurationMenu.Single -> 0
+                        it is ConfigurationMenu.Multi && it.name == templateGroupName -> 1
+                        it is ConfigurationMenu.Multi && it.name == otherGroupName -> 2
+                        else -> 3
+                    }
+                }
             },
             idAndNameMapper = { it.id to it.id },
             comparator = compareByDescending { it.availability?.after ?: Instant.MAX },

@@ -75,12 +75,14 @@ public abstract class Mixin_SoundSystemExt_SoundManager implements SoundSystemEx
     @Group(name = "setListener", min = 1)
     @Inject(method = "setListener(Lnet/minecraft/entity/player/EntityPlayer;F)V", at = @At("HEAD"))
     private void recordListenerPosition(EntityPlayer player, float partialTicks, CallbackInfo ci) {
+    //#if MC >= 1.12
         recordListenerPosition((Entity) player, partialTicks, ci);
     }
     @Group(name = "setListener", min = 1)
     @Inject(method = "setListener(Lnet/minecraft/entity/Entity;F)V", at = @At("HEAD"), remap = false)
     @Dynamic("https://github.com/MinecraftForge/MinecraftForge/commit/6f642ba6ceb1978abdd5d63a5e4227f4cd1afa23")
     private void recordListenerPosition(Entity player, float partialTicks, CallbackInfo ci) {
+    //#endif
         if (player == null) return;
 
         double x = player.prevPosX + (player.posX - player.prevPosX) * partialTicks;

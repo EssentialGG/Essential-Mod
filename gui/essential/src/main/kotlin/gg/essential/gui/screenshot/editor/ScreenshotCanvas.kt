@@ -359,10 +359,6 @@ class ScreenshotCanvas(
                         }
                     }
                     draggingCrop.set(crop)
-                    //We changed a state that can change the position of this item,
-                    //Therefore, we want to call animationFrame to invalidate the cached
-                    //x and y
-                    animationFrame()
                 }
             }
         }

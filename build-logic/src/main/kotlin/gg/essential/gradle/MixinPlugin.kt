@@ -49,6 +49,7 @@ private fun Project.configureMixin(platform: Platform) {
 private fun Project.configureLoomMixin() {
     extensions.configure<LoomGradleExtensionAPI> {
         mixin {
+            useLegacyMixinAp.set(true) // TODO ideally migrate away from this
             defaultRefmapName.set("mixins.essential.refmap.json")
         }
     }
@@ -62,12 +63,7 @@ private fun Project.addMixinDependency(platform: Platform) {
     dependencies {
         if (platform.mcVersion < 11400) {
             // Our special mixin which has its Guava 21 dependency relocated, so it can run alongside Guava 17
-            "implementation"(project(":mixin-compat"))
-            // and outside dev, with extra patches for improved backwards compat (we cannot easily use those in dev
-            // cause IntelliJ does not run any tasks during import)
-            configurations.matching { it.name == "bundle" }.configureEach {
-                "bundle"(project(":mixin-compat", "patched"))
-            }
+            "implementation"("jij"("gg.essential:mixin:0.1.0+mixin.0.8.4")!!)
         }
 
         // Use more recent mixin AP so we get reproducible refmaps (and hopefully less bugs in general)

@@ -14,8 +14,9 @@ package gg.essential.mod.vigilance2
 import gg.essential.gui.elementa.state.v2.ListState
 import gg.essential.gui.elementa.state.v2.MutableState
 import gg.essential.gui.elementa.state.v2.ReferenceHolderImpl
-import gg.essential.gui.elementa.state.v2.combinators.bimap
+import gg.essential.gui.elementa.state.v2.combinators.bimapState
 import gg.essential.gui.elementa.state.v2.mutableStateOf
+import gg.essential.gui.elementa.state.v2.onChange
 import gg.essential.mod.vigilance2.builder.StateBackedPropertyValue
 import gg.essential.vigilance.Vigilant
 import gg.essential.vigilance.data.Migration
@@ -49,7 +50,7 @@ open class Vigilant2 {
         val (category, name) = path.split(".", limit = 2)
         val attributes = PropertyAttributesExt(type, name, category, hidden = true)
         propertyCollector.lateBindProperties.add { instance ->
-            state.onSetValue(referenceHolder) { instance.markDirty() }
+            state.onChange(referenceHolder) { instance.markDirty() }
             PropertyData(attributes, StateBackedPropertyValue(state, true), instance)
         }
         return state
@@ -69,7 +70,7 @@ open class Vigilant2 {
 
     inline fun <reified T : Enum<T>> property(path: String, defaultValue: T): MutableState<T> =
         property(path, PropertyType.SELECTOR, defaultValue.ordinal)
-            .bimap({ T::class.java.enumConstants[it] }, { it.ordinal })
+            .bimapState({ T::class.java.enumConstants[it] }, { it.ordinal })
 
     //endregion
 

@@ -58,12 +58,7 @@ public abstract class Mixin_FixArrowsStuckInUnusedPlayerModelPart extends ModelB
 
     @Inject(method = "<init>", at = @At(
         value = "ESSENTIAL:FIELD_IN_INIT",
-        // FIXME remap bug: field name isn't remapped (probably need to traverse up the class hierarchy)
-        //#if MC>=11600 && FABRIC
-        //$$ target = "Lnet/minecraft/client/render/entity/model/PlayerEntityModel;leftArm:Lnet/minecraft/client/model/ModelPart;",
-        //#else
         target = "Lnet/minecraft/client/model/ModelPlayer;bipedLeftArm:Lnet/minecraft/client/model/ModelRenderer;",
-        //#endif
         opcode = Opcodes.PUTFIELD
     ))
     private void removeOverwrittenModelPartsFromPartsList(CallbackInfo ci) {

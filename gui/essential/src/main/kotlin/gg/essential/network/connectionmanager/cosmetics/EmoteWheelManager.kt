@@ -15,7 +15,6 @@ import gg.essential.connectionmanager.common.packet.cosmetic.emote.ClientCosmeti
 import gg.essential.connectionmanager.common.packet.cosmetic.emote.ClientCosmeticEmoteWheelUpdatePacket
 import gg.essential.connectionmanager.common.packet.cosmetic.emote.ServerCosmeticEmoteWheelPopulatePacket
 import gg.essential.cosmetics.CosmeticId
-import gg.essential.cosmetics.model.EmoteWheel
 import gg.essential.gui.elementa.state.v2.MutableState
 import gg.essential.gui.elementa.state.v2.State
 import gg.essential.gui.elementa.state.v2.clear
@@ -32,7 +31,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
-import java.util.*
 import kotlin.time.Duration.Companion.seconds
 
 class EmoteWheelManager(
@@ -57,8 +55,15 @@ class EmoteWheelManager(
 
     init {
         connectionManager.registerPacketHandler<ServerCosmeticEmoteWheelPopulatePacket> { packet ->
-            populateEmoteWheels(packet.emoteWheels())
+            populateEmoteWheels(
+                packet.emoteWheels().map { it.toMod() },
+                packet.emoteWheels().find { it.selected() }?.id()
+            )
         }
+    }
+
+    override fun onConnected() {
+        super.onConnected()
     }
 
     override fun resetState() {
@@ -92,15 +97,15 @@ class EmoteWheelManager(
         return newIndex
     }
 
-    private fun populateEmoteWheels(emoteWheels: List<EmoteWheel>) {
-        this.emoteWheels.setAll(emoteWheels.map { it.toMod() })
+    private fun populateEmoteWheels(emoteWheels: List<EmoteWheelPage>, selectedId: String?) {
+        this.emoteWheels.setAll(emoteWheels)
 
-        sentEmoteWheelId = emoteWheels.find { it.selected() }?.id()
+        sentEmoteWheelId = selectedId
         mutableSelectedEmoteWheelId.set(sentEmoteWheelId)
 
         if (mutableSelectedEmoteWheelId.getUntracked() == null) {
             LOGGER.error("No emote wheel was selected, selecting the first one.")
-            emoteWheels.firstOrNull()?.id()?.let { selectEmoteWheel(it) }
+            emoteWheels.firstOrNull()?.id?.let { selectEmoteWheel(it) }
         }
     }
 

@@ -139,10 +139,13 @@ public class ServerChatChannelMessagePacketHandler extends PacketHandler<ServerC
                 if (EssentialConfig.INSTANCE.getMessageSound() && !EssentialConfig.INSTANCE.getStreamerMode()) {
                     USound.INSTANCE.playExpSound();
                 }
+
+                String messageContents;
+                messageContents = message.getContents(EssentialConfig.INSTANCE.getChatFilterWithSource().getUntracked().getFirst());
                
                 Notifications.INSTANCE.push(
                         notificationTitle,
-                        message.getContents(),
+                        messageContents,
                         4f,
                         () -> {
                             GuiUtil.openScreen(SocialMenu.class, () -> new SocialMenu(channel.getId()));

@@ -14,25 +14,31 @@ package gg.essential.mod.cosmetics
 import gg.essential.mod.EssentialAsset
 import gg.essential.model.util.now
 import gg.essential.network.cosmetics.Cosmetic
+import gg.essential.network.cosmetics.CosmeticBase
+import gg.essential.network.cosmetics.CosmeticStoreInfo
 
 const val CAPE_DISABLED_COSMETIC_ID = "CAPE_DISABLED"
 
 @JvmField
 val CAPE_DISABLED_COSMETIC = Cosmetic(
-    CAPE_DISABLED_COSMETIC_ID,
-    CosmeticType("CAPE", CosmeticSlot.CAPE, emptyMap(), emptyMap()),
-    CosmeticTier.COMMON,
-    emptyMap(),
-    mapOf("geometry.steve.json" to EssentialAsset.of("""{"format_version": "1.12.0"}""")),
-    emptyList(),
-    -1,
-    emptyMap(),
-    emptySet(),
-    now(),
-    null,
-    null,
-    null,
-    emptyMap(),
-    emptyMap(),
-    0,
+    CosmeticBase(
+        CAPE_DISABLED_COSMETIC_ID,
+        CosmeticType("CAPE", CosmeticSlot.CAPE, emptyMap(), emptyMap()),
+        CosmeticTier.COMMON,
+        emptyMap(),
+        mapOf("geometry.steve.json" to EssentialAsset.of("""{"format_version": "1.12.0"}""")),
+        emptyList(),
+    ),
+    CosmeticStoreInfo(
+        -1,
+        emptyMap(),
+        emptySet(),
+        now(),
+        null,
+        null,
+        null,
+        emptyMap(),
+        emptyMap(),
+        0,
+    ),
 )

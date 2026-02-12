@@ -16,14 +16,14 @@ import net.minecraft.client.settings.KeyBinding;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-//#if FORGE==0
+//#if !FORGE
 //$$ import org.spongepowered.asm.mixin.Mutable;
 //#endif
 
 @Mixin(GameSettings.class)
 public interface GameOptionsAccessor {
     @Accessor
-    //#if FORGE==0
+    //#if !FORGE
     //$$ @Mutable
     //#endif
     void setKeyBindings(KeyBinding[] keyBindings);

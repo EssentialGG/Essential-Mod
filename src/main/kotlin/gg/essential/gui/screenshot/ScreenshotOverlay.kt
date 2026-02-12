@@ -64,6 +64,7 @@ import gg.essential.gui.screenshot.constraints.AspectPreservingFillConstraint
 import gg.essential.gui.screenshot.toast.ScreenshotPreviewAction
 import gg.essential.gui.screenshot.toast.ScreenshotPreviewActionSlot
 import gg.essential.gui.util.hoveredState
+import gg.essential.network.connectionmanager.features.Feature
 import gg.essential.universal.UResolution
 import gg.essential.universal.USound
 import gg.essential.util.GuiUtil
@@ -337,7 +338,7 @@ class ScreenshotPreviewToast(val file: File) : ScreenshotToast() {
                     val upload: () -> Unit = { connectionManager.screenshotManager.uploadAndCopyLinkToClipboard(file.toPath()) }
 
                     GuiUtil.launchModalFlow {
-                        ensurePrerequisites()
+                        ensurePrerequisites(Feature.MEDIA)
                         upload()
                     }
                 }

@@ -11,12 +11,12 @@
  */
 package gg.essential.gui.elementa.essentialmarkdown.ext.colorattribute.internal
 
-import gg.essential.elementa.impl.commonmark.node.Node
-import gg.essential.elementa.impl.commonmark.node.Nodes
-import gg.essential.elementa.impl.commonmark.node.SourceSpans
-import gg.essential.elementa.impl.commonmark.node.Text
-import gg.essential.elementa.impl.commonmark.parser.delimiter.DelimiterProcessor
-import gg.essential.elementa.impl.commonmark.parser.delimiter.DelimiterRun
+import org.commonmark.node.Node
+import org.commonmark.node.Nodes
+import org.commonmark.node.SourceSpans
+import org.commonmark.node.Text
+import org.commonmark.parser.delimiter.DelimiterProcessor
+import org.commonmark.parser.delimiter.DelimiterRun
 import gg.essential.gui.elementa.essentialmarkdown.ext.colorattribute.ColorAttribute
 import java.awt.Color
 

@@ -11,8 +11,8 @@
  */
 package gg.essential.gui.elementa.essentialmarkdown.ext.colorattribute
 
-import gg.essential.elementa.impl.commonmark.parser.Parser
 import gg.essential.gui.elementa.essentialmarkdown.ext.colorattribute.internal.ColorAttributeDelimiterProcessor
+import org.commonmark.parser.Parser
 
 class ColorAttributeExtension : Parser.ParserExtension {
 

@@ -33,6 +33,7 @@ import gg.essential.gui.elementa.state.v2.MutableState;
 import gg.essential.gui.elementa.state.v2.State;
 import gg.essential.gui.elementa.state.v2.collections.MutableTrackedList;
 import gg.essential.gui.elementa.state.v2.collections.TrackedList;
+import gg.essential.gui.modals.FeatureDisabledModal;
 import gg.essential.gui.notification.Notifications;
 import gg.essential.gui.screenshot.LocalScreenshot;
 import gg.essential.gui.screenshot.ScreenshotId;
@@ -61,6 +62,7 @@ import gg.essential.media.model.MediaVariant;
 import gg.essential.network.connectionmanager.ConnectionManager;
 import gg.essential.network.connectionmanager.NetworkedManager;
 import gg.essential.network.connectionmanager.chat.ChatManager;
+import gg.essential.network.connectionmanager.features.Feature;
 import gg.essential.network.connectionmanager.handler.screenshot.ServerScreenshotListPacketHandler;
 import gg.essential.sps.SpsAddress;
 import gg.essential.universal.UDesktop;
@@ -265,6 +267,13 @@ public class ScreenshotManager implements NetworkedManager, IScreenshotManager {
 
     @Override
     public CompletableFuture<Media> uploadAndCopyLinkToClipboard(Path path, ClientScreenshotMetadata metadata) {
+        // Check for media system feature availability before the ScreenshotUploadToast is started
+        if (Essential.getInstance().getConnectionManager().getDisabledFeaturesManager().isFeatureDisabled(Feature.MEDIA)) {
+            GuiUtil.INSTANCE.pushModal(FeatureDisabledModal.Companion::media);
+            CompletableFuture<Media> future = new CompletableFuture<>();
+            future.completeExceptionally(new ScreenshotUploadException("Media systems currently unavailable"));
+            return future;
+        }
         return uploadAndCopyLinkToClipboard(path, metadata, ScreenshotUploadToast.create());
     }
 

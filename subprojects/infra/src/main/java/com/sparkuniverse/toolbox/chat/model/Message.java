@@ -48,6 +48,9 @@ public class Message {
     @SerializedName("created_at")
     public final long createdAt;
 
+    @SerializedName("unfiltered_contents")
+    @Nullable String unfilteredContents;
+
     public Message(
             final long id,
             final long channelId,
@@ -66,6 +69,28 @@ public class Message {
         this.replyTargetId = replyTargetId;
         this.lastEditTime = lastEditTime;
         this.createdAt = createdAt;
+    }
+
+    public Message(
+            final long id,
+            final long channelId,
+            final @NotNull UUID sender,
+            final @NotNull String contents,
+            final boolean read,
+            final @Nullable Long replyTargetId,
+            final @Nullable Long lastEditTime,
+            final long createdAt,
+            final @Nullable String unfilteredContents
+    ) {
+        this.id = id;
+        this.channelId = channelId;
+        this.sender = sender;
+        this.contents = contents;
+        this.read = read;
+        this.replyTargetId = replyTargetId;
+        this.lastEditTime = lastEditTime;
+        this.createdAt = createdAt;
+        this.unfilteredContents = unfilteredContents;
     }
 
     public long getId() {
@@ -103,6 +128,18 @@ public class Message {
 
     public long getCreatedAt() {
         return this.createdAt;
+    }
+
+    public @Nullable String getUnfilteredContents() {
+        return unfilteredContents;
+    }
+
+    public String getContents(boolean filtered) {
+        if (!filtered && this.unfilteredContents != null) {
+            return this.unfilteredContents;
+        } else {
+            return this.contents;
+        }
     }
 
     @Override

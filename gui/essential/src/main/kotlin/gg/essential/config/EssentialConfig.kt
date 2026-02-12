@@ -283,6 +283,8 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
 
     val collectOptionalTelemetryWithSource = mutableStateOf(/*state*/true to /*updateInfra*/false)
 
+    val chatFilterWithSource = mutableStateOf(/*state*/true to /*updateInfra*/false)
+
     override val migrations = listOf(
         Migration { config ->
             val overrideGuiScale = config.remove("general.general.gui_scale") as Boolean? ?: return@Migration
@@ -686,6 +688,14 @@ object EssentialConfig : Vigilant2(), GuiEssentialPlatform.Config {
                 switch(collectOptionalTelemetryWithSource.bimap({ it.first }, { it to true })) {
                     name = "Collect optional telemetry data"
                     description = "Give Essential permission to collect additional telemetry data to help improve your experience."
+                }
+            }
+        }
+        category("Chat Safety") {
+            subcategory("Chat Safety") {
+                switch(chatFilterWithSource.bimap({ it.first }, { it to true })) {
+                    name = "Chat filter"
+                    description = "Prevents inappropriate or offensive language from appearing in chat"
                 }
             }
         }

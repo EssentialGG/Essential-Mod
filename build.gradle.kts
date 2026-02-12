@@ -19,9 +19,9 @@ plugins {
     id("gg.essential.defaults")
     id("gg.essential.defaults.repo")
     id("gg.essential.multi-version")
-    id("gg.essential.mixin")
     id("gg.essential.bundle")
     id("gg.essential.relocate")
+    id("gg.essential.mixin")
     id("essential.embedded-loader")
     id("essential.pinned-jar")
 }
@@ -191,7 +191,9 @@ tasks.jar {
         manifest {
             if (mcVersion >= 11400) {
                 attributes("MixinConfigs" to "mixins.essential.json,mixins.essential.init.json,mixins.essential.modcompat.json,mixins.essential.tests.json")
-                attributes("Requires-Essential-Stage2-Version" to "1.6.0")
+                attributes("Requires-Essential-Stage2-Version" to "1.7.1")
+            } else {
+                attributes("Requires-Essential-Stage2-Version" to "1.7.0")
             }
         }
     }
@@ -227,6 +229,9 @@ tasks.relocatedJar {
 
     // pseudotcp
     relocate("org.ice4j", "gg.essential.lib.ice4j")
+
+    // EssentialMarkdown
+    relocate("org.commonmark", "gg.essential.lib.commonmark")
 
     // connection-manager
     relocate("org.java_websocket", "gg.essential.lib.websocket")

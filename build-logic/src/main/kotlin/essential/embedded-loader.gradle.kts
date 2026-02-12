@@ -14,7 +14,7 @@ package essential
 import gg.essential.gradle.multiversion.Platform
 import java.nio.file.FileSystems
 import java.nio.file.Files
-import kotlin.io.path.nameWithoutExtension
+import java.nio.file.StandardCopyOption
 
 plugins {
     java
@@ -23,10 +23,10 @@ plugins {
 val platform: Platform by extensions
 
 val dependency = when {
-    platform.isFabric -> "gg.essential:loader-fabric:1.2.1"
-    platform.isModLauncher && platform.mcVersion >= 11700 -> "gg.essential:loader-modlauncher9:1.2.1"
-    platform.isModLauncher -> "gg.essential:loader-modlauncher8:1.2.1"
-    platform.isLegacyForge -> "gg.essential:loader-launchwrapper:1.2.1"
+    platform.isFabric -> "gg.essential:loader-fabric"
+    platform.isModLauncher && platform.mcVersion >= 11700 -> "gg.essential:loader-modlauncher9"
+    platform.isModLauncher -> "gg.essential:loader-modlauncher8"
+    platform.isLegacyForge -> "gg.essential:loader-launchwrapper"
     else -> throw UnsupportedOperationException("No known loader variant for current platform.")
 }
 
@@ -61,41 +61,36 @@ tasks.jar {
 }
 
 /**
- * Takes the stage1 jar from the input stage0 jar and copies it to a different location in the output jar.
+ * Extracts the stage1 jar from the given input stage0 jar.
  * We do this so we don't need to do any double-unpacking at runtime when we upgrade the installed stage1 version, and
  * because the raw loader stored above will actually be stripped when the Essential jar is installed via stage2 (because
  * the regular upgrade path would break with relaunching; we instead need to use the `stage1.update.jar` path).
  */
-abstract class Stage1JarTransform : TransformAction<TransformParameters.None> {
-    @get:InputArtifact
-    abstract val input: Provider<FileSystemLocation>
+abstract class ExtractStage1JarTask : DefaultTask() {
+    @get:InputFile
+    abstract val stage0: RegularFileProperty
+    @get:OutputFile
+    abstract val stage1: RegularFileProperty
 
-    override fun transform(outputs: TransformOutputs) {
-        val input = input.get().asFile.toPath()
-        val output = outputs.file(input.nameWithoutExtension + "-stage1-only.jar").toPath()
+    @TaskAction
+    fun extract() {
+        val input = stage0.get().asFile.toPath()
+        val output = stage1.get().asFile.toPath()
         FileSystems.newFileSystem(input, null as ClassLoader?).use { sourceFs ->
             val source = sourceFs.getPath("gg/essential/loader/stage0/stage1.jar")
-            FileSystems.newFileSystem(output, mapOf("create" to true)).use { targetFs ->
-                val target = targetFs.getPath("gg/essential/loader-stage1.jar")
-                Files.createDirectories(target.parent)
-                Files.copy(source, target)
-            }
+            Files.createDirectories(output.parent)
+            Files.copy(source, output, StandardCopyOption.REPLACE_EXISTING)
         }
     }
 }
 
-dependencies {
-    val attr = Attribute.of("stage1Jar", Boolean::class.javaObjectType)
-    dependencies.registerTransform(Stage1JarTransform::class.java) {
-        from.attribute(attr, false)
-        to.attribute(attr, true)
+val extractStage1Jar by tasks.registering(ExtractStage1JarTask::class) {
+    stage0.fileProvider(loader.elements.map { it.single().asFile })
+    stage1.set(layout.buildDirectory.file("loader-stage1.jar"))
+}
+
+tasks.named<Jar>("bundleJar") {
+    from(extractStage1Jar.flatMap { it.stage1 }) {
+        into("gg/essential/")
     }
-    dependencies.artifactTypes.all {
-        attributes.attribute(attr, false)
-    }
-    // Note: May need to pre-bundle this if we ever want to have the real thing on the classpath too; each dependency
-    //       can only be present once per configuration.
-    implementation("bundle"(dependency) {
-        attributes { attribute(attr, true) }
-    })
 }

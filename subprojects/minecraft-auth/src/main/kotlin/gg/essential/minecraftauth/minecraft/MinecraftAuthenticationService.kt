@@ -20,6 +20,8 @@ import gg.essential.minecraftauth.minecraft.response.MinecraftTokenResponse
 import gg.essential.minecraftauth.util.JSON
 import gg.essential.minecraftauth.util.JSON_MEDIA_TYPE
 import gg.essential.minecraftauth.util.execute
+import gg.essential.util.har.requestBodyContainsSecrets
+import gg.essential.util.har.responseBodyContainsSecrets
 import kotlinx.serialization.encodeToString
 import okhttp3.Request
 import okhttp3.RequestBody
@@ -44,6 +46,8 @@ object MinecraftAuthenticationService {
         val request = MinecraftAuthenticationRequest("XBL3.0 x=$userHash;$token")
         val (status, content) = Request.Builder().url(AUTHENTICATION_URI)
             .header("Accept", "application/json")
+            .requestBodyContainsSecrets()
+            .responseBodyContainsSecrets()
             .post(RequestBody.create(JSON_MEDIA_TYPE, JSON.encodeToString(request)))
             .build().execute()
 

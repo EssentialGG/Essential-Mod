@@ -14,9 +14,11 @@ package gg.essential.gui.modals
 import gg.essential.Essential
 import gg.essential.gui.overlay.ModalFlow
 import gg.essential.data.OnboardingData
+import gg.essential.network.connectionmanager.features.Feature
 import gg.essential.network.connectionmanager.suspension.suspensionModal
 import gg.essential.universal.UMinecraft
 import gg.essential.util.AutoUpdate
+import gg.essential.util.GuiEssentialPlatform.Companion.platform
 
 object McModalPrerequisites : ModalPrerequisites() {
 
@@ -76,6 +78,24 @@ object McModalPrerequisites : ModalPrerequisites() {
             if (suspension.isPermanent) {
                 suspensionModal(suspension)
                 return PrerequisiteResult.FAILURE
+            }
+        }
+        return PrerequisiteResult.PASS
+    }
+
+    override suspend fun ModalFlow.doFeatureDisabledModal(features: List<Feature>): PrerequisiteResult {
+        for (feature in features) {
+            if (platform.disabledFeaturesManager.isFeatureDisabled(feature)) {
+                awaitModal<Nothing> {
+                    when (feature) {
+                        Feature.WARDROBE -> FeatureDisabledModal.wardrobe(modalManager)
+                        Feature.SOCIAL -> FeatureDisabledModal.social(modalManager)
+                        Feature.MEDIA -> FeatureDisabledModal.media(modalManager)
+                        Feature.COSMETIC_PURCHASE,
+                        Feature.COIN_BUNDLE_PURCHASE -> FeatureDisabledModal.store(modalManager)
+                        Feature.WORLD_HOSTING -> FeatureDisabledModal.worldHosting(modalManager)
+                    }
+                }
             }
         }
         return PrerequisiteResult.PASS

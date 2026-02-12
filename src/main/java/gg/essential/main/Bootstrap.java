@@ -13,7 +13,6 @@ package gg.essential.main;
 
 import gg.essential.mixins.MixinErrorHandler;
 import gg.essential.mixins.IntegrationTestsPlugin;
-import gg.essential.util.MixinUtils;
 import org.apache.logging.log4j.LogManager;
 import org.spongepowered.asm.launch.MixinBootstrap;
 import org.spongepowered.asm.mixin.Mixins;
@@ -25,12 +24,7 @@ import java.net.URL;
 import java.security.CodeSource;
 
 //#if MC<11400
-import net.minecraft.launchwrapper.IClassTransformer;
 import net.minecraft.launchwrapper.Launch;
-import net.minecraft.launchwrapper.LaunchClassLoader;
-import java.lang.reflect.Field;
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 //#endif
 
 public class Bootstrap {
@@ -41,14 +35,6 @@ public class Bootstrap {
     public static void initialize() {
         MixinBootstrap.init();
 
-        // Smooth Font's transformer fails silently if called more than once
-        MixinUtils.addTransformerExclusion("bre.smoothfont.asm.Transformer");
-        MixinUtils.addTransformerExclusion("com.therandomlabs.randompatches.core.RPTransformer");
-        MixinUtils.addTransformerExclusion("lakmoore.sel.common.Transformer");
-        MixinUtils.addTransformerExclusion("openmods.core.OpenModsClassTransformer");
-        MixinUtils.addTransformerExclusion("net.creeperhost.launchertray.transformer.MinecraftTransformer");
-        MixinUtils.addTransformerExclusion("vazkii.quark.base.asm.ClassTransformer");
-
         Mixins.addConfiguration("mixins.essential.json");
         Mixins.addConfiguration("mixins.essential.init.json");
         //#if MC>11400
@@ -57,12 +43,7 @@ public class Bootstrap {
 
         Mixins.registerErrorHandlerClass(MixinErrorHandler.class.getName());
 
-
         //#if MC<11400
-        workaroundThreadUnsafeTransformerList();
-        gg.essential.asm.compat.betterfps.BetterFpsTransformerWrapper.initialize();
-        net.minecraft.launchwrapper.Launch.classLoader.registerTransformer(gg.essential.asm.compat.PhosphorTransformer.class.getName());
-
         CodeSource codeSource = Bootstrap.class.getProtectionDomain().getCodeSource();
         if (codeSource != null) {
             URL location = codeSource.getLocation();
@@ -98,32 +79,4 @@ public class Bootstrap {
             Mixins.addConfiguration("mixins.essential.tests.json");
         }
     }
-
-    //#if MC<11400
-    // Registering a transformer is not a thread safe operation.
-    // Usually this isn't an issue because all transformers are registered early during boot where there is only one
-    // thread.
-    // Forge however also registers a transformer way later when loading its mods, and at that point other threads may
-    // already be active, so thread safety becomes a concern and classes may randomly fail to load due to
-    // `ConcurrentModificationException`s.
-    // This method patches the issue by replacing the transformers list with a copy-on-write one.
-    @SuppressWarnings("unchecked")
-    private static void workaroundThreadUnsafeTransformerList() {
-        try {
-            LaunchClassLoader classLoader = Launch.classLoader;
-            Field field = LaunchClassLoader.class.getDeclaredField("transformers");
-            field.setAccessible(true);
-            List<IClassTransformer> value = (List<IClassTransformer>) field.get(classLoader);
-            if (value instanceof CopyOnWriteArrayList) {
-                LogManager.getLogger().debug("LaunchClassLoader.transformers appears to already be copy-on-write");
-                return;
-            }
-            LogManager.getLogger().debug("Replacing LaunchClassLoader.transformers list with a copy-on-write list");
-            field.set(classLoader, new CopyOnWriteArrayList<>(value));
-        } catch (Throwable t) {
-            LogManager.getLogger().error(
-                "Failed to replace plain LaunchClassLoader.transformers list with copy-on-write one", t);
-        }
-    }
-    //#endif
 }

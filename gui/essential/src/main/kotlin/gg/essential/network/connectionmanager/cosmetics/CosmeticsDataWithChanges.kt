@@ -20,6 +20,7 @@ import gg.essential.cosmetics.ImplicitOwnership
 import gg.essential.cosmetics.ImplicitOwnershipId
 import gg.essential.gui.elementa.state.v2.*
 import gg.essential.gui.elementa.state.v2.collections.asMap
+import gg.essential.gui.elementa.state.v2.combinators.letState
 import gg.essential.mod.cosmetics.CosmeticBundle
 import gg.essential.mod.cosmetics.CosmeticCategory
 import gg.essential.mod.cosmetics.CosmeticType
@@ -46,7 +47,7 @@ class CosmeticsDataWithChanges(
         (originals + updates).mapNotNull { (_, cosmetic) ->
             val updatedType = cosmetic?.type?.id?.let { updatedTypes[it] }
             if (updatedType != null) {
-                cosmetic.copy(type = updatedType)
+                cosmetic.copy(base = cosmetic.base.copy(type = updatedType))
             } else {
                 cosmetic
             }
@@ -189,5 +190,8 @@ class CosmeticsDataWithChanges(
     override fun getCosmeticBundle(id: CosmeticBundleId): CosmeticBundle? = bundlesMap[id]
     override fun getFeaturedPageCollection(id: FeaturedPageCollectionId): FeaturedPageCollection? = featuredPageCollectionsMap[id]
     override fun getImplicitOwnership(id: ImplicitOwnershipId): ImplicitOwnership? = implicitOwnershipsMap[id]
+
+    override fun cosmetic(id: CosmeticId): State<Cosmetic?> =
+        cosmetics.letState { cosmetics -> cosmetics.find { it.id == id } ?: inner.cosmetic(id)() }
 
 }

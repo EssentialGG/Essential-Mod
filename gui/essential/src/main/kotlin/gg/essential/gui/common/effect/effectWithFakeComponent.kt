@@ -38,6 +38,8 @@ abstract class EffectWithFakeComponent(private val effect: Effect) : Effect() {
         effect.setup()
     }
 
+    @Deprecated("See [ElementaVersion.V8].")
+    @Suppress("DEPRECATION")
     override fun animationFrame() {
         dummyComponent.animationFrame()
     }

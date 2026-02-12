@@ -307,7 +307,7 @@ class MessageWrapperImpl(
             ).onActiveClick { runAction() } effect ShadowEffect(EssentialPalette.BLACK)
 
             val anyLineHovered = stateByV2 { messageLinesHoveredStates().any { it() } }
-            actionButtonHovered.rebind((buttonHovered or messageHitboxPadding.hoveredState()).toV2())
+            actionButtonHovered.set((buttonHovered or messageHitboxPadding.hoveredState()).toV2())
             actionButton.bindParent(actionButtonHitbox, buttonHovered or anyLineHovered.toV1(this) or messageHitboxPadding.hoveredState())
         }
     }

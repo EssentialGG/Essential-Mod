@@ -39,6 +39,7 @@ import gg.essential.network.cosmetics.toMod
 import gg.essential.network.cosmetics.toModSetting
 import gg.essential.network.registerPacketHandler
 import gg.essential.util.USession
+import kotlinx.coroutines.launch
 import java.util.*
 
 class InfraEquippedOutfitsManager(
@@ -49,6 +50,7 @@ class InfraEquippedOutfitsManager(
     private val infraCosmeticsData: InfraCosmeticsData,
     private val applyCapeModelPartEnabled: (Boolean) -> Unit,
 ) : EquippedOutfitsManager, NetworkedManager, SubscriptionManager.Listener {
+
     private val refHolder: ReferenceHolder = ReferenceHolderImpl()
     private val infraOutfits: MutableMap<UUID, InfraOutfit> = mutableMapOf()
     private val infraOutfitStates: MutableMap<UUID, MutableState<InfraOutfit>> = MapMaker().weakValues().makeMap()
@@ -156,8 +158,10 @@ class InfraEquippedOutfitsManager(
 
     override fun onSubscriptionAdded(uuids: Set<UUID>) {
         for (uuid in uuids) {
-            connectionManager.call(ClientCosmeticOutfitSelectedRequestPacket(uuid))
-                .fireAndForget()
+            connectionManager.connectionScope.launch {
+                connectionManager.call(ClientCosmeticOutfitSelectedRequestPacket(uuid))
+                    .fireAndForget()
+            }
         }
     }
 

@@ -47,10 +47,10 @@ import gg.essential.gui.overlay.launchModalFlow
 import gg.essential.gui.wardrobe.Item
 import gg.essential.gui.wardrobe.ItemId
 import gg.essential.gui.wardrobe.WardrobeState
+import gg.essential.gui.modals.FeatureDisabledModal
 import gg.essential.gui.wardrobe.giftCosmeticOrEmote
 import gg.essential.gui.wardrobe.modals.CoinsPurchaseModal
 import gg.essential.gui.wardrobe.modals.PurchaseConfirmationModal
-import gg.essential.gui.wardrobe.modals.StoreDisabledModal
 import gg.essential.network.connectionmanager.coins.CoinsManager
 import gg.essential.network.connectionmanager.features.Feature
 import gg.essential.network.cosmetics.Cosmetic
@@ -74,7 +74,7 @@ private val LOGGER = LoggerFactory.getLogger("Essential Logger")
 
 fun openGiftModal(item: Item.CosmeticOrEmote, state: WardrobeState) {
     if (platform.disabledFeaturesManager.isFeatureDisabled(Feature.COSMETIC_PURCHASE)) {
-        platform.pushModal { StoreDisabledModal(it) }
+        platform.pushModal { FeatureDisabledModal.store(it) }
         return
     }
 
@@ -109,7 +109,7 @@ fun openGiftModal(item: Item.CosmeticOrEmote, state: WardrobeState) {
     }
 
     launchModalFlow(platform.createModalManager()) {
-        ensurePrerequisites(social = true)
+        ensurePrerequisites(Feature.SOCIAL)
 
         val selectedUsers = selectFriendsToGiftModal(item, state, allFriends, validFriends, loadingFriends)
             ?: return@launchModalFlow
@@ -134,12 +134,10 @@ private fun showErrorToast(message: String) {
     Notifications.push("Gifting failed", message) { type = NotificationType.ERROR }
 }
 
-private suspend fun ModalFlow.giftItemToFriends(item: Item.CosmeticOrEmote, uuids: Set<UUID>, state: WardrobeState) {
+private suspend fun giftItemToFriends(item: Item.CosmeticOrEmote, uuids: Set<UUID>, state: WardrobeState) {
     val cost = (item.getCost(state).getUntracked() ?: 0) * uuids.size
     if (cost > state.coins.getUntracked()) {
-        awaitModal<Unit> {
-            CoinsPurchaseModal.create(modalManager, state, cost)
-        }
+        CoinsPurchaseModal.open(state, cost)
         return
     }
 

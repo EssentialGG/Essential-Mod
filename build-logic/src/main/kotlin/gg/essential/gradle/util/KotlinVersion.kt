@@ -21,9 +21,9 @@ data class KotlinVersion(
     val serialization: String,
 ) {
     companion object {
-        val latest = KotlinVersion(null, "1.9.23", "1.8.0", "1.6.3")
+        val latest = KotlinVersion(null, "2.3.0", "1.10.2", "1.9.0")
 
-        val fabricLanguageKotlin = latest.copy(mod = "1.10.19")
+        val fabricLanguageKotlin = latest.copy(mod = "1.13.8")
         val kotlinForForge1 = latest.copy(mod = "1.17.0")
         val kotlinForForge2 = latest.copy(mod = "2.2.0")
         val kotlinForForge3 = latest.copy(mod = "3.6.0")

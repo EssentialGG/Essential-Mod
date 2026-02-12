@@ -12,10 +12,13 @@
 package gg.essential.network.mojang
 
 import gg.essential.mod.Model
+import gg.essential.util.ExponentialBackoff
+import gg.essential.util.RateLimitException
 import gg.essential.util.UuidAsDashlessStringSerializer
 import gg.essential.util.executeAwait
 import gg.essential.util.httpClient
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
@@ -31,23 +34,46 @@ import okhttp3.MultipartBody
 import okhttp3.Request
 import okhttp3.RequestBody
 import java.util.UUID
+import kotlin.coroutines.CoroutineContext
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Provides a Kotlin interface to Mojang's "/minecraft/profile" API.
  *
  * All methods are completely unmanaged (no locking) and direct (no local caching or anything).
  * All methods are fully thread-safe.
+ * Optionally ([retryOnRateLimit]), all methods may re-try with exponential backoff when rate-limited (though note that
+ * each call does this independently!).
  *
  * You'll likely want to use the [ManagedMojangProfileApi] wrapper instead.
  */
-class MojangProfileApi(val accessToken: String) {
+class MojangProfileApi(
+    val accessToken: String,
+    val retryOnRateLimit: Boolean = false,
+) {
     private val JSON = MediaType.parse("application/json")
     private val URL_BASE = System.getProperty(
         "minecraft.api.services.host",
         "https://api.minecraftservices.com",
     ) + "/minecraft/profile"
 
-    suspend fun fetch(): Profile = withContext(Dispatchers.IO) {
+    private suspend fun <T> call(
+        context: CoroutineContext,
+        block: suspend () -> T,
+    ): T {
+        val backoff = ExponentialBackoff(2.seconds, 60.seconds, 2.0)
+        backoff.increment() // skip the initial 0 delay, Mojang doesn't emit 429 randomly
+        while (true) {
+            try {
+                return withContext(context) { block() }
+            } catch (e: RateLimitException) {
+                if (!retryOnRateLimit) throw e
+                delay(backoff.increment())
+            }
+        }
+    }
+
+    suspend fun fetch(): Profile = call(Dispatchers.IO) {
         val request = Request.Builder().apply {
             url(URL_BASE)
             header("Authorization", "Bearer $accessToken")
@@ -58,7 +84,7 @@ class MojangProfileApi(val accessToken: String) {
         }
     }
 
-    suspend fun putSkin(skin: gg.essential.mod.Skin?): Profile = withContext(Dispatchers.IO) {
+    suspend fun putSkin(skin: gg.essential.mod.Skin?): Profile = call(Dispatchers.IO) {
         val request = Request.Builder().apply {
             url("$URL_BASE/skins")
             header("Authorization", "Bearer $accessToken")
@@ -78,7 +104,7 @@ class MojangProfileApi(val accessToken: String) {
         }
     }
 
-    suspend fun putSkin(png: ByteArray, model: Model): Profile = withContext(Dispatchers.IO) {
+    suspend fun putSkin(png: ByteArray, model: Model): Profile = call(Dispatchers.IO) {
         val request = Request.Builder().apply {
             url("$URL_BASE/skins")
             header("Authorization", "Bearer $accessToken")
@@ -95,7 +121,7 @@ class MojangProfileApi(val accessToken: String) {
         }
     }
 
-    suspend fun putCape(id: String?): Profile = withContext(Dispatchers.IO) {
+    suspend fun putCape(id: String?): Profile = call(Dispatchers.IO) {
         val request = Request.Builder().apply {
             url("$URL_BASE/capes/active")
             header("Authorization", "Bearer $accessToken")

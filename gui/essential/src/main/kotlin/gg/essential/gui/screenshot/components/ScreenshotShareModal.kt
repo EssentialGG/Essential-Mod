@@ -20,6 +20,7 @@ import gg.essential.gui.screenshot.LocalScreenshot
 import gg.essential.gui.screenshot.RemoteScreenshot
 import gg.essential.gui.screenshot.ScreenshotId
 import gg.essential.handlers.screenshot.ClientScreenshotMetadata
+import gg.essential.network.connectionmanager.features.Feature
 import gg.essential.util.GuiEssentialPlatform.Companion.platform
 import kotlinx.coroutines.future.await
 
@@ -27,7 +28,7 @@ suspend fun ModalFlow.shareScreenshotModal(
     screenshot: ScreenshotId,
     metadata: ClientScreenshotMetadata? = null,
 ) {
-    ensurePrerequisites(social = true)
+    ensurePrerequisites(listOf(Feature.SOCIAL, Feature.MEDIA) )
 
     val selectedChannels = selectScreenshotShareTargetsModal()?.toList() ?: return
     val screenshotManager = platform.screenshotManager

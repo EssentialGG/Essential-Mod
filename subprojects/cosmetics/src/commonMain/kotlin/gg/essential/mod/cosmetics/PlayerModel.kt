@@ -16,6 +16,8 @@ import gg.essential.model.file.AnimationFile
 import gg.essential.model.file.ModelFile
 import gg.essential.model.util.now
 import gg.essential.network.cosmetics.Cosmetic
+import gg.essential.network.cosmetics.CosmeticBase
+import gg.essential.network.cosmetics.CosmeticStoreInfo
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
@@ -25,22 +27,26 @@ object PlayerModel {
 
     private val cosmetic =
         Cosmetic(
-            "PLAYER",
-            cosmeticType,
-            CosmeticTier.COMMON,
-            emptyMap(),
-            emptyMap(),
-            emptyList(),
-            -1,
-            emptyMap(),
-            emptySet(),
-            now(),
-            null,
-            null,
-            null,
-            emptyMap(),
-            emptyMap(),
-            0,
+            CosmeticBase(
+                "PLAYER",
+                cosmeticType,
+                CosmeticTier.COMMON,
+                emptyMap(),
+                emptyMap(),
+                emptyList(),
+            ),
+            CosmeticStoreInfo(
+                -1,
+                emptyMap(),
+                emptySet(),
+                now(),
+                null,
+                null,
+                null,
+                emptyMap(),
+                emptyMap(),
+                0,
+            ),
         )
 
     private val steveModelJson =

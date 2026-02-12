@@ -13,10 +13,10 @@ package gg.essential.util
 
 import gg.essential.Essential
 import gg.essential.config.EssentialConfig
+import gg.essential.data.Changelog
 import gg.essential.data.MenuData
 import gg.essential.data.VersionData
 import gg.essential.elementa.components.Window
-import gg.essential.gui.about.components.ChangelogComponent
 import gg.essential.gui.elementa.state.v2.mutableStateOf
 import gg.essential.gui.modals.updateAvailableModal
 import gg.essential.gui.modals.updateRequiredModal
@@ -118,7 +118,7 @@ object AutoUpdate {
             changelogFuture = CompletableFuture.supplyAsync {
                 val encodedVersion = URLEncoder.encode(version, StandardCharsets.UTF_8.toString()).replace("+", "%20").replace("#", "%23")
                 val versionResponse = httpGetToStringBlocking("${MenuData.BASE_URL}/mods/v1/essential:loader-stage2/versions/$encodedVersion/changelog")
-                val changelog = Gson().fromJson(versionResponse, ChangelogComponent.Changelog::class.java)
+                val changelog = Gson().fromJson(versionResponse, Changelog::class.java)
                 changelog.summary
             }
         }

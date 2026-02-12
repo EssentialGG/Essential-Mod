@@ -44,7 +44,7 @@ class ManagedMojangProfileApi private constructor(val uuid: UUID) {
             ?.also { latestAccessToken = it }
             ?: latestAccessToken
             ?: "<unknown>"
-        return MojangProfileApi(accessToken)
+        return MojangProfileApi(accessToken, retryOnRateLimit = true)
     }
 
     /** Invalidates the cached profile, such that it will be re-fetched fresh from Mojang when next needed. */

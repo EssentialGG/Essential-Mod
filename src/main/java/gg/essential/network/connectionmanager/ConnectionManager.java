@@ -24,6 +24,8 @@ import gg.essential.gui.elementa.state.v2.State;
 import gg.essential.gui.wardrobe.Wardrobe;
 import gg.essential.handlers.MojangSkinManager;
 import gg.essential.mod.Skin;
+import gg.essential.network.GatewayService;
+import gg.essential.network.GatewayServicesManager;
 import gg.essential.network.client.MinecraftHook;
 import gg.essential.network.connectionmanager.chat.ChatManager;
 import gg.essential.network.connectionmanager.coins.CoinsManager;
@@ -69,7 +71,6 @@ import gg.essential.util.Multithreading;
 import gg.essential.util.USession;
 import gg.essential.util.lwjgl3.Lwjgl3Loader;
 import kotlin.Unit;
-import kotlin.collections.MapsKt;
 import kotlin.jvm.functions.Function0;
 import kotlin.jvm.functions.Function1;
 import kotlinx.coroutines.JobKt;
@@ -83,7 +84,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import static gg.essential.gui.elementa.state.v2.StateKt.effect;
-import static gg.essential.gui.elementa.state.v2.combinators.StateKt.map;
 import static kotlinx.coroutines.ExceptionsKt.CancellationException;
 
 public class ConnectionManager extends ConnectionManagerKt {
@@ -96,6 +96,8 @@ public class ConnectionManager extends ConnectionManagerKt {
     private final MinecraftHook minecraftHook;
     @NotNull
     private final List<NetworkedManager> managers = new ArrayList<>();
+    @NotNull
+    private final GatewayServicesManager gatewayServicesManager = new GatewayServicesManager(this);
     @NotNull
     private final NoticesManager noticesManager;
     @NotNull
@@ -252,7 +254,7 @@ public class ConnectionManager extends ConnectionManagerKt {
             this.cosmeticsManager.getCosmeticsData(),
             this.cosmeticsManager.getUnlockedCosmetics(),
             this.cosmeticsManager.getInfraEquippedOutfitsManager(),
-            map(this.skinsManager.getSkins(), map -> MapsKt.mapValues(map, it -> it.getValue().getSkin()))
+            this.skinsManager
         );
         this.managers.add(this.outfitManager);
         effect(refHolder, observer -> {
@@ -289,6 +291,11 @@ public class ConnectionManager extends ConnectionManagerKt {
     @NotNull
     public MinecraftHook getMinecraftHook() {
         return this.minecraftHook;
+    }
+
+    @Override
+    public @NotNull GatewayService getGatewayService(@NotNull String id) {
+        return gatewayServicesManager.getService(id);
     }
 
     @NotNull

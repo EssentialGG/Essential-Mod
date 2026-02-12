@@ -84,8 +84,16 @@ open class EssentialGUI(
     @get:ApiStatus.Internal
     protected val outlineThickness = 3f
 
+    protected open fun getTitleBackgroundColor(): Color = Color(0x232323)
+    protected open fun getTitleEdgesColor(): Color = Color(0x303030)
+    protected open fun getBackgroundColor(): Color = Color(0x181818)
+    protected open fun getContentEdgesColor(): Color = Color(0x232323)
+    protected open fun getButtonColor(): Color = Color(0x323232)
+    protected open fun getButtonHighlightColor(): Color = Color(0x474747)
+    protected open fun getTextColor(): Color = Color(0xBFBFBF)
+    protected open fun getTextHighlightColor(): Color = Color(0xE5E5E5)
 
-    private val background by UIBlock(BACKGROUND).constrain {
+    private val background by UIBlock(getBackgroundColor()).constrain {
         width = 100.percent
         height = 100.percent
     } childOf window
@@ -104,14 +112,14 @@ open class EssentialGUI(
         height = 75.percent
     } childOf window
 
-    private val leftDivider by UIBlock(DARK_GRAY).constrain {
+    private val leftDivider by UIBlock(getContentEdgesColor()).constrain {
         x = SiblingConstraint(alignOpposite = true)
         y = componentYConstraint(container)
         width = outlineThickness.pixels
         height = componentHeightConstraint(container)
     } childOf window
 
-    val rightDivider by UIBlock(DARK_GRAY).constrain {
+    val rightDivider by UIBlock(getContentEdgesColor()).constrain {
         x = SiblingConstraint() boundTo container
         y = componentYConstraint(container)
         width = outlineThickness.pixels
@@ -119,7 +127,7 @@ open class EssentialGUI(
     } childOf window
 
     @get:ApiStatus.Internal
-    val bottomDivider by UIBlock(DARK_GRAY).constrain {
+    val bottomDivider by UIBlock(getContentEdgesColor()).constrain {
         x = componentXConstraint(leftDivider)
         y = SiblingConstraint()
         width =
@@ -128,7 +136,7 @@ open class EssentialGUI(
     } childOf window
 
 
-    val titleBar by UIBlock(DARK_GRAY).constrain {
+    val titleBar by UIBlock(getTitleBackgroundColor()).constrain {
         width = 100.percent
         height = 30.pixels
     } childOf container
@@ -136,7 +144,7 @@ open class EssentialGUI(
     val titleText by UIWrappedText(guiTitle).constrain {
         x = 10.pixels
         y = 11.pixels
-        color = TEXT_HIGHLIGHT.toConstraint()
+        color = getTextHighlightColor().toConstraint()
     } childOf titleBar
 
     val content by UIContainer().constrain {
@@ -157,14 +165,14 @@ open class EssentialGUI(
 
     init {
         // Notches in titlebar
-        UIBlock(COMPONENT_HIGHLIGHT).constrain {
+        UIBlock(getTitleEdgesColor()).constrain {
             x = 0.pixels(alignOutside = true) boundTo titleBar
             y = 0.pixels boundTo titleBar
             height = 100.percent boundTo titleBar
             width = outlineThickness.pixels
         } childOf window
 
-        UIBlock(COMPONENT_HIGHLIGHT).constrain {
+        UIBlock(getTitleEdgesColor()).constrain {
             x = 0.pixels(alignOpposite = true, alignOutside = true) boundTo titleBar
             y = 0.pixels boundTo titleBar
             height = 100.percent boundTo titleBar
@@ -184,14 +192,5 @@ open class EssentialGUI(
 
     fun setTitle(newTitle: String) {
         titleText.setText(newTitle)
-    }
-    private companion object EssentialGuiPalette {
-        private val BACKGROUND = Color(0x181818)
-        private val DARK_GRAY: Color = Color(0x232323)
-        private val BUTTON = Color(0x323232)
-        private val BUTTON_HIGHLIGHT = Color(0x474747)
-        private var TEXT = Color(0xBFBFBF)
-        private var TEXT_HIGHLIGHT = Color(0xE5E5E5)
-        private val COMPONENT_HIGHLIGHT = Color(0x303030)
     }
 }

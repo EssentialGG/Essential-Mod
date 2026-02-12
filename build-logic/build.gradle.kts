@@ -26,7 +26,7 @@ dependencies {
     implementation(gradleApi())
     implementation(localGroovy())
 
-    val kotlinCompilerVersion = "1.9.24"
+    val kotlinCompilerVersion = "2.3.0"
 
     implementation("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinCompilerVersion")
     implementation("org.jetbrains.kotlin:kotlin-serialization:$kotlinCompilerVersion")
@@ -37,8 +37,8 @@ dependencies {
     implementation("org.ow2.asm:asm-commons:9.3")
     implementation ("com.google.guava:guava:30.1.1-jre")
 
-    implementation("gg.essential:essential-gradle-toolkit:0.6.10")
-    implementation("gg.essential.loom:gg.essential.loom.gradle.plugin:1.7.35") // TODO remove once EGT has updated
+    implementation("gg.essential:essential-gradle-toolkit:0.7.0-alpha.2")
+    // FIXME remove the forced remap version in `root.gradle.kts` once EGT updates its remap
 }
 
 gradlePlugin {

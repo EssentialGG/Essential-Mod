@@ -2,3 +2,4 @@ com.mojang.authlib.properties.Property com.mojang.authlib.properties.Property
 com.mojang.authlib.properties.Property name() getName()Ljava/lang/String;
 com.mojang.authlib.properties.Property value() getValue()Ljava/lang/String;
 com.mojang.authlib.properties.Property signature() getSignature()Ljava/lang/String;
+net.minecraft.network.listener.ClientQueryPacketListener onPingResult() onPong()

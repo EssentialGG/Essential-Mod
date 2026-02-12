@@ -304,7 +304,7 @@ object IconCosmeticRenderer {
                 //$$ alwaysOnTop
                 //#endif
             ).run {
-                drawIcon(matrixStack, this, SIZE, centreX, centreY, 0f, SNEAKING_COLOR, light)
+                drawIcon(matrixStack, this, SIZE, SIZE, centreX, centreY, 0f, SNEAKING_COLOR, light)
 
                 //#if MC<11600
                 buffer.drawDirect()
@@ -322,7 +322,7 @@ object IconCosmeticRenderer {
 
             if (alwaysOnTop) {
                 val vertexConsumer = TextRenderTypeVertexConsumer.createWithTexture(buffer, texture)
-                drawIcon(matrixStack, vertexConsumer, SIZE, centreX, centreY, 0f, WHITE,
+                drawIcon(matrixStack, vertexConsumer, SIZE, SIZE, centreX, centreY, 0f, WHITE,
                     //#if MC>=12102
                     //$$ light.withMinimumLight(2) // same behaviour as the non-sneaking nameplate text in 1.21.2+
                     //#else
@@ -358,6 +358,18 @@ object IconCosmeticRenderer {
         size: Float,
         shadow: Boolean
     ) {
+        drawTextureInTabList(drawContext, x, y, texture, size, size, shadow)
+    }
+
+    fun drawTextureInTabList(
+        drawContext: UDrawContext,
+        x: Float,
+        y: Float,
+        texture: ResourceLocation,
+        width: Float,
+        height: Float,
+        shadow: Boolean
+    ) {
         OnlineIndicator.beforeTabDraw()
 
         //#if MC<12105
@@ -379,9 +391,9 @@ object IconCosmeticRenderer {
         //#endif
 
         if (shadow) {
-            drawIcon(drawContext, texture, size, x + 1, y + 1, 5f, TAB_SHADOW_COLOR)
+            drawIcon(drawContext, texture, width, height, x + 1, y + 1, 5f, TAB_SHADOW_COLOR)
         }
-        drawIcon(drawContext, texture, size, x, y, 10f, WHITE)
+        drawIcon(drawContext, texture, width, height, x, y, 10f, WHITE)
 
         //#if MC<12105
         @Suppress("DEPRECATION")
@@ -398,7 +410,8 @@ object IconCosmeticRenderer {
     private fun drawIcon(
         drawContext: UDrawContext,
         texture: ResourceLocation,
-        size: Float,
+        width: Float,
+        height: Float,
         centreX: Float,
         centreY: Float,
         zOffset: Float,
@@ -413,11 +426,11 @@ object IconCosmeticRenderer {
         //$$ drawContext.mc.drawTexture(
         //$$     RenderPipelines.GUI_TEXTURED,
         //$$     texture,
-        //$$     /* x */ ((centreX - size / 2) * scale).roundToInt(),
-        //$$     /* y */ ((centreY - size / 2) * scale).roundToInt(),
+        //$$     /* x */ ((centreX - width / 2) * scale).roundToInt(),
+        //$$     /* y */ ((centreY - height / 2) * scale).roundToInt(),
         //$$     /* u */ 0f, /* v */ 0f,
-        //$$     /* width */ (size * scale).roundToInt(),
-        //$$     /* height */ (size * scale).roundToInt(),
+        //$$     /* width */ (width * scale).roundToInt(),
+        //$$     /* height */ (height * scale).roundToInt(),
         //$$     /* uWidth */ 1, /* vHeight */ 1,
         //$$     /* textureWidth */ 1, /* textureHeight */ 1,
         //$$     color.toInt(),
@@ -435,7 +448,7 @@ object IconCosmeticRenderer {
         //#endif
         val vertexConsumer = TextRenderTypeVertexConsumer.createWithTexture(buffer, texture)
 
-        drawIcon(drawContext.matrixStack, vertexConsumer, size, centreX, centreY, zOffset, color, Light.MAX_VALUE)
+        drawIcon(drawContext.matrixStack, vertexConsumer, width, height, centreX, centreY, zOffset, color, Light.MAX_VALUE)
 
         //#if MC>=12102
         //$$ }
@@ -450,15 +463,16 @@ object IconCosmeticRenderer {
     private fun drawIcon(
         matrixStack: UMatrixStack,
         vertexConsumer: TextRenderTypeVertexConsumer,
-        size: Float,
+        width: Float,
+        height: Float,
         centreX: Float,
         centreY: Float,
         zOffset: Float,
         color: UInt,
         light: Light
     ) {
-        val left = centreX - size / 2
-        val top = centreY - size / 2
+        val left = centreX - width / 2
+        val top = centreY - height / 2
         val z = zOffset.toDouble()
 
         val alpha = color.toInt() shr 24 and 255
@@ -467,9 +481,9 @@ object IconCosmeticRenderer {
         val blue = color.toInt() and 255
 
         vertexConsumer.pos(matrixStack, left.toDouble(), top.toDouble(), z).color(red, green, blue, alpha).tex(0.0, 0.0).light(light).endVertex()
-        vertexConsumer.pos(matrixStack, left.toDouble(), (top + size).toDouble(), z).color(red, green, blue, alpha).tex(0.0, 1.0).light(light).endVertex()
-        vertexConsumer.pos(matrixStack, (left + size).toDouble(), (top + size).toDouble(), z).color(red, green, blue, alpha).tex(1.0, 1.0).light(light).endVertex()
-        vertexConsumer.pos(matrixStack, (left + size).toDouble(), top.toDouble(), z).color(red, green, blue, alpha).tex(1.0, 0.0).light(light).endVertex()
+        vertexConsumer.pos(matrixStack, left.toDouble(), (top + height).toDouble(), z).color(red, green, blue, alpha).tex(0.0, 1.0).light(light).endVertex()
+        vertexConsumer.pos(matrixStack, (left + width).toDouble(), (top + height).toDouble(), z).color(red, green, blue, alpha).tex(1.0, 1.0).light(light).endVertex()
+        vertexConsumer.pos(matrixStack, (left + width).toDouble(), top.toDouble(), z).color(red, green, blue, alpha).tex(1.0, 0.0).light(light).endVertex()
     }
 
 }

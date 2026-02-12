@@ -125,7 +125,7 @@ class TintVanillaButtonsEffectShared {
         }
 
         val NON_WHITE_TINT_PIPELINE: URenderPipeline = URenderPipeline.builderWithLegacyShader(
-            "essential:darken_vanilla/tint",
+            "essential:tint_vanilla/not_white",
             UGraphics.DrawMode.QUADS,
             UGraphics.CommonVertexFormats.POSITION_TEXTURE_COLOR,
             """

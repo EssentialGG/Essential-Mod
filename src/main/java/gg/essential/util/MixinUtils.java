@@ -15,8 +15,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.injection.InjectionPoint;
-import org.spongepowered.asm.service.ITransformerProvider;
-import org.spongepowered.asm.service.MixinService;
 import org.spongepowered.asm.util.VersionNumber;
 
 import java.lang.reflect.Field;
@@ -26,13 +24,6 @@ public class MixinUtils {
     private static final Logger logger = LogManager.getLogger();
     private static final VersionNumber MIXIN_0_8_2 = VersionNumber.parse("0.8.2");
     private static final String ESSENTIAL_NAMESPACE = "ESSENTIAL";
-
-    public static void addTransformerExclusion(String name) {
-        ITransformerProvider transformers = MixinService.getService().getTransformerProvider();
-        if (transformers != null) {
-            transformers.addTransformerExclusion(name);
-        }
-    }
 
     @SuppressWarnings("unchecked")
     public static void registerInjectionPoint(Class<? extends InjectionPoint> clazz) {

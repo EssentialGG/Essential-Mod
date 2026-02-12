@@ -11,15 +11,15 @@
  */
 package gg.essential.gui.elementa.essentialmarkdown
 
-import gg.essential.elementa.impl.commonmark.ext.gfm.strikethrough.Strikethrough
-import gg.essential.elementa.impl.commonmark.ext.gfm.strikethrough.StrikethroughExtension
-import gg.essential.elementa.impl.commonmark.ext.ins.Ins
-import gg.essential.elementa.impl.commonmark.ext.ins.InsExtension
-import gg.essential.elementa.impl.commonmark.node.*
-import gg.essential.elementa.impl.commonmark.parser.Parser
 import gg.essential.gui.elementa.essentialmarkdown.ext.colorattribute.ColorAttribute
 import gg.essential.gui.elementa.essentialmarkdown.ext.colorattribute.ColorAttributeExtension
 import gg.essential.gui.elementa.essentialmarkdown.drawables.*
+import org.commonmark.ext.gfm.strikethrough.Strikethrough
+import org.commonmark.ext.gfm.strikethrough.StrikethroughExtension
+import org.commonmark.ext.ins.Ins
+import org.commonmark.ext.ins.InsExtension
+import org.commonmark.node.*
+import org.commonmark.parser.Parser
 import java.awt.Color
 import java.net.MalformedURLException
 import java.net.URL

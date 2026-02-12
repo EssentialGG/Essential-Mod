@@ -15,16 +15,17 @@ import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import gg.essential.Essential
 import gg.essential.config.LoadsResources
+import gg.essential.gui.account.MicrosoftUserAuthentication
 import gg.essential.gui.account.factory.MicrosoftAccountSessionFactory
 import gg.essential.gui.menu.AccountManager
 import gg.essential.gui.notification.Notifications
 import gg.essential.gui.notification.error
+import gg.essential.minecraftauth.microsoft.MicrosoftAuthenticationService
 import gg.essential.universal.UDesktop
 import gg.essential.util.Multithreading
 import java.lang.ref.WeakReference
 import java.net.InetSocketAddress
 import java.net.URI
-import java.util.concurrent.CompletableFuture
 import java.util.regex.Pattern
 
 /**
@@ -37,15 +38,20 @@ object WebAccountManager {
 
     private var domain = "https://essential.gg"
     private val microsoftOauthParamPattern = Pattern.compile("code=(?<code>.+)")
-    private var oauthUriFuture: CompletableFuture<URI>? = null
 
-    var microsoftRedirectUri = "https://essential.gg"
-        private set
-    var authorizationCodeFuture: CompletableFuture<String>? = null
-        private set
+    private class PendingOAuthData(
+        val codeVerifier: String,
+        val redirectUri: String,
+    ) {
+        fun complete(code: String) = MicrosoftUserAuthentication.OAuthData(
+            codeVerifier,
+            redirectUri,
+            code,
+        )
+    }
+    private var pendingOAuthData: PendingOAuthData? = null
+
     var mostRecentAccountManager: WeakReference<AccountManager?> = WeakReference(null)
-
-    private var loginErrorFuture: CompletableFuture<String> = CompletableFuture()
 
     /**
      * Opens the browser to the landing page of the account system
@@ -56,7 +62,6 @@ object WebAccountManager {
             startServer()
             running = true
         }
-        authorizationCodeFuture = CompletableFuture<String>()
         UDesktop.browse(URI("http://localhost:$port"))
     }
 
@@ -97,7 +102,6 @@ object WebAccountManager {
     @LoadsResources("/assets/essential/account/.+")
     private fun startServer() {
         val server = HttpServer.create(InetSocketAddress("localhost", 0), 0)
-        authorizationCodeFuture = CompletableFuture<String>()
 
         registerAssets(server)
         registerPages(server)
@@ -110,8 +114,6 @@ object WebAccountManager {
 
         port = server.address.port
         domain = "http://localhost:$port"
-
-        microsoftRedirectUri = "$domain/microsoft/complete"
     }
 
     /**
@@ -120,16 +122,17 @@ object WebAccountManager {
     private fun registerMicrosoftAccountListener(server: HttpServer) {
 
         // Redirect the user to start the oauth process
-        // The location is dependent on the future we receive from
-        // the MicrosoftUserAuthentication handler
         server.createContext("/microsoft/auth") {
-            val future = oauthUriFuture
-            if (future == null) {
-                println("Future not initialized")
-                send(it, "/assets/essential/account/error.html", mapOf("error" to "Internal error please check logs"))
-                return@createContext
-            }
-            it.responseHeaders.add("Location", future.join().toString())
+            val codeVerifier = MicrosoftAuthenticationService.generateVerifierToken()
+            val redirectUri = "$domain/microsoft/complete"
+            val oAuthData = PendingOAuthData(
+                codeVerifier,
+                redirectUri,
+            )
+            this.pendingOAuthData = oAuthData
+
+            val authUri = MicrosoftAuthenticationService.generateAuthorizationURI(oAuthData.codeVerifier, oAuthData.redirectUri)
+            it.responseHeaders.add("Location", authUri.toString())
             it.sendResponseHeaders(302, 0)
             it.responseBody.close()
         }
@@ -137,73 +140,62 @@ object WebAccountManager {
 
         // Users are redirected here after signing in to their account on live.com
         server.createContext("/microsoft/complete") { exchange ->
+            val oAuthData = pendingOAuthData
+            if (oAuthData == null) {
+                println("oAuthData == null. Perhaps the user had an extra account frame open?")
+                send(
+                    exchange,
+                    "/assets/essential/account/error.html",
+                    mapOf("error" to "Error during login. Please close browser and try again.")
+                )
+                return@createContext
+            }
 
-            // Extract the code and complete the future with it
+            // Forcefully unset so that MicrosoftUserAuthentication does not try to use it again
+            pendingOAuthData = null
+
+            // Extract the code
+            var code: String? = null
             val query = exchange.requestURI.query
             if (query != null) {
                 val matcher = microsoftOauthParamPattern.matcher(query)
                 if (matcher.find()) {
-                    authorizationCodeFuture?.complete(matcher.group("code")).also {
-                        // Forcefully unset so that MicrosoftUserAuthentication does not try to use it again
-                        authorizationCodeFuture = null
-                    } ?: run {
-                        println("authorizationCodeFuture == null. Perhaps the user had an extra account frame open?")
-                        send(
-                            exchange,
-                            "/assets/essential/account/error.html",
-                            mapOf("error" to "Error during login. Please close browser and try again.")
-                        )
-                        return@createContext
-                    }
+                    code = matcher.group("code")
                 }
             }
-
-            // Wait for the account handler to finish logging in and see if any error occurred
-            val error = loginErrorFuture.join()
-            if (error != null) {
-                send(exchange, "/assets/essential/account/error.html", mapOf("error" to error))
-            } else {
-                exchange.responseHeaders.add("Location", "/login/success")
-                exchange.sendResponseHeaders(302, 0)
-                exchange.responseBody.close()
+            if (code == null) {
+                send(
+                    exchange,
+                    "/assets/essential/account/error.html",
+                    mapOf("error" to "Failed to find `code` parameter. Please close browser and try again."),
+                )
+                return@createContext
             }
-
-
-        }
-
-        // Serve the Microsoft login page and begin the login process
-        server.createContext("/login/microsoft") { exchange ->
-
-            // Create a new future to allow retries with a fresh URI
-            val oauthUriFuture = CompletableFuture<URI>().also {
-                this.oauthUriFuture = it
-            }
-            // Create a new future to handle the any new error we may experience
-            val loginErrorFuture = CompletableFuture<String>().also {
-                this.loginErrorFuture = it
-            }
-            authorizationCodeFuture = CompletableFuture()
 
             val factory = getMicrosoftSessionFactory()
 
-            // Begin the login process on another thread supplying our URI future for
-            // the factory to populate
-            Multithreading.runAsync {
-                // Login and report error if present
-                try {
-                    factory.login(oauthUriFuture).uuid.let {
-                        mostRecentAccountManager.get()?.login(it)
-                    }
-                    loginErrorFuture.complete(null)
-                } catch (e: Exception) {
-                    loginErrorFuture.complete(e.message)
-                    mostRecentAccountManager.get()?.let {
-                        Notifications.error("Account Error", "Something went wrong\nduring login.")
-                    }
-                    e.printStackTrace()
+            try {
+                factory.login(oAuthData.complete(code)).uuid.let {
+                    mostRecentAccountManager.get()?.login(it)
                 }
+            } catch (e: Exception) {
+                mostRecentAccountManager.get()?.let {
+                    Notifications.error("Account Error", "Something went wrong\nduring login.")
+                }
+                e.printStackTrace()
+
+                val error = e.message ?: "Internal error"
+                send(exchange, "/assets/essential/account/error.html", mapOf("error" to error))
+                return@createContext
             }
 
+            exchange.responseHeaders.add("Location", "/login/success")
+            exchange.sendResponseHeaders(302, 0)
+            exchange.responseBody.close()
+        }
+
+        // Serve our login page
+        server.createContext("/login/microsoft") { exchange ->
             send(
                 exchange,
                 "/assets/essential/account/login/microsoft.html",

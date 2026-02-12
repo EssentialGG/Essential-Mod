@@ -45,6 +45,17 @@ class TintVanillaButtonsEffect {
         Resources.drainCleanupQueue()
     }
 
+    /**
+     * To be run before the content to be tinted has been drawn.
+     * Has a different format in 1.21.6+
+     */
+    fun beforeDraw(context: UDrawContext, x1: Int, y1: Int, x2: Int, y2: Int) {
+        val areaToBeTinted = AreaToBeTinted(x1, y1, x2, y2)
+        if (areaToBeTinted.invalid) return
+
+        beforeDraw(context.matrixStack, areaToBeTinted)
+    }
+
     private fun beforeDraw(matrixStack: UMatrixStack, area: AreaToBeTinted) {
         if (resources.background.width != area.width || resources.background.height != area.height) {
             resources.background.resize(area.width, area.height)
@@ -68,6 +79,17 @@ class TintVanillaButtonsEffect {
                 Color(0, 0, 0, 255), area.x1.toDouble(), area.y1.toDouble(), area.x2.toDouble(), area.y2.toDouble(),
             )
         }.build()?.drawAndClose(CLEAR_PIPELINE)
+    }
+
+    /**
+     * To be run after the content to be tinted has been drawn.
+     * Has a different format in 1.21.6+
+     */
+    fun afterDraw(context: UDrawContext, x1: Int, y1: Int, x2: Int, y2: Int, color: Color) {
+        val areaToBeTinted = AreaToBeTinted(x1, y1, x2, y2)
+        if (areaToBeTinted.invalid) return
+
+        afterDraw(context.matrixStack, areaToBeTinted, color)
     }
 
     private fun afterDraw(matrixStack: UMatrixStack, area: AreaToBeTinted, color: Color) {
@@ -109,6 +131,10 @@ class TintVanillaButtonsEffect {
         }
     }
 
+    /**
+     * Simple method to wrap beforeDraw + afterDraw around a drawing operation.
+     * Has an identical function in the 1.21.6+ override
+     */
     fun drawTinted(context: UDrawContext, x1: Int, y1: Int, x2: Int, y2: Int, color: Color, draw: (UDrawContext) -> Unit) {
         val areaToBeTinted = AreaToBeTinted(x1, y1, x2, y2)
         if (areaToBeTinted.invalid) return

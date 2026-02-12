@@ -21,6 +21,8 @@ import gg.essential.config.EssentialConfig.discordRichPresenceState
 import gg.essential.config.EssentialConfig.essentialEnabledState
 import gg.essential.config.EssentialConfig.friendRequestPrivacyState
 import gg.essential.config.EssentialConfig.ownCosmeticsVisibleStateWithSource
+import gg.essential.config.EssentialConfig.chatFilterWithSource
+import gg.essential.connectionmanager.common.packet.chat.ChatUnfilteredContentSettingPacket
 import gg.essential.connectionmanager.common.packet.cosmetic.ClientCosmeticsUserEquippedVisibilityTogglePacket
 import gg.essential.connectionmanager.common.packet.relationships.privacy.FriendRequestPrivacySettingPacket
 import gg.essential.connectionmanager.common.packet.response.ResponseActionPacket
@@ -144,6 +146,33 @@ object McEssentialConfig {
                 if (!successful) {
                     restoreCollectOptionalTelemetryFromSystemSource()
                     Notifications.error("Error", "Failed to toggle Collect Optional Telemetry. Please try again.")
+                }
+            }
+        }
+
+        var lastToggleableChatFilterFromSystemSource = true
+
+        fun restoreToggleableChatFilterFromSystemSource() {
+            chatFilterWithSource.set(lastToggleableChatFilterFromSystemSource to false)
+        }
+
+        chatFilterWithSource.onChange(referenceHolder) { (chatFiltered, updateInfra) ->
+            if (!updateInfra) {
+                lastToggleableChatFilterFromSystemSource = chatFiltered
+                return@onChange
+            }
+            val connectionManager = Essential.getInstance().connectionManager
+            if (!connectionManager.isAuthenticated) {
+                displayNotConnectedInformation()
+                restoreToggleableChatFilterFromSystemSource()
+                return@onChange
+            }
+            val packet = ChatUnfilteredContentSettingPacket(!chatFiltered)
+            connectionManager.connectionScope.launch {
+                val successful = connectionManager.call(packet).awaitResponseActionPacket()
+                if (!successful) {
+                    restoreToggleableChatFilterFromSystemSource()
+                    Notifications.error("Error", "Failed to toggle Chat Filter. Please try again.")
                 }
             }
         }

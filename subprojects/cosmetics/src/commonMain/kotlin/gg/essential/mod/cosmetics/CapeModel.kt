@@ -16,6 +16,8 @@ import gg.essential.model.backend.RenderBackend
 import gg.essential.model.file.ModelFile
 import gg.essential.model.util.now
 import gg.essential.network.cosmetics.Cosmetic
+import gg.essential.network.cosmetics.CosmeticBase
+import gg.essential.network.cosmetics.CosmeticStoreInfo
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
@@ -79,22 +81,26 @@ object CapeModel {
     private val type = CosmeticType("CAPE", CosmeticSlot.CAPE, emptyMap(), emptyMap())
     private val cosmetic =
         Cosmetic(
-            "CAPE",
-            type,
-            CosmeticTier.COMMON,
-            emptyMap(),
-            emptyMap(),
-            emptyList(),
-            -1,
-            emptyMap(),
-            emptySet(),
-            now(),
-            null,
-            null,
-            null,
-            emptyMap(),
-            emptyMap(),
-            0,
+            CosmeticBase (
+                "CAPE",
+                type,
+                CosmeticTier.COMMON,
+                emptyMap(),
+                emptyMap(),
+                emptyList(),
+            ),
+            CosmeticStoreInfo(
+                -1,
+                emptyMap(),
+                emptySet(),
+                now(),
+                null,
+                null,
+                null,
+                emptyMap(),
+                emptyMap(),
+                0,
+            ),
         )
 
     private fun dummyTexture(height: Int) = object : RenderBackend.Texture {

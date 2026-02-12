@@ -13,6 +13,7 @@ package gg.essential.gui.modals
 
 import gg.essential.gui.elementa.state.v2.await
 import gg.essential.gui.overlay.ModalFlow
+import gg.essential.network.connectionmanager.features.Feature
 import gg.essential.util.GuiEssentialPlatform.Companion.platform
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.cancel
@@ -34,13 +35,17 @@ abstract class ModalPrerequisites {
 
     abstract suspend fun ModalFlow.doPermanentSuspensionModal(): PrerequisiteResult
 
+    abstract suspend fun ModalFlow.doFeatureDisabledModal(features: List<Feature>): PrerequisiteResult
+
     protected fun Boolean.toResult(): PrerequisiteResult = if (this) PrerequisiteResult.SUCCESS else PrerequisiteResult.FAILURE
 }
 
+suspend fun ModalFlow.ensurePrerequisites(feature: Feature) = ensurePrerequisites(features = listOf(feature))
 suspend fun ModalFlow.ensurePrerequisites(
-    cosmetics: Boolean = false,
-    social: Boolean = false,
-    rules: Boolean = social
+    // List of features relevant for this flow, e.g. SOCIAL for social screens
+    // These will also be checked against the DisabledFeaturesManager and cancel accordingly
+    features: List<Feature> = emptyList(),
+    rules: Boolean = Feature.SOCIAL in features,
 ) {
     with (platform.modalPrerequisites) {
         val prerequisites = mutableListOf<suspend () -> PrerequisiteResult>()
@@ -51,11 +56,11 @@ suspend fun ModalFlow.ensurePrerequisites(
         prerequisites.add(suspend { doRequiredUpdateModal() })
         prerequisites.add(suspend { doAuthenticationModal() })
 
-        if (cosmetics) {
-            prerequisites.add(suspend { doCosmeticsModal() })
+        if (features.isNotEmpty()) {
+            prerequisites.add(suspend { doFeatureDisabledModal(features) })
         }
 
-        if (social) {
+        if (Feature.SOCIAL in features) {
             prerequisites.add(suspend { doSocialSuspensionModal() })
         }
 
@@ -63,10 +68,14 @@ suspend fun ModalFlow.ensurePrerequisites(
             prerequisites.add(suspend { doCommunityRulesModal() })
         }
 
+        if (Feature.WARDROBE in features) {
+            prerequisites.add(suspend { doCosmeticsModal() })
+        }
+
         ensurePrerequisitesInternal(prerequisites)
 
         modalManager.coroutineScope.launch {
-            platform.suspensionManager.activeSuspension.await { it != null && (social || it.isPermanent) }
+            platform.suspensionManager.activeSuspension.await { it != null && (Feature.SOCIAL in features || it.isPermanent) }
             modalManager.coroutineScope.cancel()
         }
     }

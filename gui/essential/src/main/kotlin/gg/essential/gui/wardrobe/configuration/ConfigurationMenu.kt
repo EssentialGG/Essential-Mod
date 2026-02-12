@@ -135,6 +135,9 @@ class ConfigurationMenu(
                         }
                     }.onLeftClick { expanded.set { !it } }
                     if_(expanded) {
+                        if (grouping.description != null) {
+                            wrappedText(grouping.description, Modifier.fillWidth())
+                        }
                         for (item in grouping.items) {
                             itemButton(item)
                         }
@@ -150,6 +153,6 @@ class ConfigurationMenu(
 
     data class Single<T>(val item: T) : Grouping<T>
 
-    data class Multi<T>(val name: String, val items: List<T>) : Grouping<T>
+    data class Multi<T>(val name: String, val description: String? = null, val items: List<T>) : Grouping<T>
 
 }

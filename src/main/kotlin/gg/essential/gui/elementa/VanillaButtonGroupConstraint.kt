@@ -18,7 +18,7 @@ import gg.essential.elementa.constraints.PositionConstraint
 import gg.essential.elementa.constraints.SizeConstraint
 import gg.essential.elementa.constraints.resolution.ConstraintVisitor
 import gg.essential.elementa.dsl.constrain
-import gg.essential.gui.util.onAnimationFrame
+import gg.essential.elementa.effects.Effect
 import net.minecraft.client.gui.GuiButton
 
 /**
@@ -77,13 +77,17 @@ class VanillaButtonGroupConstraint(val buttons: List<() -> GuiButton?>, private 
                 val fallbackConstraint = UIConstraints(this@constrainTo)
                 fallbackConstraint.fallback()
 
-                onAnimationFrame {
-                    fallbackConstraint.x.animationFrame()
-                    fallbackConstraint.y.animationFrame()
-                    fallbackConstraint.width.animationFrame()
-                    fallbackConstraint.height.animationFrame()
-                    fallbackConstraint.radius.animationFrame()
-                }
+                enableEffect(object : Effect() {
+                    @Deprecated("See [ElementaVersion.V8].")
+                    @Suppress("DEPRECATION")
+                    override fun animationFrame() {
+                        fallbackConstraint.x.animationFrame()
+                        fallbackConstraint.y.animationFrame()
+                        fallbackConstraint.width.animationFrame()
+                        fallbackConstraint.height.animationFrame()
+                        fallbackConstraint.radius.animationFrame()
+                    }
+                })
 
                 x = VanillaButtonGroupConstraint(buttons, fallbackConstraint)
                 y = VanillaButtonGroupConstraint(buttons, fallbackConstraint)

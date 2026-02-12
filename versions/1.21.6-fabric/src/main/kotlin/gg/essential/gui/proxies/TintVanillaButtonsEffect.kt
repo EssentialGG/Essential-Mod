@@ -43,12 +43,20 @@ import gg.essential.gui.proxies.TintVanillaButtonsEffectShared.Companion.average
  */
 class TintVanillaButtonsEffect {
 
+    /**
+     * Simple method to wrap beforeDraw + afterDraw around a drawing operation.
+     * Has an identical function in < 1.21.6
+     */
     fun drawTinted(context: UDrawContext, x1: Int, y1: Int, x2: Int, y2: Int, color: Color, draw: (UDrawContext) -> Unit) {
         val areaToBeTinted = AreaToBeTinted(x1, y1, x2, y2)
         if (areaToBeTinted.invalid) return
 
-        Page.drawToPage(context, areaToBeTinted, color, draw)
+        val result = Page.drawToPage(context, areaToBeTinted, color) ?: return
+        // Draw the content that needs to be tinted
+        draw(result.first)
+        result.second.run()
     }
+
     /**
      * Represents a page of vanilla button draws to be tinted later.
      * Each page collects all the draws in non overlapping spaces of the context's screen space, and then later draws
@@ -137,14 +145,13 @@ class TintVanillaButtonsEffect {
          *
          * Then enqueues the page's texture to the vanilla context so it is rendered in the correct order by the vanilla gui rendering that happens later.
          */
-        fun drawVanillaToPage(vanillaContext: UDrawContext, vanillaDrawArea: AreaToBeTinted, color: Color, draw: (UDrawContext) -> Unit) {
+        fun drawVanillaToPage(vanillaContext: UDrawContext, vanillaDrawArea: AreaToBeTinted, color: Color): Pair<UDrawContext, Runnable>? {
             val placedRect = tryPlaceRect(vanillaDrawArea.width, vanillaDrawArea.height, color)
             if (placedRect == null) {
                 // no space, try next page
                 val next = nextPage ?: Page(pageWidth, pageHeight).also { nextPage = it }
 
-                next.drawVanillaToPage(vanillaContext, vanillaDrawArea, color, draw)
-                return
+                return next.drawVanillaToPage(vanillaContext, vanillaDrawArea, color)
             }
             // we have space in this page so draw this to our context
 
@@ -160,37 +167,43 @@ class TintVanillaButtonsEffect {
                 (placedMC.x - vanillaDrawArea.xMC).toFloat(),
                 (placedMC.y - vanillaDrawArea.yMC).toFloat()
             )
-            // draw to our context
-            draw(drawContext.let { UDrawContext(it, UMatrixStack(it.matrices)) })
-            drawContext.disableScissor()
-            drawContext.matrices.popMatrix()
 
-            // now enqueue the draw to the vanilla context
+            return drawContext.let {
+                UDrawContext(it, UMatrixStack(it.matrices))
+            } to Runnable {
+                drawContext.disableScissor()
+                drawContext.matrices.popMatrix()
 
-            // pass in the textureView to the drawTexture() call via a temporary texture registration
-            val textureManager = MinecraftClient.getInstance().textureManager
-            val identifier = Identifier.of("essential", "__tmp_texture__tint_vanilla_buttons_effect")
-            textureManager.registerTexture(identifier, object : AbstractTexture() {
-                init { glTextureView = this@Page.texture.textureView }
-                override fun close() {} // we don't want the later `destroyTexture` to close our texture
-            })
+                // now enqueue the draw to the vanilla context
 
-            // draw the texture to the vanilla context, which won't actually read the referenced texture until later
-            vanillaContext.mc.drawTexture(
-                RenderPipelines.GUI_TEXTURED_PREMULTIPLIED_ALPHA,
-                identifier,
-                // x, y
-                vanillaDrawArea.xMC.toInt(), vanillaDrawArea.yMC.toInt(),
-                // u, v
-                placedRect.x.toFloat(), -placedRect.y.toFloat(),
-                // width, height
-                vanillaDrawArea.widthMC.toInt(), vanillaDrawArea.heightMC.toInt(),
-                // uWidth, vHeight
-                placedRect.width, -placedRect.height,
-                // textureWidth, textureHeight
-                pageWidth, pageHeight
-            )
-            textureManager.destroyTexture(identifier)
+                // pass in the textureView to the drawTexture() call via a temporary texture registration
+                val textureManager = MinecraftClient.getInstance().textureManager
+                val identifier = Identifier.of("essential", "__tmp_texture__tint_vanilla_buttons_effect")
+                textureManager.registerTexture(identifier, object : AbstractTexture() {
+                    init {
+                        glTextureView = this@Page.texture.textureView
+                    }
+
+                    override fun close() {} // we don't want the later `destroyTexture` to close our texture
+                })
+
+                // draw the texture to the vanilla context, which won't actually read the referenced texture until later
+                vanillaContext.mc.drawTexture(
+                    RenderPipelines.GUI_TEXTURED_PREMULTIPLIED_ALPHA,
+                    identifier,
+                    // x, y
+                    vanillaDrawArea.xMC.toInt(), vanillaDrawArea.yMC.toInt(),
+                    // u, v
+                    placedRect.x.toFloat(), -placedRect.y.toFloat(),
+                    // width, height
+                    vanillaDrawArea.widthMC.toInt(), vanillaDrawArea.heightMC.toInt(),
+                    // uWidth, vHeight
+                    placedRect.width, -placedRect.height,
+                    // textureWidth, textureHeight
+                    pageWidth, pageHeight
+                )
+                textureManager.destroyTexture(identifier)
+            }
         }
 
         /**
@@ -273,9 +286,9 @@ class TintVanillaButtonsEffect {
                 rootPage = null
             }
 
-            fun drawToPage(vanillaContext: UDrawContext, area: AreaToBeTinted, color: Color, draw: (UDrawContext) -> Unit) {
+            fun drawToPage(vanillaContext: UDrawContext, area: AreaToBeTinted, color: Color): Pair<UDrawContext, Runnable>? {
                 val page = rootPage ?: Page().also { rootPage = it }
-                page.drawVanillaToPage(vanillaContext, area, color, draw)
+                return page.drawVanillaToPage(vanillaContext, area, color)
             }
         }
     }

@@ -22,10 +22,11 @@ plugins {
 kotlin {
     // Common dependencies
     dependencies {
-        implementation("org.jetbrains.kotlin:kotlin-stdlib:1.5.30")
-        implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.5.0")
-        implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.3.2")
-        implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")
+        val kotlinVersion = KotlinVersion.minimal
+        implementation("org.jetbrains.kotlin:kotlin-stdlib:${kotlinVersion.stdlib}")
+        implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${kotlinVersion.coroutines}")
+        implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:${kotlinVersion.serialization}")
+        implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:${kotlinVersion.serialization}")
         implementation(project(":feature-flags"))
         api(project(":utils"))
     }

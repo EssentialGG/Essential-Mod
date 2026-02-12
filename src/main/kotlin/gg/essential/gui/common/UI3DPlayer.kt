@@ -61,6 +61,7 @@ import gg.essential.model.backend.RenderBackend
 import gg.essential.model.backend.minecraft.MinecraftRenderBackend
 import gg.essential.model.bones.BakedAnimations
 import gg.essential.model.collision.PlaneCollisionProvider
+import gg.essential.model.light.Light
 import gg.essential.model.light.LightProvider
 import gg.essential.model.molang.MolangQueryEntity
 import gg.essential.model.util.PlayerPoseManager
@@ -109,7 +110,6 @@ import java.util.*
 //#if MC>=12106
 //$$ import com.mojang.blaze3d.buffers.GpuBuffer
 //$$ import com.mojang.blaze3d.buffers.Std140Builder
-//$$ import gg.essential.model.light.Light
 //$$ import org.lwjgl.system.MemoryStack
 //#endif
 
@@ -761,7 +761,7 @@ open class UI3DPlayer(
     private fun doDrawFallbackPlayer() {
         //#if MC>=11400
         //$$ val immediate = Minecraft.getInstance().renderTypeBuffers.bufferSource
-        //$$ val vertexConsumerProvider = MinecraftRenderBackend.VertexConsumerProvider(immediate, 0xf000f0)
+        //$$ val vertexConsumerProvider = MinecraftRenderBackend.VertexConsumerProvider(immediate, Light.MAX_VALUE.value.toInt())
         //#else
         val vertexConsumerProvider = MinecraftRenderBackend.VertexConsumerProvider()
         UGraphics.enableDepth()
@@ -826,6 +826,7 @@ open class UI3DPlayer(
             false,
             false,
             player.takeUnless { errored }?.uniqueID, // try to only render this player's particles
+            Light.MAX_VALUE,
         )
 
         //#if MC>=12104
@@ -835,6 +836,8 @@ open class UI3DPlayer(
         UGraphics.disableDepth()
     }
 
+    // Older versions of MC do not always have a proper lightmap texture bound.
+    // To always have one bound, we simply bind an all-white (we don't really care about any value other than `Light.MAX_VALUE`) texture ourselves.
     private fun bindWhiteLightMapTexture() {
         //#if MC>=12111
         //$$ // RenderLayer now always binds the lightmap texture of its configured RenderSetup

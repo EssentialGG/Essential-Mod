@@ -35,6 +35,7 @@ class MarkdownContentWidthConstraint : WidthConstraint {
         // the tree, their update and draw will never be called, so we need to call it for them before we
         // can read its effective width.
         // Surplus calls should be harmless.
+        @Suppress("DEPRECATION") // invalidate constraints in case the window is still pre ElementaVersion.V8
         markdown.animationFrame()
         markdown.update()
 

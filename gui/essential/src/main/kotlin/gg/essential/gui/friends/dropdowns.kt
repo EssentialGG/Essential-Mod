@@ -243,10 +243,10 @@ private fun showGroupDropdown(
         ) {
             // We don't want to show anyone currently in the group here
             val potentialFriends = socialMenuState.relationships.getObservableFriendList()
-                    .toStateV2List()
-                    .mapList { list ->
-                        list.filter { !channel.members.contains(it) && !socialMenuState.isSuspended(it)() }
-                    }
+                .toStateV2List()
+                .mapList { list ->
+                    list.filter { !channel.members.contains(it) && !socialMenuState.isSuspended(it)() }
+                }
 
 
             platform.pushModal { manager ->

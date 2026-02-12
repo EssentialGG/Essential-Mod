@@ -47,24 +47,25 @@ class SkinsManager(private val connectionManager: CMConnection) : NetworkedManag
     private val packetQueue = SequentialPacketQueue.Builder(connectionManager).onTimeoutSkip().create()
 
     // Actual data
-    private val mutableSkins = mutableStateOf<Map<SkinId, SkinItem>>(mapOf())
+    private val mutableSkins = mutableStateOf<Map<SkinId, SkinItem>?>(null)
 
     // Derived data
-    val skins: State<Map<SkinId, SkinItem>> = mutableSkins
-    val skinsOrdered = mutableSkins.map { skins ->
+    val loaded = mutableSkins.letState { it != null }
+    val skins: State<Map<SkinId, SkinItem>> = mutableSkins.letState { it ?: mapOf() }
+    val skinsOrdered = skins.map { skins ->
         skins.values.sortedWith(
             compareBy<SkinItem> { it.favoritedSince?.toEpochMilli() }
                 .thenByDescending { (it.lastUsedAt ?: it.createdAt).toEpochMilli() }
         )
     }.toListState()
 
-    private val skinsOrderedByLastUsed = mutableSkins.map { skins ->
+    private val skinsOrderedByLastUsed = skins.map { skins ->
         skins.values.sortedByDescending { (it.lastUsedAt ?: it.createdAt).toEpochMilli()  }
     }.toListState()
 
     init {
         connectionManager.registerPacketHandler<ServerSkinPopulatePacket> { packet ->
-            mutableSkins.set { map -> map + packet.skins.associate { it.id to it.toMod() } }
+            mutableSkins.set { map -> (map ?: mapOf()) + packet.skins.associate { it.id to it.toMod() } }
         }
     }
 
@@ -75,7 +76,7 @@ class SkinsManager(private val connectionManager: CMConnection) : NetworkedManag
     }
 
     override fun resetState() {
-        mutableSkins.set { mapOf() }
+        mutableSkins.set { null }
     }
 
     fun getSkin(id: SkinId) = skins.map { it[id] }
@@ -87,7 +88,7 @@ class SkinsManager(private val connectionManager: CMConnection) : NetworkedManag
         }
     }
 
-    fun addSkin(name: String, skin: Skin, favorite: Boolean = false): CompletableFuture<SkinItem> {
+    fun addSkin(name: String, skin: Skin, favorite: Boolean = false, mojangSync: Boolean = false): CompletableFuture<SkinItem> {
         return connectionManager.connectionScope.async {
             val request = ClientSkinCreatePacket(name, skin.model.toInfra(), skin.hash, favorite)
             val response = connectionManager.call(request)
@@ -114,7 +115,7 @@ class SkinsManager(private val connectionManager: CMConnection) : NetworkedManag
         connectionManager.connectionScope.launch {
             val success = connectionManager.call(ClientSkinDeletePacket(skinId)).awaitResponseActionPacket()
             if (success) {
-                mutableSkins.set { it - skinId }
+                mutableSkins.set { it!! - skinId }
             } else {
                 Notifications.push("Error deleting skin", "An unexpected error has occurred. Try again.")
             }

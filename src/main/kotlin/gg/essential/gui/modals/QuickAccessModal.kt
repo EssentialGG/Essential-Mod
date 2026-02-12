@@ -92,9 +92,8 @@ class QuickAccessModal(modalManager: ModalManager) : Modal(modalManager) {
 
     private fun LayoutScope.layoutBody() {
 
-        // this should match up with the check in PauseMenuDisplay
-        // though perhaps we may apply further limits on this appearing in future
-        val hostable = !UMinecraft.getMinecraft().isSingleplayer
+        // The following variables should match their equivalents in RightSideBarNew
+        val hostable = UScreen.currentScreen.isMainMenu
 
         val isHostingWorld = pollingStateV2 {
             Essential.getInstance().connectionManager.spsManager.localSession != null
@@ -116,7 +115,7 @@ class QuickAccessModal(modalManager: ModalManager) : Modal(modalManager) {
 
         row (Arrangement.spacedBy(6f)) {
 
-            if_({ hostableOrHasInviteButton() && isHostingWorld() }) {
+            if_({ isHostingWorld() }) {
                 MenuButton {
                     openScreenAndCloseModal { WorldShareSettingsGui() }
                 }.setIcon(EssentialPalette.HOST_5X.state())(

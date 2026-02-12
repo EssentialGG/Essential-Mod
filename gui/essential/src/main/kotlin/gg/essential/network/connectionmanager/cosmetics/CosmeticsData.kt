@@ -19,11 +19,15 @@ import gg.essential.cosmetics.FeaturedPageCollectionId
 import gg.essential.cosmetics.ImplicitOwnership
 import gg.essential.cosmetics.ImplicitOwnershipId
 import gg.essential.gui.elementa.state.v2.ListState
+import gg.essential.gui.elementa.state.v2.State
+import gg.essential.gui.elementa.state.v2.combinators.letState
 import gg.essential.mod.cosmetics.CosmeticBundle
 import gg.essential.mod.cosmetics.CosmeticCategory
 import gg.essential.mod.cosmetics.CosmeticType
 import gg.essential.mod.cosmetics.featured.FeaturedPageCollection
 import gg.essential.network.cosmetics.Cosmetic
+import gg.essential.network.cosmetics.CosmeticBase
+import gg.essential.network.cosmetics.CosmeticStoreInfo
 
 interface CosmeticsData {
     val categories: ListState<CosmeticCategory>
@@ -38,5 +42,10 @@ interface CosmeticsData {
     fun getCosmeticBundle(id: CosmeticBundleId): CosmeticBundle? // rename to getBundle() when removing feature flag
     fun getFeaturedPageCollection(id: FeaturedPageCollectionId): FeaturedPageCollection?
     fun getImplicitOwnership(id: ImplicitOwnershipId): ImplicitOwnership?
+    @Deprecated("Deprecated in favor of cosmetic")
     fun getCosmetic(id: CosmeticId): Cosmetic?
+
+    fun cosmetic(id: CosmeticId): State<Cosmetic?>
+    fun cosmeticBase(id: CosmeticId): State<CosmeticBase?> = cosmetic(id).letState { it?.base }
+    fun cosmeticStoreInfo(id: CosmeticId): State<CosmeticStoreInfo?> = cosmetic(id).letState { it?.storeInfo }
 }

@@ -46,16 +46,22 @@ import gg.essential.gui.layoutdsl.scrollable
 import gg.essential.gui.layoutdsl.spacer
 import gg.essential.gui.layoutdsl.text
 import gg.essential.gui.layoutdsl.withHoverState
+import gg.essential.gui.modals.ensurePrerequisites
+import gg.essential.gui.overlay.launchModalFlow
 import gg.essential.gui.screenshot.DateRange
 import gg.essential.gui.screenshot.ScreenshotId
 import gg.essential.gui.screenshot.ScreenshotInfo
 import gg.essential.gui.screenshot.createDateOnlyCalendar
 import gg.essential.gui.screenshot.providers.WindowedProvider
+import gg.essential.gui.util.limitToRangeFast
+import gg.essential.gui.util.walkTopMostNotNull
 import gg.essential.handlers.screenshot.ClientScreenshotMetadata
+import gg.essential.network.connectionmanager.features.Feature
 import gg.essential.network.connectionmanager.media.IScreenshotManager
 import gg.essential.universal.UMatrixStack
 import gg.essential.universal.USound
 import gg.essential.util.*
+import gg.essential.util.GuiEssentialPlatform.Companion.platform
 import gg.essential.vigilance.utils.onLeftClick
 import java.util.*
 
@@ -162,8 +168,16 @@ abstract class ScreenshotListView(
         )
         text.bindShadowColor(selectedTab.map { if (it == tab) EssentialPalette.BLUE_SHADOW else EssentialPalette.COMPONENT_BACKGROUND }.toV1(text))
         text.onLeftClick {
-            USound.playButtonPress()
-            selectedTab.set(tab)
+            if (tab == Tab.UPLOADED) {
+                launchModalFlow(platform.createModalManager()) {
+                    USound.playButtonPress()
+                    ensurePrerequisites(Feature.MEDIA)
+                    selectedTab.set(tab)
+                }
+            } else {
+                USound.playButtonPress()
+                selectedTab.set(tab)
+            }
         }
     }
 
@@ -251,22 +265,10 @@ abstract class ScreenshotListView(
     }
 
     private fun updateVisibleTextures() {
-        val visibleComponents = mutableListOf<ScreenshotPreview>()
-        val topBound = screenshotScissorBox.getTop()
-        val bottomBound = screenshotScissorBox.getBottom()
-        fun findVisibleComponents(component: UIComponent) {
-            if (component is ScreenshotPreview) {
-                visibleComponents.add(component)
-                return
-            }
-            for (child in component.children) {
-                if (child.getTop() > bottomBound || child.getBottom() < topBound) {
-                    continue // not visible
-                }
-                findVisibleComponents(child)
-            }
-        }
-        findVisibleComponents(scroller)
+        val visibleComponents = scroller
+            .walkTopMostNotNull { it as? ScreenshotPreview }
+            .limitToRangeFast(screenshotScissorBox.getTop(), screenshotScissorBox.getBottom())
+            .toList()
 
         var window = WindowedProvider.Window(IntRange(Int.MAX_VALUE, Int.MIN_VALUE), false)
         for (component in visibleComponents) {

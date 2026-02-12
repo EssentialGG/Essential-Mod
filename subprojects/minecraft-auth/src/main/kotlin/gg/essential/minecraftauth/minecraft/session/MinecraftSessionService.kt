@@ -18,6 +18,7 @@ import gg.essential.minecraftauth.minecraft.session.request.JoinServerRequest
 import gg.essential.minecraftauth.util.JSON
 import gg.essential.minecraftauth.util.JSON_MEDIA_TYPE
 import gg.essential.minecraftauth.util.execute
+import gg.essential.util.har.requestBodyContainsSecrets
 import kotlinx.serialization.encodeToString
 import okhttp3.Request
 import okhttp3.RequestBody
@@ -45,6 +46,7 @@ object MinecraftSessionService {
     fun joinServer(accessToken: String, uuid: UUID, serverId: String) {
         val request = JoinServerRequest(accessToken, uuid.toString().replace("-", ""), serverId)
         val (status, content) = Request.Builder().url(JOIN_URI)
+            .requestBodyContainsSecrets()
             .post(RequestBody.create(JSON_MEDIA_TYPE, JSON.encodeToString(request)))
             .build().execute()
 

@@ -15,7 +15,6 @@ package gg.essential.gui.layoutdsl
 import gg.essential.elementa.UIComponent
 import gg.essential.elementa.state.State
 import gg.essential.elementa.state.v2.ReferenceHolder
-import gg.essential.gui.common.ListState
 import gg.essential.gui.common.not
 import gg.essential.gui.elementa.state.v2.*
 import gg.essential.gui.elementa.state.v2.collections.MutableTrackedList
@@ -42,18 +41,25 @@ class LayoutScope(
     private val childrenScopes = mutableListOf<LayoutScope>()
 
     operator fun <T : UIComponent> T.invoke(modifier: Modifier = Modifier, block: LayoutScope.() -> Unit = {}): T {
-        this@LayoutScope.component.getChildModifier().applyToComponent(this)
-        modifier.applyToComponent(this)
+        addChild(this, modifier, block)
+        return this
+    }
 
-        val childScope = LayoutScope(this, this@LayoutScope, this)
+    fun <T : UIComponent> addChild(childComponent: T, modifier: Modifier = Modifier, block: LayoutScope.() -> Unit = {}) {
+        contract {
+            callsInPlace(block, InvocationKind.EXACTLY_ONCE)
+        }
+
+        component.getChildModifier().applyToComponent(childComponent)
+        modifier.applyToComponent(childComponent)
+
+        val childScope = LayoutScope(childComponent, this, childComponent)
         childrenScopes.add(childScope)
 
         childScope.block()
 
         val index = childScope.findNextIndexIn(component) ?: 0
-        component.insertChildAt(this, index)
-
-        return this
+        component.insertChildAt(childComponent, index)
     }
 
     operator fun LayoutDslComponent.invoke(modifier: Modifier = Modifier) = layout(modifier)
@@ -99,18 +105,9 @@ class LayoutScope(
      * required.
      * Order relative to other components within the same [layout] call is kept automatically at all times.
      *
-     * Note that given old scopes are discarded, care must be taken to not inadvertently leak child components, e.g. via
-     * listener subscriptions or other links that cannot be cleaned up automatically.
      * If the space of possible [T] is very limited, [cache] may be set to `true` to retain old scopes after they are
      * removed and to re-use them if their corresponding [T] value is re-introduced at a later time.
      * This requires that [T] be usable as a key in a HashMap.
-     */
-    fun <T> forEach(state: ListState<T>, cache: Boolean = false, block: LayoutScope.(T) -> Unit) {
-        forEach(state.toV2().toListState(), cache, block)
-    }
-
-    /**
-     * StateV2 support for forEach
      */
     fun <T> forEach(list: ListStateV2<T>, cache: Boolean = false, block: LayoutScope.(T) -> Unit) {
         val forEachScope = LayoutScope(component, this@LayoutScope, stateScope)

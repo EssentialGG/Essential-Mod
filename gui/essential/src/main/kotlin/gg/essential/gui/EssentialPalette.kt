@@ -190,6 +190,9 @@ object EssentialPalette {
     @JvmField
     val RED: Color = Color(0xCC2929)
 
+    @JvmField
+    val BACKGROUND_RED = Color(0x290F0F)
+
     @Deprecated("Originally meant for messages, but has since been abused in multiple places.")
     @JvmField
     val MESSAGE_SENT: Color = Color(0x0A82FD)
@@ -551,22 +554,6 @@ object EssentialPalette {
     }
 
     fun getTextColor(hovered: State<Boolean>): State<Color> = getTextColor(hovered, BasicState(true))
-
-    fun getLinkColor(hovered: State<Boolean>, enabled: State<Boolean>): State<Color> {
-        return hovered.zip(enabled).map { (hovered, enabled) ->
-            if (enabled) {
-                if (hovered) {
-                    GREEN
-                } else {
-                    TEXT
-                }
-            } else {
-                TEXT_DISABLED
-            }
-        }
-    }
-
-    fun getLinkColor(hovered: State<Boolean>): State<Color> = getLinkColor(hovered, BasicState(true))
 
     fun getButtonColor(hovered: State<Boolean>, enabled: State<Boolean>): State<Color> {
         return hovered.zip(enabled).map { (hovered, enabled) ->

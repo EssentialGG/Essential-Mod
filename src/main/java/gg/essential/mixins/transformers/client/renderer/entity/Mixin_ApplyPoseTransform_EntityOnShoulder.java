@@ -155,12 +155,7 @@ public abstract class Mixin_ApplyPoseTransform_EntityOnShoulder {
         //$$ float limbSwingAmount,
         //$$ float netHeadYaw,
         //$$ float headPitch,
-        //$$ // FIXME remap bug
-        //#if MC>=11700 && FORGELIKE
-        //$$ net.minecraft.world.entity.EntityType<?> entityType,
-        //#else
         //$$ net.minecraft.entity.EntityType<?> entityType,
-        //#endif
         //$$ org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci
         //#else
         EntityPlayer player,
@@ -206,12 +201,7 @@ public abstract class Mixin_ApplyPoseTransform_EntityOnShoulder {
     //$$     float limbSwingAmount,
     //$$     float netHeadYaw,
     //$$     float headPitch,
-    //$$     // FIXME remap bug
-        //#if MC>=11700 && FORGELIKE
-        //$$ net.minecraft.world.entity.EntityType<?> entityType,
-        //#else
-        //$$ net.minecraft.entity.EntityType<?> entityType,
-        //#endif
+    //$$     net.minecraft.entity.EntityType<?> entityType,
     //$$     org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci
     //$$ ) {
     //$$     if (!(player instanceof AbstractClientPlayerEntity)) return;
@@ -232,12 +222,7 @@ public abstract class Mixin_ApplyPoseTransform_EntityOnShoulder {
     //$$     float limbSwingAmount,
     //$$     float netHeadYaw,
     //$$     float headPitch,
-    //$$     // FIXME remap bug
-        //#if MC>=11700 && FORGELIKE
-        //$$ net.minecraft.world.entity.EntityType<?> entityType,
-        //#else
-        //$$ net.minecraft.entity.EntityType<?> entityType,
-        //#endif
+    //$$     net.minecraft.entity.EntityType<?> entityType,
     //$$     org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci
     //$$ ) {
     //$$     if (!(player instanceof AbstractClientPlayerEntity)) return;

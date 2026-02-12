@@ -15,7 +15,7 @@ import gg.essential.gui.elementa.state.v2.ListState
 import gg.essential.gui.elementa.state.v2.MutableState
 import gg.essential.gui.elementa.state.v2.Observer
 import gg.essential.gui.elementa.state.v2.State
-import gg.essential.gui.elementa.state.v2.combinators.bimap
+import gg.essential.gui.elementa.state.v2.combinators.bimapState
 import gg.essential.gui.elementa.state.v2.memo
 import gg.essential.gui.elementa.state.v2.mutableStateOf
 import gg.essential.gui.elementa.state.v2.stateOf
@@ -130,7 +130,7 @@ class GuiBuilder internal constructor(
             property(state, PropertyType.SELECTOR, configure)
 
         fun <T> selector(state: MutableState<T>, options: List<T>, configure: SelectorPropertyBuilder.() -> Unit) =
-            selector(state.bimap({ options.indexOf(it) }, { options[it] }), configure)
+            selector(state.bimapState({ options.indexOf(it) }, { options[it] }), configure)
 
         @OptIn(ExperimentalStdlibApi::class) // `enumEntries` became stable with 2.0
         @JvmName("selectorEnum")

@@ -18,7 +18,6 @@ import gg.essential.minecraftauth.microsoft.MicrosoftAuthenticationService
 import gg.essential.minecraftauth.microsoft.response.MicrosoftAccessTokenResponse
 import gg.essential.minecraftauth.minecraft.MinecraftAuthenticationService
 import gg.essential.minecraftauth.xbox.XboxLiveAuthenticationService
-import gg.essential.handlers.account.WebAccountManager
 import gg.essential.lib.gson.JsonDeserializationContext
 import gg.essential.lib.gson.JsonDeserializer
 import gg.essential.lib.gson.JsonElement
@@ -28,16 +27,11 @@ import gg.essential.lib.gson.JsonSerializer
 import gg.essential.lib.gson.annotations.JsonAdapter
 import gg.essential.util.UUIDUtil
 import java.lang.reflect.Type
-import java.net.URI
-import java.security.SecureRandom
 import java.time.Duration
 import java.time.Instant
-import java.util.*
-import java.util.concurrent.CompletableFuture
 
 class MicrosoftUserAuthentication {
 
-    private var redirectUri: String? = null
     private var accessToken: Token? = null
 
     @field:JsonAdapter(LegacyTokenSerializer::class)
@@ -49,38 +43,52 @@ class MicrosoftUserAuthentication {
     private var profile: GameProfile? = null
     val expiryTime: Instant?
         get() = refreshToken?.expires
-    var openUri: URI? = null
 
-    fun logIn(future: CompletableFuture<URI>, forceRefresh: Boolean = false): Pair<GameProfile, String> {
+    class OAuthData(
+        val codeVerifier: String,
+        val redirectUri: String,
+        val code: String,
+    )
+
+    fun logInViaOAuth(oAuthData: OAuthData): Pair<GameProfile, String> {
+        // Acquires [accessToken] and [refreshToken] via OAuth
+        acquireAccessTokenViaOAuth(oAuthData)
+        // uses just-acquired [accessToken] to log in
+        return logIn()
+    }
+
+    fun logIn(forceRefresh: Boolean = false): Pair<GameProfile, String> {
         if (forceRefresh) {
             mcToken = null
         }
-        val profile = acquireGameProfile(future)
-        val token = acquireMCToken(future)
+        val profile = acquireGameProfile()
+        val token = acquireMCToken()
         return Pair(profile, token)
     }
 
     fun refreshRefreshToken() {
-        acquireAccessToken(CompletableFuture.completedFuture(null), true)
+        acquireAccessToken(true)
     }
 
-    private fun acquireAccessToken(future: CompletableFuture<URI>, forceRefresh: Boolean): String {
+    private fun acquireAccessToken(forceRefresh: Boolean): String {
         if (!forceRefresh) {
             accessToken.ifValid { return it }
         }
 
-        val refreshToken = this.refreshToken ?: return acquireAccessTokenViaOAuth(future)
+        val refreshToken = this.refreshToken
+            ?: throw InvalidCredentialsException("Re-authentication with Microsoft required")
         val response = MicrosoftAuthenticationService.refreshAccessToken(refreshToken.value)
         saveMicrosoftTokens(response)
 
         return response.accessToken
     }
 
-    private fun acquireAccessTokenViaOAuth(future: CompletableFuture<URI>): String {
-        val codeVerifier = Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(32).also { SecureRandom().nextBytes(it) })
-        val code = acquireAuthorizationCode(codeVerifier, future)
+    private fun acquireAccessTokenViaOAuth(oAuthData: OAuthData): String {
+        val codeVerifier = oAuthData.codeVerifier
+        val redirectUri = oAuthData.redirectUri
+        val code = oAuthData.code
 
-        val response = MicrosoftAuthenticationService.exchangeCodeForAccessToken(code, codeVerifier, redirectUri ?: "")
+        val response = MicrosoftAuthenticationService.exchangeCodeForAccessToken(code, codeVerifier, redirectUri)
         saveMicrosoftTokens(response)
 
         return response.accessToken
@@ -92,32 +100,18 @@ class MicrosoftUserAuthentication {
         this.accessToken = Token(response.accessToken, Instant.now() + Duration.ofSeconds(response.expiresIn))
     }
 
-    private fun acquireAuthorizationCode(codeVerifier: String, future: CompletableFuture<URI>): String {
-        //Get future from account manager instead of ourselves
-
-        redirectUri = WebAccountManager.microsoftRedirectUri
-
-        val uri = MicrosoftAuthenticationService.generateAuthorizationURI(codeVerifier, redirectUri ?: "")
-        if (future.isDone) {
-            throw InvalidCredentialsException("Re-authentication with Microsoft required")
-        }
-        future.complete(uri)
-        openUri = uri
-        return WebAccountManager.authorizationCodeFuture?.join()!!
-    }
-
     // https://wiki.vg/Microsoft_Authentication_Scheme#Authenticate_with_XBL
-    private fun acquireXBLToken(future: CompletableFuture<URI>, retry: Boolean = true): String {
+    private fun acquireXBLToken(retry: Boolean = true): String {
         xblToken.ifValid { return it }
 
-        val accessToken = acquireAccessToken(future, false)
+        val accessToken = acquireAccessToken(false)
 
         val response = try {
             XboxLiveAuthenticationService.authenticateWithXboxLive(accessToken)
         } catch (e: AuthenticationException.InvalidCredentials) {
             if (retry) {
                 this.accessToken = null
-                return this.acquireXBLToken(future, false)
+                return this.acquireXBLToken(false)
             } else {
                 throw e
             }
@@ -129,17 +123,17 @@ class MicrosoftUserAuthentication {
         return response.token
     }
 
-    private fun acquireXSTSToken(future: CompletableFuture<URI>, retry: Boolean = true): Pair<String, String> {
+    private fun acquireXSTSToken(retry: Boolean = true): Pair<String, String> {
         xstsToken.ifValid { return Pair(it, uhs!!) }
 
-        val xblToken = acquireXBLToken(future)
+        val xblToken = acquireXBLToken()
 
         val (response, userHash) = try {
             XboxLiveAuthenticationService.authenticateWithXSTS(xblToken)
         } catch (e: AuthenticationException.InvalidCredentials) {
             if (retry) {
                 this.xblToken = null
-                return this.acquireXSTSToken(future, false)
+                return this.acquireXSTSToken(false)
             } else {
                 throw e
             }
@@ -153,17 +147,17 @@ class MicrosoftUserAuthentication {
         return response.token to userHash
     }
 
-    private fun acquireMCToken(future: CompletableFuture<URI>, retry: Boolean = true): String {
+    private fun acquireMCToken(retry: Boolean = true): String {
         mcToken.ifValid { return it }
 
-        val (xstsToken, uhs) = acquireXSTSToken(future)
+        val (xstsToken, uhs) = acquireXSTSToken()
 
         val response = try {
             MinecraftAuthenticationService.authenticateWithXbox(xstsToken, uhs)
         } catch (e: AuthenticationException.InvalidCredentials) {
             if (retry) {
                 this.xstsToken = null
-                return this.acquireMCToken(future, false)
+                return this.acquireMCToken(false)
             } else {
                 throw e
             }
@@ -180,9 +174,9 @@ class MicrosoftUserAuthentication {
         return token
     }
 
-    private fun acquireGameProfile(future: CompletableFuture<URI>): GameProfile {
+    private fun acquireGameProfile(): GameProfile {
         // We acquire the token before checking the cache so that we regularly refresh the profile.
-        val token = acquireMCToken(future)
+        val token = acquireMCToken()
         profile?.let { return it }
 
         val response = MinecraftAuthenticationService.getProfile(token)

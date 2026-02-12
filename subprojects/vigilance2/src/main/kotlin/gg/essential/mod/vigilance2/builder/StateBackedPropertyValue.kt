@@ -19,7 +19,7 @@ class StateBackedPropertyValue<T>(
     val state: MutableState<T>,
     override val writeDataToFile: Boolean,
 ) : PropertyValue() {
-    override fun getValue(instance: Vigilant): Any? = state.get()
+    override fun getValue(instance: Vigilant): Any? = state.getUntracked()
 
     override fun setValue(value: Any?, instance: Vigilant) {
         @Suppress("UNCHECKED_CAST")
